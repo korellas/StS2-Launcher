@@ -16,6 +16,7 @@ public class LauncherView
     public LogView Log { get; }
 
     private readonly StyledLabel _statusLabel;
+    private readonly StyledLabel _versionLabel;
     private readonly Control _parent;
     private readonly StyledPanel _panel;
     private float _panelBaseY;
@@ -57,6 +58,11 @@ public class LauncherView
 
         var title = new StyledLabel("StS2 Launcher", scale, fontSize: 26);
         left.AddChild(title);
+
+        _versionLabel = new StyledLabel("", scale, fontSize: 11);
+        _versionLabel.AddThemeColorOverride("font_color", new Color(0.55f, 0.55f, 0.6f));
+        left.AddChild(_versionLabel);
+
         left.AddChild(new HSeparator());
 
         _statusLabel = new StyledLabel("Initializing...", scale);
@@ -111,6 +117,8 @@ public class LauncherView
     private readonly float _scale;
 
     public void SetStatus(string text) => _statusLabel.Text = text;
+
+    public void SetVersionStatus(string text) => _versionLabel.Text = text;
 
     public void AppendLog(string msg) => Log.AppendLog(msg);
 
