@@ -77,7 +77,11 @@ public static class ModEntry
             LanMultiplayerPatcher.Apply(_harmony);
             ModLoaderPatches.Apply(_harmony);
             LauncherPatches.Apply(_harmony);
+#if DEBUG
+            // Transpiler-based diagnostic logging: full IL rewrite of LoadProgress.
+            // Skipped in release to keep startup lean.
             SaveDiagnosticPatches.Apply(_harmony);
+#endif
 
             PatchHelper.Log("All game patches applied.");
         }

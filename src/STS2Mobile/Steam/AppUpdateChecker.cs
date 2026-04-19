@@ -9,8 +9,10 @@ namespace STS2Mobile.Steam;
 // latest GitHub release. Returns the download URL if an update is available.
 public static class AppUpdateChecker
 {
+    // Points at this fork's releases so sideloaded builds prompt for updates from
+    // here rather than upstream Ekyso. Change the repo segment if forking further.
     private const string ReleasesUrl =
-        "https://api.github.com/repos/Ekyso/StS2-Launcher/releases/latest";
+        "https://api.github.com/repos/korellas/StS2-Launcher/releases/latest";
 
     public static async Task<AppUpdateResult> CheckAsync()
     {
@@ -79,7 +81,15 @@ public static class AppUpdateChecker
     {
         if (string.IsNullOrEmpty(version))
             return null;
-        return version.TrimStart('v', 'V');
+        version = version.TrimStart('v', 'V').Trim();
+        // Drop semver pre-release / build-metadata suffix so "0.3.3-corner" and
+        // "0.3.3+build42" both normalise to "0.3.3" for comparison. CompareVersions
+        // only handles numeric segments, and string suffixes would otherwise be
+        // silently parsed as 0 and defeat the check.
+        var cut = version.IndexOfAny(new[] { '-', '+', ' ' });
+        if (cut >= 0)
+            version = version.Substring(0, cut);
+        return version;
     }
 
     private static int CompareVersions(string a, string b)

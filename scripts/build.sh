@@ -2,9 +2,18 @@
 set -euo pipefail
 
 NO_BUMP=false
-if [[ "${1:-}" == "--no-bump" ]]; then
-    NO_BUMP=true
-fi
+CONFIG="Release"
+for arg in "$@"; do
+    case "$arg" in
+        --no-bump) NO_BUMP=true ;;
+        --debug)   CONFIG="Debug" ;;
+        *)
+            echo "Unknown flag: $arg" >&2
+            echo "Usage: build.sh [--no-bump] [--debug]" >&2
+            exit 1
+            ;;
+    esac
+done
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PATCHER_DIR="$ROOT/src/STS2Mobile"
@@ -17,11 +26,11 @@ echo "Formatting C# code..."
 ~/.dotnet/tools/csharpier format "$PATCHER_DIR"
 
 # 2. Build patcher
-echo "Building patcher..."
+echo "Building patcher (config=$CONFIG)..."
 cd "$PATCHER_DIR"
-dotnet publish -c Release
+dotnet publish -c "$CONFIG"
 
-PUBLISH_DIR="$PATCHER_DIR/bin/Release/net9.0/publish"
+PUBLISH_DIR="$PATCHER_DIR/bin/$CONFIG/net9.0/publish"
 BCL_DIR="$BUILD_DIR/assets/dotnet_bcl"
 mkdir -p "$BCL_DIR"
 
@@ -32,9 +41,17 @@ cp "$PUBLISH_DIR"/STS2Mobile.dll "$PUBLISH_DIR"/SteamKit2.dll \
 
 cp "$ROOT/upstream/godot-export/.godot/mono/publish/arm64/GodotSharp.dll" "$BCL_DIR/"
 
-CRYPTO_SO="$HOME/.nuget/packages/microsoft.netcore.app.runtime.mono.android-arm64/9.0.7/runtimes/android-arm64/native/libSystem.Security.Cryptography.Native.Android.so"
-if [ -f "$CRYPTO_SO" ]; then
-    cp "$CRYPTO_SO" "$BUILD_DIR/libs/release/arm64-v8a/"
+# Pick the newest installed Mono.android-arm64 runtime pack version (was hardcoded to 9.0.7).
+CRYPTO_PACK_DIR="$HOME/.nuget/packages/microsoft.netcore.app.runtime.mono.android-arm64"
+if [ -d "$CRYPTO_PACK_DIR" ]; then
+    CRYPTO_VER=$(ls -1 "$CRYPTO_PACK_DIR" | sort -V | tail -1)
+    CRYPTO_NATIVE_DIR="$CRYPTO_PACK_DIR/$CRYPTO_VER/runtimes/android-arm64/native"
+    if [ -f "$CRYPTO_NATIVE_DIR/libSystem.Security.Cryptography.Native.Android.so" ]; then
+        cp "$CRYPTO_NATIVE_DIR/libSystem.Security.Cryptography.Native.Android.so" "$BUILD_DIR/libs/release/arm64-v8a/"
+    fi
+    if [ -f "$CRYPTO_NATIVE_DIR/libSystem.Security.Cryptography.Native.Android.jar" ]; then
+        cp "$CRYPTO_NATIVE_DIR/libSystem.Security.Cryptography.Native.Android.jar" "$BUILD_DIR/libs/release/"
+    fi
 fi
 
 echo "Copied patcher + dependencies to android assets"
