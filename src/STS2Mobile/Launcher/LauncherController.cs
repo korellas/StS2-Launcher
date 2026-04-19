@@ -124,6 +124,45 @@ public class LauncherController
 
         var result = _model.StartSession();
         HandleFastPath(result);
+
+        // Lazy, non-blocking APK update check. Runs in the background and only
+        // updates the version label — PLAY/LAUNCH is never gated on this task.
+        _ = AutoCheckAppUpdateAsync();
+    }
+
+    private async Task AutoCheckAppUpdateAsync()
+    {
+        var installed = AppUpdateChecker.GetInstalledVersion();
+        _runOnMainThread(() =>
+            _view.SetVersionStatus(
+                installed != null ? $"v{installed} · checking updates…" : "Launcher"
+            )
+        );
+
+        try
+        {
+            var result = await AppUpdateChecker.CheckAsync();
+            _runOnMainThread(() =>
+            {
+                if (result.HasUpdate)
+                    _view.SetVersionStatus(
+                        $"v{installed ?? "?"} → v{result.LatestVersion} available"
+                    );
+                else if (installed != null)
+                    _view.SetVersionStatus($"v{installed} · up to date");
+                else
+                    _view.SetVersionStatus("Launcher");
+            });
+        }
+        catch (Exception ex)
+        {
+            PatchHelper.Log($"[Launcher] Auto update check failed: {ex.Message}");
+            _runOnMainThread(() =>
+                _view.SetVersionStatus(
+                    installed != null ? $"v{installed} · update check failed" : "Launcher"
+                )
+            );
+        }
     }
 
     private void HandleFastPath(FastPathResult result)
@@ -307,7 +346,7 @@ public class LauncherController
                 {
                     _view.AppendColoredLog(
                         $"Launcher update available: v{result.LatestVersion} — "
-                            + "download at https://github.com/Ekyso/StS2-Launcher/releases/latest",
+                            + "download at https://github.com/korellas/StS2-Launcher/releases/latest",
                         YellowLog
                     );
                     _view.SetStatus(

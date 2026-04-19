@@ -21,6 +21,7 @@ import java.io.OutputStream;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -47,6 +48,11 @@ public class GodotApp extends GodotActivity {
 	private static GodotApp instance;
 	private WifiManager.MulticastLock multicastLock;
 	private String gameDir;
+	// Flipped true once Godot has produced its first frame so the Android splash can
+	// finally dismiss. Without this the system splash disappears as soon as the Activity
+	// view becomes visible, exposing several seconds of black Godot SurfaceView while
+	// Mono + Harmony + game init runs.
+	private final AtomicBoolean godotReady = new AtomicBoolean(false);
 	private static final String TAG = "STS2Mobile";
 	private static final String KEYSTORE_ALIAS = "sts2mobile_credentials";
 	private static final String PCK_FILE = "SlayTheSpire2.pck";
@@ -65,7 +71,8 @@ public class GodotApp extends GodotActivity {
 		instance = this;
 		gameDir = new File(getFilesDir(), "game").getAbsolutePath();
 
-		SplashScreen.installSplashScreen(this);
+		SplashScreen splash = SplashScreen.installSplashScreen(this);
+		splash.setKeepOnScreenCondition(() -> !godotReady.get());
 		EdgeToEdge.enable(this);
 
 		// Must be called before any native FMOD calls.
@@ -272,6 +279,9 @@ public class GodotApp extends GodotActivity {
 	@Override
 	public void onGodotMainLoopStarted() {
 		super.onGodotMainLoopStarted();
+		// Allow the Android system splash to dismiss now that Godot is actually
+		// rendering; before this point the window is a black SurfaceView.
+		godotReady.set(true);
 		runOnUiThread(updateWindowAppearance);
 	}
 
