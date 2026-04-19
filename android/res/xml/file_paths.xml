@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Paths exposed through the FileProvider declared in AndroidManifest.xml.
+  Only the "updates" subdirectory is shared because that's where we drop
+  downloaded APKs before handing them to PackageInstaller. files-path
+  resolves to Context.getFilesDir() (also what Godot's user:// maps to).
+-->
+<paths>
+    <files-path name="updates" path="updates/" />
+</paths>
