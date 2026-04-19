@@ -74,7 +74,7 @@ rm -f "$GRADLE_PROPS.bak"
 
 # Build APK (passes through --debug if given).
 echo "→ Building APK..."
-bash "$ROOT/scripts/build.sh" --no-bump "${BUILD_FLAGS[@]}"
+bash "$ROOT/scripts/build.sh" --no-bump ${BUILD_FLAGS[@]+"${BUILD_FLAGS[@]}"}
 
 APK_PATH="$APK_DIR/StS2Launcher-v$VERSION.apk"
 if [[ ! -f "$APK_PATH" ]]; then
