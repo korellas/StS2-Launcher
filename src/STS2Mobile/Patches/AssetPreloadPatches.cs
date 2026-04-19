@@ -35,10 +35,11 @@ namespace STS2Mobile.Patches;
 // set_path can't race.
 public static class AssetPreloadPatches
 {
-    // 1 is enough to prevent the race and still keeps preload in the
-    // background (the outer Process() runs per-frame from NAssetLoader).
-    // Bumping this to 2 re-introduces the crash on repro; leave at 1.
-    private const int MaxConcurrent = 1;
+    // Stock game uses 128 concurrent loads. 1 is the safest but slows
+    // preload noticeably; 2 is the smallest value that still parallelises
+    // I/O vs parsing inside Godot's worker pool and is being validated in
+    // v0.3.6. If the decimillipede repro crashes again, drop back to 1.
+    private const int MaxConcurrent = 2;
 
     private static FieldInfo _loadingField;
     private static FieldInfo _toLoadField;
