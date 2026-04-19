@@ -76,6 +76,7 @@ public static class ModEntry
             CombatBackgroundPatches.Apply(_harmony);
             LanMultiplayerPatcher.Apply(_harmony);
             ModLoaderPatches.Apply(_harmony);
+            AssetPreloadPatches.Apply(_harmony);
             LauncherPatches.Apply(_harmony);
 #if DEBUG
             // Transpiler-based diagnostic logging: full IL rewrite of LoadProgress.

@@ -8,7 +8,10 @@ import android.os.Bundle;
 import android.util.Log;
 
 import androidx.activity.EdgeToEdge;
+import androidx.core.content.FileProvider;
 import androidx.core.splashscreen.SplashScreen;
+
+import android.net.Uri;
 
 import android.content.SharedPreferences;
 
@@ -315,6 +318,71 @@ public class GodotApp extends GodotActivity {
 			startActivity(intent);
 		}
 		Runtime.getRuntime().exit(0);
+	}
+
+	// Returns the absolute directory where the C# updater should drop the
+	// downloaded APK before calling installApk. Matches res/xml/file_paths.xml
+	// so FileProvider can expose the URI to PackageInstaller.
+	public String getUpdatesDir() {
+		File dir = new File(getFilesDir(), "updates");
+		if (!dir.exists()) {
+			dir.mkdirs();
+		}
+		return dir.getAbsolutePath();
+	}
+
+	// True iff this app is currently allowed to kick off a package install.
+	// Android 8+ gates REQUEST_INSTALL_PACKAGES behind a per-source toggle
+	// in system settings; older OS versions implicitly allow it once the
+	// manifest permission is declared.
+	public boolean canInstallPackages() {
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+			return getPackageManager().canRequestPackageInstalls();
+		}
+		return true;
+	}
+
+	// Opens the system settings page where the user grants this app the
+	// "install unknown apps" permission. No-op on < Android 8.
+	public void requestInstallPackagesPermission() {
+		if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
+			return;
+		}
+		try {
+			Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+					.setData(Uri.parse("package:" + getPackageName()))
+					.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			startActivity(intent);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to open unknown-sources settings", e);
+		}
+	}
+
+	// Hands the APK to PackageInstaller via FileProvider. Android shows a
+	// confirmation dialog before actually replacing the running app — we
+	// cannot bypass that, it's system-level.
+	public boolean installApk(String apkPath) {
+		try {
+			File apk = new File(apkPath);
+			if (!apk.exists() || apk.length() == 0) {
+				Log.e(TAG, "installApk: file missing or empty at " + apkPath);
+				return false;
+			}
+
+			Uri uri = FileProvider.getUriForFile(
+					this, getPackageName() + ".fileprovider", apk);
+
+			Intent intent = new Intent(Intent.ACTION_VIEW)
+					.setDataAndType(uri, "application/vnd.android.package-archive")
+					.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+							| Intent.FLAG_GRANT_READ_URI_PERMISSION);
+			startActivity(intent);
+			Log.i(TAG, "installApk: launched PackageInstaller for " + apkPath);
+			return true;
+		} catch (Exception e) {
+			Log.e(TAG, "installApk failed for " + apkPath, e);
+			return false;
+		}
 	}
 
 	// AES-256-GCM encryption via Android Keystore (hardware-backed TEE).

@@ -13,6 +13,7 @@ public class ActionSection : VBoxContainer
     public event Action CloudPushPressed;
     public event Action CloudPullPressed;
     public event Action CheckForUpdatesPressed;
+    public event Action AppUpdatePressed;
 
     private readonly Button _launchButton;
     private readonly Button _retryButton;
@@ -21,6 +22,8 @@ public class ActionSection : VBoxContainer
     private readonly Button _pushButton;
     private readonly Button _pullButton;
     private readonly Button _updateButton;
+    private readonly StyledButton _appUpdateButton;
+    private string _appUpdateBaseText = "UPDATE LAUNCHER";
     private readonly StyleBoxFlat _offStyle;
     private readonly StyleBoxFlat _onStyle;
 
@@ -80,6 +83,26 @@ public class ActionSection : VBoxContainer
         _updateButton.Visible = false;
         _updateButton.Pressed += () => CheckForUpdatesPressed?.Invoke();
         AddChild(_updateButton);
+
+        _appUpdateButton = new StyledButton("UPDATE LAUNCHER", scale, fontSize: 16, height: 48);
+        _appUpdateButton.Visible = false;
+        var appUpdateStyle = StyledButton.MakeFilled(
+            new Color(0.85f, 0.6f, 0.15f),
+            (int)(4 * scale)
+        );
+        var appUpdateHover = StyledButton.MakeFilled(
+            new Color(0.95f, 0.7f, 0.2f),
+            (int)(4 * scale)
+        );
+        var appUpdatePressed = StyledButton.MakeFilled(
+            new Color(0.7f, 0.5f, 0.1f),
+            (int)(4 * scale)
+        );
+        _appUpdateButton.AddThemeStyleboxOverride("normal", appUpdateStyle);
+        _appUpdateButton.AddThemeStyleboxOverride("hover", appUpdateHover);
+        _appUpdateButton.AddThemeStyleboxOverride("pressed", appUpdatePressed);
+        _appUpdateButton.Pressed += () => AppUpdatePressed?.Invoke();
+        AddChild(_appUpdateButton);
 
         _launchButton = new StyledButton("LAUNCH", scale, fontSize: 16, height: 48);
         _launchButton.Visible = false;
@@ -143,6 +166,7 @@ public class ActionSection : VBoxContainer
         _cloudSyncToggle.Visible = false;
         PushPullRow.Visible = false;
         _updateButton.Visible = false;
+        _appUpdateButton.Visible = false;
     }
 
     public void SetPushPullDisabled(bool disabled)
@@ -154,4 +178,44 @@ public class ActionSection : VBoxContainer
     public void SetUpdateButtonText(string text) => _updateButton.Text = text;
 
     public void SetUpdateButtonDisabled(bool disabled) => _updateButton.Disabled = disabled;
+
+    public void ShowAppUpdate(string version)
+    {
+        _appUpdateBaseText = string.IsNullOrEmpty(version)
+            ? "UPDATE LAUNCHER"
+            : $"UPDATE LAUNCHER → v{version}";
+        _appUpdateButton.Text = _appUpdateBaseText;
+        _appUpdateButton.Disabled = false;
+        _appUpdateButton.Visible = true;
+    }
+
+    public void HideAppUpdate()
+    {
+        _appUpdateButton.Visible = false;
+    }
+
+    public void SetAppUpdateProgress(double fraction)
+    {
+        _appUpdateButton.Disabled = true;
+        var pct = (int)System.Math.Round(System.Math.Clamp(fraction, 0, 1) * 100);
+        _appUpdateButton.Text = $"Downloading… {pct}%";
+    }
+
+    public void SetAppUpdateReadyToInstall()
+    {
+        _appUpdateButton.Disabled = false;
+        _appUpdateButton.Text = "TAP TO INSTALL";
+    }
+
+    public void SetAppUpdatePermissionNeeded()
+    {
+        _appUpdateButton.Disabled = false;
+        _appUpdateButton.Text = "ALLOW INSTALL IN SETTINGS";
+    }
+
+    public void SetAppUpdateFailed()
+    {
+        _appUpdateButton.Disabled = false;
+        _appUpdateButton.Text = _appUpdateBaseText + " (retry)";
+    }
 }

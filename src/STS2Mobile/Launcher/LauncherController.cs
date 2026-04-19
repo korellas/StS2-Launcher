@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Godot;
 using STS2Mobile.Patches;
@@ -14,6 +15,10 @@ public class LauncherController
     private readonly LauncherView _view;
     private readonly Action<Action> _runOnMainThread;
     private volatile bool _checkingForUpdates;
+    private volatile bool _installingAppUpdate;
+    private string _pendingAppUpdateUrl;
+    private string _pendingAppUpdateVersion;
+    private string _downloadedApkPath;
 
     public LauncherController(
         LauncherModel model,
@@ -114,6 +119,7 @@ public class LauncherController
         _view.Actions.CloudPushPressed += OnCloudPushPressed;
         _view.Actions.CloudPullPressed += OnCloudPullPressed;
         _view.Actions.CheckForUpdatesPressed += OnCheckForUpdatesPressed;
+        _view.Actions.AppUpdatePressed += OnAppUpdatePressed;
 
         var localBackupPref = LauncherModel.LoadLocalBackupPref();
         _view.Actions.SetLocalBackupChecked(localBackupPref);
@@ -145,9 +151,17 @@ public class LauncherController
             _runOnMainThread(() =>
             {
                 if (result.HasUpdate)
+                {
                     _view.SetVersionStatus(
                         $"v{installed ?? "?"} → v{result.LatestVersion} available"
                     );
+                    if (!string.IsNullOrEmpty(result.DownloadUrl))
+                    {
+                        _pendingAppUpdateUrl = result.DownloadUrl;
+                        _pendingAppUpdateVersion = result.LatestVersion;
+                        _view.Actions.ShowAppUpdate(result.LatestVersion);
+                    }
+                }
                 else if (installed != null)
                     _view.SetVersionStatus($"v{installed} · up to date");
                 else
@@ -327,6 +341,80 @@ public class LauncherController
         await appUpdateTask;
 
         _checkingForUpdates = false;
+    }
+
+    private async void OnAppUpdatePressed()
+    {
+        if (_installingAppUpdate)
+            return;
+
+        // Second tap when the APK is already on disk: hand to PackageInstaller
+        // without re-downloading.
+        if (!string.IsNullOrEmpty(_downloadedApkPath) && File.Exists(_downloadedApkPath))
+        {
+            HandOffToInstaller(_downloadedApkPath);
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_pendingAppUpdateUrl))
+        {
+            _view.AppendLog("No pending update URL; re-run the check.");
+            return;
+        }
+
+        if (!AppUpdateInstaller.CanInstallPackages())
+        {
+            _view.AppendLog(
+                "This app isn't allowed to install packages. Opening settings..."
+            );
+            _view.Actions.SetAppUpdatePermissionNeeded();
+            AppUpdateInstaller.RequestInstallPermission();
+            return;
+        }
+
+        _installingAppUpdate = true;
+        _view.Actions.SetAppUpdateProgress(0);
+
+        try
+        {
+            var progress = new Progress<double>(f =>
+                _runOnMainThread(() => _view.Actions.SetAppUpdateProgress(f))
+            );
+            var apkPath = await AppUpdateInstaller.DownloadApkAsync(
+                _pendingAppUpdateUrl,
+                _pendingAppUpdateVersion,
+                progress
+            );
+            _downloadedApkPath = apkPath;
+            _runOnMainThread(() =>
+            {
+                _view.AppendLog($"Launcher APK ready at {apkPath}");
+                _view.Actions.SetAppUpdateReadyToInstall();
+            });
+            HandOffToInstaller(apkPath);
+        }
+        catch (Exception ex)
+        {
+            PatchHelper.Log($"[Update] Download failed: {ex.Message}");
+            _runOnMainThread(() =>
+            {
+                _view.AppendLog($"Launcher update download failed: {ex.Message}");
+                _view.Actions.SetAppUpdateFailed();
+            });
+        }
+        finally
+        {
+            _installingAppUpdate = false;
+        }
+    }
+
+    private void HandOffToInstaller(string apkPath)
+    {
+        if (!AppUpdateInstaller.LaunchInstaller(apkPath))
+        {
+            _view.AppendLog("Failed to launch installer — tap again or update from GitHub.");
+            _view.Actions.SetAppUpdateFailed();
+        }
     }
 
     private static readonly Color YellowLog = new(1f, 0.85f, 0.2f);
