@@ -70,56 +70,79 @@ public class NewsSection : VBoxContainer
             child.QueueFree();
     }
 
-    private Button BuildRow(SteamNewsItem item)
+    private Control BuildRow(SteamNewsItem item)
     {
-        // Use a flat Button so each row is its own touch target with built-in
-        // hover/pressed feedback. Wraps a Label (title + date subline) inside.
-        var btn = new Button();
-        btn.Flat = true;
-        btn.ClipText = false;
-        btn.Alignment = HorizontalAlignment.Left;
-        btn.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        // Tall enough to fit a 2-line wrapped title plus a date subline at
-        // larger font sizes; the inner VBox grows past this if needed.
-        btn.CustomMinimumSize = new Vector2(0, (int)(56 * _scale));
+        // Use a PanelContainer + gui_input handler instead of a Button.
+        // Button is not a Container in Godot 4 — adding child Controls
+        // works visually but the children aren't laid out, so the title
+        // and date end up stacked at (0,0) at their minimum size. The
+        // result is overlapping squashed text in a narrow strip.
+        // PanelContainer is a real Container that sizes its single child
+        // to fill the panel area.
+        var row = new PanelContainer();
+        row.MouseFilter = MouseFilterEnum.Stop;
+        row.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        row.CustomMinimumSize = new Vector2(0, (int)(56 * _scale));
 
-        var transparent = StyledButton.MakeFilled(Colors.Transparent, 0);
-        var hover = StyledButton.MakeFilled(new Color(1f, 1f, 1f, 0.06f), (int)(3 * _scale));
-        btn.AddThemeStyleboxOverride("normal", transparent);
-        btn.AddThemeStyleboxOverride("hover", hover);
-        btn.AddThemeStyleboxOverride("pressed", hover);
-        btn.AddThemeStyleboxOverride("focus", transparent);
+        var normalStyle = StyledButton.MakeFilled(Colors.Transparent, (int)(3 * _scale));
+        normalStyle.ContentMarginLeft = (int)(8 * _scale);
+        normalStyle.ContentMarginRight = (int)(8 * _scale);
+        normalStyle.ContentMarginTop = (int)(6 * _scale);
+        normalStyle.ContentMarginBottom = (int)(6 * _scale);
 
-        // Hide the button's own text — we render labels inside instead.
-        btn.AddThemeFontSizeOverride("font_size", 1);
+        var hoverStyle = StyledButton.MakeFilled(
+            new Color(1f, 1f, 1f, 0.06f),
+            (int)(3 * _scale)
+        );
+        hoverStyle.ContentMarginLeft = normalStyle.ContentMarginLeft;
+        hoverStyle.ContentMarginRight = normalStyle.ContentMarginRight;
+        hoverStyle.ContentMarginTop = normalStyle.ContentMarginTop;
+        hoverStyle.ContentMarginBottom = normalStyle.ContentMarginBottom;
+
+        row.AddThemeStyleboxOverride("panel", normalStyle);
 
         var inner = new VBoxContainer();
         inner.AddThemeConstantOverride("separation", (int)(2 * _scale));
-        inner.MouseFilter = Control.MouseFilterEnum.Ignore;
-        inner.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        inner.SizeFlagsVertical = SizeFlags.ExpandFill;
-        btn.AddChild(inner);
+        inner.MouseFilter = MouseFilterEnum.Ignore;
+        row.AddChild(inner);
 
         var title = new StyledLabel(item.Title, _scale, fontSize: 14);
         title.AddThemeColorOverride("font_color", TitleColor);
-        // Wrap long titles instead of truncating to "Beta..." — the news
-        // column is wide in landscape, but press headlines can still spill
-        // beyond a single line.
         title.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        title.MouseFilter = Control.MouseFilterEnum.Ignore;
+        title.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(title);
 
         var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 10);
         date.AddThemeColorOverride("font_color", DateColor);
-        date.MouseFilter = Control.MouseFilterEnum.Ignore;
+        date.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(date);
 
-        btn.MouseEntered += () => title.AddThemeColorOverride("font_color", HoverColor);
-        btn.MouseExited += () => title.AddThemeColorOverride("font_color", TitleColor);
-        btn.Pressed += () => OpenInAppWebView(item.Url);
+        row.MouseEntered += () =>
+        {
+            row.AddThemeStyleboxOverride("panel", hoverStyle);
+            title.AddThemeColorOverride("font_color", HoverColor);
+        };
+        row.MouseExited += () =>
+        {
+            row.AddThemeStyleboxOverride("panel", normalStyle);
+            title.AddThemeColorOverride("font_color", TitleColor);
+        };
+        row.GuiInput += ev =>
+        {
+            if (ev is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+            {
+                OpenInAppWebView(item.Url);
+                row.AcceptEvent();
+            }
+            else if (ev is InputEventScreenTouch t && t.Pressed)
+            {
+                OpenInAppWebView(item.Url);
+                row.AcceptEvent();
+            }
+        };
 
-        return btn;
+        return row;
     }
 
     // Tries to open the article inside the launcher via the GodotApp
