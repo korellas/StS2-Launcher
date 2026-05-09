@@ -225,18 +225,74 @@ public class DepotDownloader : IDisposable
                     continue;
             }
 
-            var gidNode = manifests["public"]["gid"];
-            if (gidNode == KeyValue.Invalid || gidNode.Value == null)
+            // Slay the Spire 2 ships its rapid-iteration patches on a `beta`
+            // branch and only periodically promotes a snapshot to `public`.
+            // Hardcoding `public` here meant the launcher saw the game as
+            // up-to-date for weeks while the user's Steam install (opted
+            // into beta) had moved many patches ahead. Walk every branch
+            // exposed in the manifest KeyValue and pick whichever has the
+            // most recent `timeupdated` — `public` still wins by default
+            // because it usually re-publishes shortly after a beta drop,
+            // but beta keeps us current in between.
+            var (selectedBranch, manifestId) = PickBestBranch(manifests);
+            if (selectedBranch == null)
                 continue;
 
-            if (!ulong.TryParse(gidNode.Value, out var manifestId))
-                continue;
-
-            Log($"Found depot {depotId} manifest {manifestId}");
+            Log(
+                $"Found depot {depotId} manifest {manifestId} (branch={selectedBranch})"
+            );
             result.Add((depotId, manifestId));
         }
 
         return result;
+    }
+
+    // Returns the (branch name, manifest gid) pair with the most recent
+    // `timeupdated` across all branches. Skips branches with no `gid` or
+    // with a password requirement we can't satisfy.
+    private static (string Branch, ulong ManifestId) PickBestBranch(KeyValue manifests)
+    {
+        string bestBranch = null;
+        ulong bestId = 0;
+        long bestTime = -1;
+
+        foreach (var branch in manifests.Children)
+        {
+            if (string.IsNullOrEmpty(branch.Name))
+                continue;
+
+            var gidNode = branch["gid"];
+            if (gidNode == KeyValue.Invalid || gidNode.Value == null)
+                continue;
+            if (!ulong.TryParse(gidNode.Value, out var manifestId))
+                continue;
+
+            // Branches gated by a password expose a `password` field; we
+            // can't download from them so skip even if they're newer.
+            if (branch["password"] != KeyValue.Invalid)
+                continue;
+
+            var timeNode = branch["timeupdated"];
+            long timeUpdated = 0;
+            if (timeNode != KeyValue.Invalid && timeNode.Value != null)
+                long.TryParse(timeNode.Value, out timeUpdated);
+
+            // Tiebreaker: when timestamps match (or both are 0/missing),
+            // prefer `public` over any other branch so stable users with no
+            // beta opt-in keep landing on `public`.
+            bool isBetter =
+                timeUpdated > bestTime
+                || (timeUpdated == bestTime && branch.Name == "public");
+
+            if (isBetter)
+            {
+                bestTime = timeUpdated;
+                bestId = manifestId;
+                bestBranch = branch.Name;
+            }
+        }
+
+        return (bestBranch, bestId);
     }
 
     private async Task<SteamApps.PICSProductInfoCallback.PICSProductInfo> GetAppInfoAsync(
