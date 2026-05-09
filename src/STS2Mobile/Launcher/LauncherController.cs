@@ -134,6 +134,24 @@ public class LauncherController
         // Lazy, non-blocking APK update check. Runs in the background and only
         // updates the version label — PLAY/LAUNCH is never gated on this task.
         _ = AutoCheckAppUpdateAsync();
+
+        // Lazy, non-blocking Steam community news fetch. Same pattern: failures
+        // collapse the section to "(news unavailable)" and never block launch.
+        _ = AutoFetchSteamNewsAsync();
+    }
+
+    private async Task AutoFetchSteamNewsAsync()
+    {
+        try
+        {
+            var items = await SteamNewsClient.FetchAsync();
+            _runOnMainThread(() => _view.News.SetItems(items));
+        }
+        catch (Exception ex)
+        {
+            PatchHelper.Log($"[News] Steam news fetch failed: {ex.Message}");
+            _runOnMainThread(() => _view.News.SetFailed());
+        }
     }
 
     private async Task AutoCheckAppUpdateAsync()

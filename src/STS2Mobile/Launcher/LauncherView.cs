@@ -13,6 +13,7 @@ public class LauncherView
     public CodeSection Code { get; }
     public DownloadSection Download { get; }
     public ActionSection Actions { get; }
+    public NewsSection News { get; }
     public LogView Log { get; }
 
     private readonly StyledLabel _statusLabel;
@@ -102,7 +103,14 @@ public class LauncherView
         var right = new VBoxContainer();
         right.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         right.SizeFlagsStretchRatio = 4f;
+        right.AddThemeConstantOverride("separation", (int)(8 * scale));
         hbox.AddChild(right);
+
+        News = new NewsSection(scale);
+        // Cap the news panel's vertical share so the console keeps the
+        // majority of the right-hand column when many announcements load.
+        News.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+        right.AddChild(News);
 
         var logTitle = new StyledLabel("Console", scale, fontSize: 14);
         logTitle.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.65f));
