@@ -39,13 +39,16 @@ public class StyledPanel : CenterContainer
     private readonly PanelContainer _panelContainer;
     private readonly float _widthRatio;
 
-    private const float MaxWidth = 1400f;
-    private const float MaxHeight = 800f;
+    // No absolute caps — phones routinely have viewports far above 1400×800
+    // in landscape (Galaxy S24 ≈ 2316×1080, tablets and foldables larger
+    // still), and capping makes the panel sit in a 4:3 island with dead
+    // space around it. Use 95%×95% of whatever the viewport actually is.
+    private const float HeightRatio = 0.95f;
 
     public void UpdateSizeFromViewport(Vector2 vpSize)
     {
-        var w = Math.Min(vpSize.X * _widthRatio, MaxWidth);
-        var h = Math.Min(vpSize.Y * 0.85f, MaxHeight);
+        var w = vpSize.X * _widthRatio;
+        var h = vpSize.Y * HeightRatio;
         _panelContainer.CustomMinimumSize = new Vector2(w, h);
     }
 
