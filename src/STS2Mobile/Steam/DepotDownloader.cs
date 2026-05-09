@@ -64,7 +64,15 @@ public class DepotDownloader : IDisposable
         {
             Directory.CreateDirectory(_stateDir);
 
-            ulong accessToken = _connection.AppAccessToken;
+            // Refresh the PICS access token before every check. Steam rotates
+            // these tokens on the server side when an app publishes a new
+            // build; reusing the one we got at login time makes Steam reply
+            // with the cached PICS snapshot from token-issue time and the
+            // new manifest is invisible to us. Free 1 RPC each check, gone.
+            ulong accessToken = await RefreshAppAccessTokenAsync();
+
+            // Force a fresh PICS read instead of accepting SteamKit2's cached
+            // last-known revision: pass MetaDataOnly=false and re-request.
             var infoResult = await _connection.Apps.PICSGetProductInfo(
                 new[] { new SteamApps.PICSRequest(AppId, accessToken) },
                 Enumerable.Empty<SteamApps.PICSRequest>()
@@ -84,12 +92,16 @@ public class DepotDownloader : IDisposable
                 throw new Exception("Failed to get app info from Steam");
 
             _appInfoCache[AppId] = appInfo;
+            LogAvailableBranches(appInfo.KeyValues["depots"]);
+
             var depots = await ParseDepotsAsync(appInfo.KeyValues["depots"]);
 
             foreach (var (depotId, manifestId) in depots)
             {
                 ct.ThrowIfCancellationRequested();
-                if (LoadCachedManifestId(depotId) != manifestId)
+                var cached = LoadCachedManifestId(depotId);
+                Log($"Compare depot {depotId}: cached={cached} latest={manifestId}");
+                if (cached != manifestId)
                 {
                     Log($"Update available: depot {depotId} manifest changed");
                     return true;
@@ -102,6 +114,53 @@ public class DepotDownloader : IDisposable
         finally
         {
             _connection.ResumeIdleTimeout();
+        }
+    }
+
+    private async Task<ulong> RefreshAppAccessTokenAsync()
+    {
+        try
+        {
+            var tokenResult = await _connection.Apps.PICSGetAccessTokens(AppId, null);
+            if (tokenResult.AppTokens.TryGetValue(AppId, out var token))
+            {
+                _connection.AppAccessToken = token;
+                return token;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Token refresh failed, falling back to cached token: {ex.Message}");
+        }
+        return _connection.AppAccessToken;
+    }
+
+    // Diagnostic: dump every branch we can see across all depots so the
+    // logcat shows exactly what PICS returned. Helps debug "stuck on up to
+    // date" reports without re-pushing a build.
+    private void LogAvailableBranches(KeyValue depotSection)
+    {
+        if (depotSection == KeyValue.Invalid)
+        {
+            Log("PICS returned no depot section");
+            return;
+        }
+        foreach (var depot in depotSection.Children)
+        {
+            if (!uint.TryParse(depot.Name, out _))
+                continue;
+            var manifests = depot["manifests"];
+            if (manifests == KeyValue.Invalid)
+                continue;
+            foreach (var branch in manifests.Children)
+            {
+                var gid = branch["gid"]?.Value ?? "?";
+                var time = branch["timeupdated"]?.Value ?? "0";
+                var pwd = branch["pwdrequired"]?.Value ?? branch["password"]?.Value ?? "0";
+                Log(
+                    $"PICS branch: depot={depot.Name} branch={branch.Name} gid={gid} timeupdated={time} pwd={pwd}"
+                );
+            }
         }
     }
 
@@ -267,8 +326,13 @@ public class DepotDownloader : IDisposable
             if (!ulong.TryParse(gidNode.Value, out var manifestId))
                 continue;
 
-            // Branches gated by a password expose a `password` field; we
-            // can't download from them so skip even if they're newer.
+            // Branches gated by a password expose `pwdrequired=1`; we can't
+            // download from them so skip even if they're newer. (The legacy
+            // `password` key is checked too just in case Steam still emits
+            // it for some apps.)
+            var pwdRequired = branch["pwdrequired"]?.Value;
+            if (pwdRequired != null && pwdRequired != "0")
+                continue;
             if (branch["password"] != KeyValue.Invalid)
                 continue;
 
