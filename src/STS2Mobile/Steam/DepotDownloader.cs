@@ -96,7 +96,7 @@ public class DepotDownloader : IDisposable
 
             var depots = await ParseDepotsAsync(appInfo.KeyValues["depots"]);
 
-            foreach (var (depotId, manifestId) in depots)
+            foreach (var (depotId, manifestId, _) in depots)
             {
                 ct.ThrowIfCancellationRequested();
                 var cached = LoadCachedManifestId(depotId);
@@ -217,10 +217,10 @@ public class DepotDownloader : IDisposable
 
             Log($"Using {_servers.Count} CDN servers");
 
-            foreach (var (depotId, manifestId) in depots)
+            foreach (var (depotId, manifestId, branch) in depots)
             {
                 ct.ThrowIfCancellationRequested();
-                await DownloadDepotAsync(depotId, manifestId, ct);
+                await DownloadDepotAsync(depotId, manifestId, branch, ct);
             }
 
             Log("All game files downloaded!");
@@ -234,11 +234,11 @@ public class DepotDownloader : IDisposable
         }
     }
 
-    private async Task<List<(uint DepotId, ulong ManifestId)>> ParseDepotsAsync(
+    private async Task<List<(uint DepotId, ulong ManifestId, string Branch)>> ParseDepotsAsync(
         KeyValue depotSection
     )
     {
-        var result = new List<(uint, ulong)>();
+        var result = new List<(uint, ulong, string)>();
 
         foreach (var depot in depotSection.Children)
         {
@@ -300,7 +300,7 @@ public class DepotDownloader : IDisposable
             Log(
                 $"Found depot {depotId} manifest {manifestId} (branch={selectedBranch})"
             );
-            result.Add((depotId, manifestId));
+            result.Add((depotId, manifestId, selectedBranch));
         }
 
         return result;
@@ -422,7 +422,11 @@ public class DepotDownloader : IDisposable
         return null;
     }
 
-    private async Task<ulong> GetManifestRequestCodeAsync(uint depotId, ulong manifestId)
+    private async Task<ulong> GetManifestRequestCodeAsync(
+        uint depotId,
+        ulong manifestId,
+        string branch
+    )
     {
         if (
             _manifestRequestCodes.TryGetValue(depotId, out var cached)
@@ -432,25 +436,33 @@ public class DepotDownloader : IDisposable
             return cached.Code;
         }
 
+        var branchName = string.IsNullOrEmpty(branch) ? "public" : branch;
         var code = await _connection.Content.GetManifestRequestCode(
             depotId,
             AppId,
             manifestId,
-            "public"
+            branchName
         );
         if (code == 0)
             throw new Exception(
-                $"Failed to get manifest request code for depot {depotId}. "
-                    + "Ensure the account owns this app."
+                $"Couldn't access depot {depotId} on branch '{branchName}'. "
+                    + "If this is the beta channel, opt in via Steam first: "
+                    + "Library → Slay the Spire 2 → Properties → Betas → "
+                    + "select 'public-beta' (no password). Then retry."
             );
 
         _manifestRequestCodes[depotId] = (code, DateTime.UtcNow.AddMinutes(5));
         return code;
     }
 
-    private async Task DownloadDepotAsync(uint depotId, ulong manifestId, CancellationToken ct)
+    private async Task DownloadDepotAsync(
+        uint depotId,
+        ulong manifestId,
+        string branch,
+        CancellationToken ct
+    )
     {
-        Log($"Processing depot {depotId}...");
+        Log($"Processing depot {depotId} (branch={branch})...");
 
         bool isUpdate = LoadCachedManifestId(depotId) != manifestId;
 
@@ -459,7 +471,7 @@ public class DepotDownloader : IDisposable
             throw new Exception($"Failed to get depot key for {depotId}: {keyResult.Result}");
         var depotKey = keyResult.DepotKey;
 
-        var manifestRequestCode = await GetManifestRequestCodeAsync(depotId, manifestId);
+        var manifestRequestCode = await GetManifestRequestCodeAsync(depotId, manifestId, branch);
 
         Log($"Downloading manifest for depot {depotId}...");
         DepotManifest manifest = null;

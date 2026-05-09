@@ -539,20 +539,11 @@ public class GodotApp extends GodotActivity {
 			topBar.addView(urlLabel, new LinearLayout.LayoutParams(
 					0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-			// "🌐 한국어" toggle. WebView has no built-in Chrome-style
-			// translate bar, so we reload the page through Google
-			// Translate's transparent proxy (`<host-with-dashes>.translate.goog`)
-			// instead. Tap again to bounce back to the untranslated URL.
-			Button translateButton = new Button(this);
-			translateButton.setText("🌐 한국어");
-			translateButton.setAllCaps(false);
-			translateButton.setTextColor(0xFFE6E6EA);
-			translateButton.setBackgroundColor(0xFF2D2F35);
-			LinearLayout.LayoutParams translateParams = new LinearLayout.LayoutParams(
-					ViewGroup.LayoutParams.WRAP_CONTENT,
-					(int) (40 * density));
-			translateParams.leftMargin = (int) (8 * density);
-			topBar.addView(translateButton, translateParams);
+			// Steam's own Korean translations are usually better than any
+			// auto-translated proxy, so we let the server pick. The locale
+			// override (`?l=koreana`) is appended below in maybeAddKoreanLocale
+			// when the URL points at a Steam domain. No client-side
+			// translation toggle needed for the common case.
 
 			FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(
 					ViewGroup.LayoutParams.MATCH_PARENT, barHeight,
@@ -585,8 +576,6 @@ public class GodotApp extends GodotActivity {
 				public void onPageFinished(WebView view, String finishedUrl) {
 					progress.setVisibility(View.GONE);
 					urlLabel.setText(finishedUrl);
-					translateButton.setText(
-							isTranslatedUrl(finishedUrl) ? "🌐 Original" : "🌐 한국어");
 				}
 
 				@Override
@@ -611,7 +600,7 @@ public class GodotApp extends GodotActivity {
 			webParams.topMargin = barHeight;
 			overlay.addView(webView, webParams);
 
-			webView.loadUrl(url);
+			webView.loadUrl(maybeAddKoreanLocale(url));
 
 			// Capture system back gestures while the overlay is up — prefer
 			// in-page back navigation, fall back to closing the overlay.
@@ -632,20 +621,6 @@ public class GodotApp extends GodotActivity {
 
 			closeButton.setOnClickListener(v -> closeWebViewInternal());
 
-			translateButton.setOnClickListener(v -> {
-				String currentUrl = webView.getUrl();
-				if (currentUrl == null || currentUrl.isEmpty()) {
-					return;
-				}
-				String target = isTranslatedUrl(currentUrl)
-						? toOriginalUrl(currentUrl)
-						: toTranslatedUrl(currentUrl);
-				if (target != null && !target.equals(currentUrl)) {
-					progress.setVisibility(View.VISIBLE);
-					webView.loadUrl(target);
-				}
-			});
-
 			FrameLayout root = (FrameLayout) findViewById(android.R.id.content);
 			root.addView(overlay, new FrameLayout.LayoutParams(
 					ViewGroup.LayoutParams.MATCH_PARENT,
@@ -661,45 +636,52 @@ public class GodotApp extends GodotActivity {
 		runOnUiThread(this::closeWebViewInternal);
 	}
 
-	// Use Naver Papago instead of Google Translate's `.translate.goog`
-	// proxy. The Google proxy serves a "This translation service isn't
-	// available in your region" page in Korea (where this fork's user
-	// base lives), and Papago is a Korean-native service so region
-	// blocking isn't an issue. Papago's website translator takes the
-	// source URL via the `st` query param.
-	private static final String PAPAGO_PREFIX =
-			"https://papago.naver.com/website?source=auto&target=ko&st=";
-
-	private static boolean isTranslatedUrl(String url) {
-		return url != null && url.startsWith(PAPAGO_PREFIX);
-	}
-
-	private static String toTranslatedUrl(String url) {
-		try {
-			if (url == null || isTranslatedUrl(url)) {
-				return url;
-			}
-			return PAPAGO_PREFIX + Uri.encode(url);
-		} catch (Exception e) {
-			Log.w(TAG, "toTranslatedUrl failed for " + url, e);
+	// Steam serves localised announcement pages directly when given an
+	// `l=koreana` query param. We use this instead of any client-side
+	// translate proxy because (a) Google's `.translate.goog` is region-
+	// blocked in Korea, (b) Naver Papago's `st` param is for free-text
+	// translation and just lands on the Papago home page when given a
+	// URL, and (c) Steam's own translation, when present, is better than
+	// machine translation anyway. For any non-Steam host we leave the
+	// URL alone — those are press articles where there's no equivalent
+	// server-side toggle.
+	private static String maybeAddKoreanLocale(String url) {
+		if (url == null || url.isEmpty()) {
 			return url;
 		}
-	}
-
-	private static String toOriginalUrl(String url) {
 		try {
-			if (url == null || !isTranslatedUrl(url)) {
+			Uri u = Uri.parse(url);
+			String host = u.getHost();
+			if (host == null) {
 				return url;
 			}
-			String encoded = url.substring(PAPAGO_PREFIX.length());
-			// Trim any extra params Papago appended after the URL.
-			int amp = encoded.indexOf('&');
-			if (amp >= 0) {
-				encoded = encoded.substring(0, amp);
+			boolean isSteam =
+					host.equals("steamcommunity.com")
+							|| host.endsWith(".steamcommunity.com")
+							|| host.equals("store.steampowered.com")
+							|| host.endsWith(".steampowered.com");
+			if (!isSteam) {
+				return url;
 			}
-			return Uri.decode(encoded);
+			// Don't double-add or stomp on an explicit user choice.
+			String existing = u.getQueryParameter("l");
+			if (existing != null) {
+				return url;
+			}
+			String separator = (u.getQuery() == null || u.getQuery().isEmpty())
+					? "?"
+					: "&";
+			String fragment = u.getFragment();
+			String base = fragment == null
+					? url
+					: url.substring(0, url.length() - (fragment.length() + 1));
+			String result = base + separator + "l=koreana";
+			if (fragment != null) {
+				result += "#" + fragment;
+			}
+			return result;
 		} catch (Exception e) {
-			Log.w(TAG, "toOriginalUrl failed for " + url, e);
+			Log.w(TAG, "maybeAddKoreanLocale failed for " + url, e);
 			return url;
 		}
 	}
