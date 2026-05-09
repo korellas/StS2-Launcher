@@ -306,14 +306,25 @@ public class DepotDownloader : IDisposable
         return result;
     }
 
-    // Returns the (branch name, manifest gid) pair with the most recent
-    // `timeupdated` across all branches. Skips branches with no `gid` or
-    // with a password requirement we can't satisfy.
+    // Picks the best (branch name, manifest gid) pair to follow.
+    //
+    // Steam doesn't populate `timeupdated` for STS2 (every branch reports
+    // 0), so we can't rank by recency. Instead, prefer any beta-flavoured
+    // branch (e.g. STS2's `public-beta`) over plain `public`: this fork
+    // is sideloaded by early-access enthusiasts who keep their Steam
+    // client opted into the beta channel, and they expect the launcher
+    // to follow the same builds. If multiple beta branches exist, the
+    // one with the highest `timeupdated` wins; on ties, the first one
+    // PICS returned. If no beta-named branch is available, fall back to
+    // `public`. Password-gated branches are still skipped — we can't
+    // download from those.
+    //
+    // TODO: surface a Stable/Beta toggle in the launcher UI for users
+    // who want to stay on `public`; for now the audience is overwhelmingly
+    // on beta.
     private static (string Branch, ulong ManifestId) PickBestBranch(KeyValue manifests)
     {
-        string bestBranch = null;
-        ulong bestId = 0;
-        long bestTime = -1;
+        var candidates = new List<(string Name, ulong ManifestId, long TimeUpdated)>();
 
         foreach (var branch in manifests.Children)
         {
@@ -326,37 +337,36 @@ public class DepotDownloader : IDisposable
             if (!ulong.TryParse(gidNode.Value, out var manifestId))
                 continue;
 
-            // Branches gated by a password expose `pwdrequired=1`; we can't
-            // download from them so skip even if they're newer. (The legacy
-            // `password` key is checked too just in case Steam still emits
-            // it for some apps.)
             var pwdRequired = branch["pwdrequired"]?.Value;
             if (pwdRequired != null && pwdRequired != "0")
                 continue;
             if (branch["password"] != KeyValue.Invalid)
                 continue;
 
-            var timeNode = branch["timeupdated"];
             long timeUpdated = 0;
+            var timeNode = branch["timeupdated"];
             if (timeNode != KeyValue.Invalid && timeNode.Value != null)
                 long.TryParse(timeNode.Value, out timeUpdated);
 
-            // Tiebreaker: when timestamps match (or both are 0/missing),
-            // prefer `public` over any other branch so stable users with no
-            // beta opt-in keep landing on `public`.
-            bool isBetter =
-                timeUpdated > bestTime
-                || (timeUpdated == bestTime && branch.Name == "public");
-
-            if (isBetter)
-            {
-                bestTime = timeUpdated;
-                bestId = manifestId;
-                bestBranch = branch.Name;
-            }
+            candidates.Add((branch.Name, manifestId, timeUpdated));
         }
 
-        return (bestBranch, bestId);
+        if (candidates.Count == 0)
+            return (null, 0);
+
+        var betas = candidates
+            .Where(c => c.Name.IndexOf("beta", StringComparison.OrdinalIgnoreCase) >= 0)
+            .OrderByDescending(c => c.TimeUpdated)
+            .ToList();
+        if (betas.Count > 0)
+            return (betas[0].Name, betas[0].ManifestId);
+
+        var pub = candidates.FirstOrDefault(c => c.Name == "public");
+        if (pub.Name != null)
+            return (pub.Name, pub.ManifestId);
+
+        var first = candidates.OrderByDescending(c => c.TimeUpdated).First();
+        return (first.Name, first.ManifestId);
     }
 
     private async Task<SteamApps.PICSProductInfoCallback.PICSProductInfo> GetAppInfoAsync(
