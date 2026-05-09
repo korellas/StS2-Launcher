@@ -539,6 +539,21 @@ public class GodotApp extends GodotActivity {
 			topBar.addView(urlLabel, new LinearLayout.LayoutParams(
 					0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
+			// "🌐 한국어" toggle. WebView has no built-in Chrome-style
+			// translate bar, so we reload the page through Google
+			// Translate's transparent proxy (`<host-with-dashes>.translate.goog`)
+			// instead. Tap again to bounce back to the untranslated URL.
+			Button translateButton = new Button(this);
+			translateButton.setText("🌐 한국어");
+			translateButton.setAllCaps(false);
+			translateButton.setTextColor(0xFFE6E6EA);
+			translateButton.setBackgroundColor(0xFF2D2F35);
+			LinearLayout.LayoutParams translateParams = new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.WRAP_CONTENT,
+					(int) (40 * density));
+			translateParams.leftMargin = (int) (8 * density);
+			topBar.addView(translateButton, translateParams);
+
 			FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(
 					ViewGroup.LayoutParams.MATCH_PARENT, barHeight,
 					Gravity.TOP);
@@ -569,6 +584,16 @@ public class GodotApp extends GodotActivity {
 				@Override
 				public void onPageFinished(WebView view, String finishedUrl) {
 					progress.setVisibility(View.GONE);
+					urlLabel.setText(finishedUrl);
+					translateButton.setText(
+							isTranslatedUrl(finishedUrl) ? "🌐 Original" : "🌐 한국어");
+				}
+
+				@Override
+				public void onPageStarted(
+						WebView view, String startedUrl,
+						android.graphics.Bitmap favicon) {
+					progress.setVisibility(View.VISIBLE);
 				}
 
 				@Override
@@ -607,6 +632,20 @@ public class GodotApp extends GodotActivity {
 
 			closeButton.setOnClickListener(v -> closeWebViewInternal());
 
+			translateButton.setOnClickListener(v -> {
+				String currentUrl = webView.getUrl();
+				if (currentUrl == null || currentUrl.isEmpty()) {
+					return;
+				}
+				String target = isTranslatedUrl(currentUrl)
+						? toOriginalUrl(currentUrl)
+						: toTranslatedUrl(currentUrl);
+				if (target != null && !target.equals(currentUrl)) {
+					progress.setVisibility(View.VISIBLE);
+					webView.loadUrl(target);
+				}
+			});
+
 			FrameLayout root = (FrameLayout) findViewById(android.R.id.content);
 			root.addView(overlay, new FrameLayout.LayoutParams(
 					ViewGroup.LayoutParams.MATCH_PARENT,
@@ -620,6 +659,106 @@ public class GodotApp extends GodotActivity {
 
 	public void closeWebView() {
 		runOnUiThread(this::closeWebViewInternal);
+	}
+
+	private static final String TRANSLATE_HOST_SUFFIX = ".translate.goog";
+
+	private static boolean isTranslatedUrl(String url) {
+		if (url == null) {
+			return false;
+		}
+		try {
+			String host = Uri.parse(url).getHost();
+			return host != null && host.endsWith(TRANSLATE_HOST_SUFFIX);
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	// Wraps a URL through Google Translate's transparent proxy
+	// (`<host-with-dashes>.translate.goog`) with Korean as the target
+	// language. Preserves path, query, and fragment so deep links like
+	// /news/app/<id>/view/<post> continue to resolve.
+	private static String toTranslatedUrl(String url) {
+		try {
+			Uri u = Uri.parse(url);
+			String host = u.getHost();
+			if (host == null || host.endsWith(TRANSLATE_HOST_SUFFIX)) {
+				return url;
+			}
+			String translatedHost = host.replace('.', '-') + TRANSLATE_HOST_SUFFIX;
+			StringBuilder sb = new StringBuilder();
+			sb.append(u.getScheme() != null ? u.getScheme() : "https")
+					.append("://")
+					.append(translatedHost);
+			if (u.getPort() != -1) {
+				sb.append(":").append(u.getPort());
+			}
+			if (u.getPath() != null) {
+				sb.append(u.getPath());
+			}
+			sb.append("?");
+			String existingQuery = u.getQuery();
+			if (existingQuery != null && !existingQuery.isEmpty()) {
+				sb.append(existingQuery).append("&");
+			}
+			sb.append("_x_tr_sl=auto&_x_tr_tl=ko&_x_tr_hl=ko&_x_tr_pto=wapp");
+			if (u.getFragment() != null) {
+				sb.append("#").append(u.getFragment());
+			}
+			return sb.toString();
+		} catch (Exception e) {
+			Log.w(TAG, "toTranslatedUrl failed for " + url, e);
+			return url;
+		}
+	}
+
+	// Reverse of toTranslatedUrl. Reconstruct the original URL from the
+	// proxy host so the user can flip back to the source page.
+	private static String toOriginalUrl(String url) {
+		try {
+			Uri u = Uri.parse(url);
+			String host = u.getHost();
+			if (host == null || !host.endsWith(TRANSLATE_HOST_SUFFIX)) {
+				return url;
+			}
+			String prefix = host.substring(
+					0, host.length() - TRANSLATE_HOST_SUFFIX.length());
+			String originalHost = prefix.replace('-', '.');
+			StringBuilder sb = new StringBuilder();
+			sb.append(u.getScheme() != null ? u.getScheme() : "https")
+					.append("://")
+					.append(originalHost);
+			if (u.getPort() != -1) {
+				sb.append(":").append(u.getPort());
+			}
+			if (u.getPath() != null) {
+				sb.append(u.getPath());
+			}
+			// Strip the _x_tr_* params we appended; keep anything else.
+			String q = u.getQuery();
+			if (q != null && !q.isEmpty()) {
+				StringBuilder kept = new StringBuilder();
+				for (String part : q.split("&")) {
+					if (!part.startsWith("_x_tr_") && !part.isEmpty()) {
+						if (kept.length() > 0) {
+							kept.append("&");
+						}
+						kept.append(part);
+					}
+				}
+				if (kept.length() > 0) {
+					sb.append("?").append(kept);
+				}
+			}
+			if (u.getFragment() != null) {
+				sb.append("#").append(u.getFragment());
+			}
+			return sb.toString();
+		} catch (Exception e) {
+			Log.w(TAG, "toOriginalUrl failed for " + url, e);
+			return url;
+		}
 	}
 
 	private void closeWebViewInternal() {
