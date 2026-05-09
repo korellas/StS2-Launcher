@@ -72,43 +72,49 @@ public class NewsSection : VBoxContainer
 
     private Control BuildRow(SteamNewsItem item)
     {
-        // Use a PanelContainer + gui_input handler instead of a Button.
-        // Button is not a Container in Godot 4 — adding child Controls
-        // works visually but the children aren't laid out, so the title
-        // and date end up stacked at (0,0) at their minimum size. The
-        // result is overlapping squashed text in a narrow strip.
-        // PanelContainer is a real Container that sizes its single child
-        // to fill the panel area.
-        var row = new PanelContainer();
-        row.MouseFilter = MouseFilterEnum.Stop;
-        row.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        row.CustomMinimumSize = new Vector2(0, (int)(56 * _scale));
+        // Button (with the inner VBox anchored to FullRect inside it) gives
+        // us hover/pressed/focus styles for free. Single-line title +
+        // ellipsis on overflow keeps the row's height fixed and predictable
+        // — the previous WordSmart-wrap version inside a PanelContainer
+        // produced a layout cycle that exploded the news column tall enough
+        // to push the rest of the panel out of view on real devices. With
+        // the wider news column from the 3-column rework, almost every
+        // STS2 announcement title fits on one line; the rare press-article
+        // headline truncates with an ellipsis.
+        var btn = new Button();
+        btn.Flat = true;
+        btn.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        btn.CustomMinimumSize = new Vector2(0, (int)(54 * _scale));
+        btn.Text = "";
 
-        var normalStyle = StyledButton.MakeFilled(Colors.Transparent, (int)(3 * _scale));
-        normalStyle.ContentMarginLeft = (int)(8 * _scale);
-        normalStyle.ContentMarginRight = (int)(8 * _scale);
-        normalStyle.ContentMarginTop = (int)(6 * _scale);
-        normalStyle.ContentMarginBottom = (int)(6 * _scale);
-
+        var transparent = StyledButton.MakeFilled(Colors.Transparent, 0);
         var hoverStyle = StyledButton.MakeFilled(
             new Color(1f, 1f, 1f, 0.06f),
             (int)(3 * _scale)
         );
-        hoverStyle.ContentMarginLeft = normalStyle.ContentMarginLeft;
-        hoverStyle.ContentMarginRight = normalStyle.ContentMarginRight;
-        hoverStyle.ContentMarginTop = normalStyle.ContentMarginTop;
-        hoverStyle.ContentMarginBottom = normalStyle.ContentMarginBottom;
+        btn.AddThemeStyleboxOverride("normal", transparent);
+        btn.AddThemeStyleboxOverride("hover", hoverStyle);
+        btn.AddThemeStyleboxOverride("pressed", hoverStyle);
+        btn.AddThemeStyleboxOverride("focus", transparent);
 
-        row.AddThemeStyleboxOverride("panel", normalStyle);
-
+        // Button is not a Container in Godot 4 — children stay at (0,0)
+        // unless explicitly anchored. Anchor inner to FullRect so the
+        // VBoxContainer fills the button's rect; then the VBox lays out
+        // the title and date labels normally.
         var inner = new VBoxContainer();
+        btn.AddChild(inner);
+        inner.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        inner.OffsetLeft = (int)(8 * _scale);
+        inner.OffsetRight = -(int)(8 * _scale);
+        inner.OffsetTop = (int)(6 * _scale);
+        inner.OffsetBottom = -(int)(6 * _scale);
         inner.AddThemeConstantOverride("separation", (int)(2 * _scale));
         inner.MouseFilter = MouseFilterEnum.Ignore;
-        row.AddChild(inner);
 
         var title = new StyledLabel(item.Title, _scale, fontSize: 14);
         title.AddThemeColorOverride("font_color", TitleColor);
-        title.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        title.AutowrapMode = TextServer.AutowrapMode.Off;
+        title.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         title.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(title);
@@ -118,31 +124,11 @@ public class NewsSection : VBoxContainer
         date.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(date);
 
-        row.MouseEntered += () =>
-        {
-            row.AddThemeStyleboxOverride("panel", hoverStyle);
-            title.AddThemeColorOverride("font_color", HoverColor);
-        };
-        row.MouseExited += () =>
-        {
-            row.AddThemeStyleboxOverride("panel", normalStyle);
-            title.AddThemeColorOverride("font_color", TitleColor);
-        };
-        row.GuiInput += ev =>
-        {
-            if (ev is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
-            {
-                OpenInAppWebView(item.Url);
-                row.AcceptEvent();
-            }
-            else if (ev is InputEventScreenTouch t && t.Pressed)
-            {
-                OpenInAppWebView(item.Url);
-                row.AcceptEvent();
-            }
-        };
+        btn.MouseEntered += () => title.AddThemeColorOverride("font_color", HoverColor);
+        btn.MouseExited += () => title.AddThemeColorOverride("font_color", TitleColor);
+        btn.Pressed += () => OpenInAppWebView(item.Url);
 
-        return row;
+        return btn;
     }
 
     // Tries to open the article inside the launcher via the GodotApp
