@@ -73,16 +73,18 @@ public class NewsSection : VBoxContainer
     private Button BuildRow(SteamNewsItem item)
     {
         // Use a flat Button so each row is its own touch target with built-in
-        // hover/pressed feedback. Wraps a 2-line label (title + date) inside.
+        // hover/pressed feedback. Wraps a Label (title + date subline) inside.
         var btn = new Button();
         btn.Flat = true;
         btn.ClipText = false;
         btn.Alignment = HorizontalAlignment.Left;
         btn.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        btn.CustomMinimumSize = new Vector2(0, (int)(34 * _scale));
+        // Tall enough to fit a 2-line wrapped title plus a date subline at
+        // larger font sizes; the inner VBox grows past this if needed.
+        btn.CustomMinimumSize = new Vector2(0, (int)(56 * _scale));
 
         var transparent = StyledButton.MakeFilled(Colors.Transparent, 0);
-        var hover = StyledButton.MakeFilled(new Color(1f, 1f, 1f, 0.05f), (int)(2 * _scale));
+        var hover = StyledButton.MakeFilled(new Color(1f, 1f, 1f, 0.06f), (int)(3 * _scale));
         btn.AddThemeStyleboxOverride("normal", transparent);
         btn.AddThemeStyleboxOverride("hover", hover);
         btn.AddThemeStyleboxOverride("pressed", hover);
@@ -92,15 +94,19 @@ public class NewsSection : VBoxContainer
         btn.AddThemeFontSizeOverride("font_size", 1);
 
         var inner = new VBoxContainer();
-        inner.AddThemeConstantOverride("separation", 0);
+        inner.AddThemeConstantOverride("separation", (int)(2 * _scale));
         inner.MouseFilter = Control.MouseFilterEnum.Ignore;
         inner.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        inner.SizeFlagsVertical = SizeFlags.ExpandFill;
         btn.AddChild(inner);
 
-        var title = new StyledLabel(item.Title, _scale, fontSize: 12);
+        var title = new StyledLabel(item.Title, _scale, fontSize: 14);
         title.AddThemeColorOverride("font_color", TitleColor);
-        title.AutowrapMode = TextServer.AutowrapMode.Off;
-        title.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        // Wrap long titles instead of truncating to "Beta..." — the news
+        // column is wide in landscape, but press headlines can still spill
+        // beyond a single line.
+        title.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         title.MouseFilter = Control.MouseFilterEnum.Ignore;
         inner.AddChild(title);
 
@@ -111,19 +117,37 @@ public class NewsSection : VBoxContainer
 
         btn.MouseEntered += () => title.AddThemeColorOverride("font_color", HoverColor);
         btn.MouseExited += () => title.AddThemeColorOverride("font_color", TitleColor);
-        btn.Pressed += () =>
-        {
-            try
-            {
-                OS.ShellOpen(item.Url);
-            }
-            catch (Exception ex)
-            {
-                STS2Mobile.PatchHelper.Log($"[News] Failed to open {item.Url}: {ex.Message}");
-            }
-        };
+        btn.Pressed += () => OpenInAppWebView(item.Url);
 
         return btn;
+    }
+
+    // Tries to open the article inside the launcher via the GodotApp
+    // WebView overlay; falls back to the system browser if the JNI bridge
+    // isn't available (e.g. running on desktop for dev).
+    private static void OpenInAppWebView(string url)
+    {
+        try
+        {
+            var jcw = Engine.GetSingleton("JavaClassWrapper");
+            var wrapper = (GodotObject)jcw.Call("wrap", "com.game.sts2launcher.GodotApp");
+            var godotApp = (GodotObject)wrapper.Call("getInstance");
+            godotApp.Call("showWebView", url);
+        }
+        catch (Exception ex)
+        {
+            STS2Mobile.PatchHelper.Log(
+                $"[News] In-app WebView unavailable ({ex.Message}); falling back to OS shell"
+            );
+            try
+            {
+                OS.ShellOpen(url);
+            }
+            catch (Exception ex2)
+            {
+                STS2Mobile.PatchHelper.Log($"[News] Failed to open {url}: {ex2.Message}");
+            }
+        }
     }
 
     // "3d ago", "2w ago", "Mar 5" — keeps the row to a single short line.

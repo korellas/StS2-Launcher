@@ -34,7 +34,7 @@ public class LauncherView
         bg.GuiInput += DismissKeyboard;
         parent.AddChild(bg);
 
-        _panel = new StyledPanel(scale, widthRatio: 0.9f);
+        _panel = new StyledPanel(scale, widthRatio: 0.95f);
         _panel.UpdateSizeFromViewport(vpSize);
         _panel.Panel.GuiInput += DismissKeyboard;
         parent.AddChild(_panel);
@@ -100,17 +100,27 @@ public class LauncherView
         fmodCredit.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.55f));
         fmodContainer.AddChild(fmodCredit);
 
-        var right = new VBoxContainer();
-        right.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        right.SizeFlagsStretchRatio = 4f;
-        right.AddThemeConstantOverride("separation", (int)(8 * scale));
-        hbox.AddChild(right);
+        // Center column: Steam News. Lives between controls and console
+        // so it can use the horizontal space landscape mode gives us. The
+        // 3:3 split with the console gives titles enough width to render in
+        // a single line without ellipsis-truncation.
+        var newsCol = new VBoxContainer();
+        newsCol.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        newsCol.SizeFlagsStretchRatio = 3f;
+        newsCol.AddThemeConstantOverride("separation", (int)(6 * scale));
+        hbox.AddChild(newsCol);
 
         News = new NewsSection(scale);
-        // Cap the news panel's vertical share so the console keeps the
-        // majority of the right-hand column when many announcements load.
-        News.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
-        right.AddChild(News);
+        News.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+        newsCol.AddChild(News);
+
+        // Right column: console log. Same flex weight as news so the two
+        // share the panel evenly after controls take their fixed share.
+        var right = new VBoxContainer();
+        right.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        right.SizeFlagsStretchRatio = 3f;
+        right.AddThemeConstantOverride("separation", (int)(6 * scale));
+        hbox.AddChild(right);
 
         var logTitle = new StyledLabel("Console", scale, fontSize: 14);
         logTitle.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.65f));
