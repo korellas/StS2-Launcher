@@ -661,100 +661,43 @@ public class GodotApp extends GodotActivity {
 		runOnUiThread(this::closeWebViewInternal);
 	}
 
-	private static final String TRANSLATE_HOST_SUFFIX = ".translate.goog";
+	// Use Naver Papago instead of Google Translate's `.translate.goog`
+	// proxy. The Google proxy serves a "This translation service isn't
+	// available in your region" page in Korea (where this fork's user
+	// base lives), and Papago is a Korean-native service so region
+	// blocking isn't an issue. Papago's website translator takes the
+	// source URL via the `st` query param.
+	private static final String PAPAGO_PREFIX =
+			"https://papago.naver.com/website?source=auto&target=ko&st=";
 
 	private static boolean isTranslatedUrl(String url) {
-		if (url == null) {
-			return false;
-		}
-		try {
-			String host = Uri.parse(url).getHost();
-			return host != null && host.endsWith(TRANSLATE_HOST_SUFFIX);
-		} catch (Exception e) {
-			return false;
-		}
+		return url != null && url.startsWith(PAPAGO_PREFIX);
 	}
 
-	// Wraps a URL through Google Translate's transparent proxy
-	// (`<host-with-dashes>.translate.goog`) with Korean as the target
-	// language. Preserves path, query, and fragment so deep links like
-	// /news/app/<id>/view/<post> continue to resolve.
 	private static String toTranslatedUrl(String url) {
 		try {
-			Uri u = Uri.parse(url);
-			String host = u.getHost();
-			if (host == null || host.endsWith(TRANSLATE_HOST_SUFFIX)) {
+			if (url == null || isTranslatedUrl(url)) {
 				return url;
 			}
-			String translatedHost = host.replace('.', '-') + TRANSLATE_HOST_SUFFIX;
-			StringBuilder sb = new StringBuilder();
-			sb.append(u.getScheme() != null ? u.getScheme() : "https")
-					.append("://")
-					.append(translatedHost);
-			if (u.getPort() != -1) {
-				sb.append(":").append(u.getPort());
-			}
-			if (u.getPath() != null) {
-				sb.append(u.getPath());
-			}
-			sb.append("?");
-			String existingQuery = u.getQuery();
-			if (existingQuery != null && !existingQuery.isEmpty()) {
-				sb.append(existingQuery).append("&");
-			}
-			sb.append("_x_tr_sl=auto&_x_tr_tl=ko&_x_tr_hl=ko&_x_tr_pto=wapp");
-			if (u.getFragment() != null) {
-				sb.append("#").append(u.getFragment());
-			}
-			return sb.toString();
+			return PAPAGO_PREFIX + Uri.encode(url);
 		} catch (Exception e) {
 			Log.w(TAG, "toTranslatedUrl failed for " + url, e);
 			return url;
 		}
 	}
 
-	// Reverse of toTranslatedUrl. Reconstruct the original URL from the
-	// proxy host so the user can flip back to the source page.
 	private static String toOriginalUrl(String url) {
 		try {
-			Uri u = Uri.parse(url);
-			String host = u.getHost();
-			if (host == null || !host.endsWith(TRANSLATE_HOST_SUFFIX)) {
+			if (url == null || !isTranslatedUrl(url)) {
 				return url;
 			}
-			String prefix = host.substring(
-					0, host.length() - TRANSLATE_HOST_SUFFIX.length());
-			String originalHost = prefix.replace('-', '.');
-			StringBuilder sb = new StringBuilder();
-			sb.append(u.getScheme() != null ? u.getScheme() : "https")
-					.append("://")
-					.append(originalHost);
-			if (u.getPort() != -1) {
-				sb.append(":").append(u.getPort());
+			String encoded = url.substring(PAPAGO_PREFIX.length());
+			// Trim any extra params Papago appended after the URL.
+			int amp = encoded.indexOf('&');
+			if (amp >= 0) {
+				encoded = encoded.substring(0, amp);
 			}
-			if (u.getPath() != null) {
-				sb.append(u.getPath());
-			}
-			// Strip the _x_tr_* params we appended; keep anything else.
-			String q = u.getQuery();
-			if (q != null && !q.isEmpty()) {
-				StringBuilder kept = new StringBuilder();
-				for (String part : q.split("&")) {
-					if (!part.startsWith("_x_tr_") && !part.isEmpty()) {
-						if (kept.length() > 0) {
-							kept.append("&");
-						}
-						kept.append(part);
-					}
-				}
-				if (kept.length() > 0) {
-					sb.append("?").append(kept);
-				}
-			}
-			if (u.getFragment() != null) {
-				sb.append("#").append(u.getFragment());
-			}
-			return sb.toString();
+			return Uri.decode(encoded);
 		} catch (Exception e) {
 			Log.w(TAG, "toOriginalUrl failed for " + url, e);
 			return url;

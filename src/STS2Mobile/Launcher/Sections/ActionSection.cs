@@ -85,16 +85,21 @@ public class ActionSection : VBoxContainer
         _updateButton.Pressed += () => CheckForUpdatesPressed?.Invoke();
         AddChild(_updateButton);
 
-        // Banner explaining what the orange button does — passive
-        // "v0.3.x → v0.3.y available" text in the corner is too easy to
-        // miss; this sits right above the action so the call-to-action is
-        // unmissable when there's an update.
-        _appUpdateBanner = new StyledLabel("", scale, fontSize: 12);
+        // Single-line action prompt that sits right above the orange button.
+        // WordSmart auto-wrap caused a layout cycle on device — autowrap
+        // labels in a Container need a known width to compute their
+        // height, but the left column's width depends on its children's
+        // preferred sizes — so the banner kept reporting a huge height
+        // and shoved every other control out of the visible panel area.
+        // Off + ellipsis keeps the row a fixed height; the column is wide
+        // enough that a short prompt fits without truncation.
+        _appUpdateBanner = new StyledLabel("", scale, fontSize: 11);
         _appUpdateBanner.AddThemeColorOverride(
             "font_color",
             new Color(1.0f, 0.85f, 0.4f)
         );
-        _appUpdateBanner.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _appUpdateBanner.AutowrapMode = TextServer.AutowrapMode.Off;
+        _appUpdateBanner.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         _appUpdateBanner.HorizontalAlignment = HorizontalAlignment.Center;
         _appUpdateBanner.Visible = false;
         AddChild(_appUpdateBanner);
@@ -205,8 +210,8 @@ public class ActionSection : VBoxContainer
         _appUpdateButton.Visible = true;
 
         _appUpdateBanner.Text = string.IsNullOrEmpty(version)
-            ? "🔔 New launcher version available — tap below to install"
-            : $"🔔 New launcher v{version} ready — tap below to install";
+            ? "Update ready ↓"
+            : $"v{version} ready — tap ↓";
         _appUpdateBanner.Visible = true;
     }
 
@@ -221,28 +226,27 @@ public class ActionSection : VBoxContainer
         _appUpdateButton.Disabled = true;
         var pct = (int)System.Math.Round(System.Math.Clamp(fraction, 0, 1) * 100);
         _appUpdateButton.Text = $"Downloading… {pct}%";
-        _appUpdateBanner.Text = "Downloading update — please wait";
+        _appUpdateBanner.Text = "Downloading…";
     }
 
     public void SetAppUpdateReadyToInstall()
     {
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Text = "TAP TO INSTALL";
-        _appUpdateBanner.Text = "✅ Download complete — tap below to install";
+        _appUpdateBanner.Text = "Ready to install ↓";
     }
 
     public void SetAppUpdatePermissionNeeded()
     {
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Text = "ALLOW INSTALL IN SETTINGS";
-        _appUpdateBanner.Text =
-            "Android needs permission to install updates — tap below";
+        _appUpdateBanner.Text = "Permission needed ↓";
     }
 
     public void SetAppUpdateFailed()
     {
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Text = _appUpdateBaseText + " (retry)";
-        _appUpdateBanner.Text = "Update download failed — tap below to retry";
+        _appUpdateBanner.Text = "Download failed — retry ↓";
     }
 }

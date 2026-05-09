@@ -122,9 +122,27 @@ public class LauncherView
         right.AddThemeConstantOverride("separation", (int)(6 * scale));
         hbox.AddChild(right);
 
+        // Console header row: title on the left, Copy button on the right.
+        // Copy puts the entire log into the system clipboard so users can
+        // paste it into a bug report — selection-and-copy on a touchscreen
+        // RichTextLabel is fiddly enough that a one-tap dump is worth it.
+        var logHeader = new HBoxContainer();
+        logHeader.AddThemeConstantOverride("separation", (int)(8 * scale));
+        right.AddChild(logHeader);
+
         var logTitle = new StyledLabel("Console", scale, fontSize: 14);
         logTitle.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.65f));
-        right.AddChild(logTitle);
+        logTitle.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        logHeader.AddChild(logTitle);
+
+        var copyLogsButton = new StyledButton("Copy", scale, fontSize: 11, height: 26);
+        copyLogsButton.CustomMinimumSize = new Vector2((int)(60 * scale), (int)(26 * scale));
+        copyLogsButton.Pressed += () =>
+        {
+            DisplayServer.ClipboardSet(Log.GetParsedText());
+            Log.AppendLog("[copied console contents to clipboard]");
+        };
+        logHeader.AddChild(copyLogsButton);
 
         Log = new LogView(scale);
         Log.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
