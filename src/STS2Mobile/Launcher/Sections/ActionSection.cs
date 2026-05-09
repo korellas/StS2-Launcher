@@ -23,6 +23,7 @@ public class ActionSection : VBoxContainer
     private readonly Button _pullButton;
     private readonly Button _updateButton;
     private readonly StyledButton _appUpdateButton;
+    private readonly StyledLabel _appUpdateBanner;
     private string _appUpdateBaseText = "UPDATE LAUNCHER";
     private readonly StyleBoxFlat _offStyle;
     private readonly StyleBoxFlat _onStyle;
@@ -83,6 +84,20 @@ public class ActionSection : VBoxContainer
         _updateButton.Visible = false;
         _updateButton.Pressed += () => CheckForUpdatesPressed?.Invoke();
         AddChild(_updateButton);
+
+        // Banner explaining what the orange button does — passive
+        // "v0.3.x → v0.3.y available" text in the corner is too easy to
+        // miss; this sits right above the action so the call-to-action is
+        // unmissable when there's an update.
+        _appUpdateBanner = new StyledLabel("", scale, fontSize: 12);
+        _appUpdateBanner.AddThemeColorOverride(
+            "font_color",
+            new Color(1.0f, 0.85f, 0.4f)
+        );
+        _appUpdateBanner.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _appUpdateBanner.HorizontalAlignment = HorizontalAlignment.Center;
+        _appUpdateBanner.Visible = false;
+        AddChild(_appUpdateBanner);
 
         _appUpdateButton = new StyledButton("UPDATE LAUNCHER", scale, fontSize: 16, height: 48);
         _appUpdateButton.Visible = false;
@@ -167,6 +182,7 @@ public class ActionSection : VBoxContainer
         PushPullRow.Visible = false;
         _updateButton.Visible = false;
         _appUpdateButton.Visible = false;
+        _appUpdateBanner.Visible = false;
     }
 
     public void SetPushPullDisabled(bool disabled)
@@ -187,11 +203,17 @@ public class ActionSection : VBoxContainer
         _appUpdateButton.Text = _appUpdateBaseText;
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Visible = true;
+
+        _appUpdateBanner.Text = string.IsNullOrEmpty(version)
+            ? "🔔 New launcher version available — tap below to install"
+            : $"🔔 New launcher v{version} ready — tap below to install";
+        _appUpdateBanner.Visible = true;
     }
 
     public void HideAppUpdate()
     {
         _appUpdateButton.Visible = false;
+        _appUpdateBanner.Visible = false;
     }
 
     public void SetAppUpdateProgress(double fraction)
@@ -199,23 +221,28 @@ public class ActionSection : VBoxContainer
         _appUpdateButton.Disabled = true;
         var pct = (int)System.Math.Round(System.Math.Clamp(fraction, 0, 1) * 100);
         _appUpdateButton.Text = $"Downloading… {pct}%";
+        _appUpdateBanner.Text = "Downloading update — please wait";
     }
 
     public void SetAppUpdateReadyToInstall()
     {
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Text = "TAP TO INSTALL";
+        _appUpdateBanner.Text = "✅ Download complete — tap below to install";
     }
 
     public void SetAppUpdatePermissionNeeded()
     {
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Text = "ALLOW INSTALL IN SETTINGS";
+        _appUpdateBanner.Text =
+            "Android needs permission to install updates — tap below";
     }
 
     public void SetAppUpdateFailed()
     {
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Text = _appUpdateBaseText + " (retry)";
+        _appUpdateBanner.Text = "Update download failed — tap below to retry";
     }
 }
