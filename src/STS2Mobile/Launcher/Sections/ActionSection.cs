@@ -10,6 +10,7 @@ public class ActionSection : VBoxContainer
     public event Action RetryPressed;
     public event Action<bool> LocalBackupToggled;
     public event Action<bool> CloudSyncToggled;
+    public event Action<bool> BetaChannelToggled;
     public event Action CloudPushPressed;
     public event Action CloudPullPressed;
     public event Action CheckForUpdatesPressed;
@@ -19,11 +20,11 @@ public class ActionSection : VBoxContainer
     private readonly Button _retryButton;
     private readonly StyledButton _localBackupToggle;
     private readonly StyledButton _cloudSyncToggle;
+    private readonly StyledButton _betaChannelToggle;
     private readonly Button _pushButton;
     private readonly Button _pullButton;
     private readonly Button _updateButton;
     private readonly StyledButton _appUpdateButton;
-    private readonly StyledLabel _appUpdateBanner;
     private string _appUpdateBaseText = "UPDATE LAUNCHER";
     private readonly StyleBoxFlat _offStyle;
     private readonly StyleBoxFlat _onStyle;
@@ -64,6 +65,28 @@ public class ActionSection : VBoxContainer
         };
         AddChild(_cloudSyncToggle);
 
+        // Channel toggle. Off (default) → follow Steam's `public` branch.
+        // On → prefer any beta-named branch (e.g. STS2's `public-beta`).
+        // The user MUST opt into the same beta channel inside the Steam
+        // client first; otherwise GetManifestRequestCode fails with
+        // "Ensure the account owns this app" on protected branches.
+        _betaChannelToggle = new StyledButton(
+            "Beta Channel: OFF",
+            scale,
+            fontSize: 14,
+            height: 44
+        );
+        _betaChannelToggle.ToggleMode = true;
+        _betaChannelToggle.Visible = false;
+        ApplyToggleStyle(_betaChannelToggle, false);
+        _betaChannelToggle.Toggled += pressed =>
+        {
+            _betaChannelToggle.Text = pressed ? "Beta Channel: ON" : "Beta Channel: OFF";
+            ApplyToggleStyle(_betaChannelToggle, pressed);
+            BetaChannelToggled?.Invoke(pressed);
+        };
+        AddChild(_betaChannelToggle);
+
         var pushPullRow = new HBoxContainer();
         pushPullRow.Visible = false;
         pushPullRow.AddThemeConstantOverride("separation", (int)(6 * scale));
@@ -85,25 +108,11 @@ public class ActionSection : VBoxContainer
         _updateButton.Pressed += () => CheckForUpdatesPressed?.Invoke();
         AddChild(_updateButton);
 
-        // Single-line action prompt that sits right above the orange button.
-        // WordSmart auto-wrap caused a layout cycle on device — autowrap
-        // labels in a Container need a known width to compute their
-        // height, but the left column's width depends on its children's
-        // preferred sizes — so the banner kept reporting a huge height
-        // and shoved every other control out of the visible panel area.
-        // Off + ellipsis keeps the row a fixed height; the column is wide
-        // enough that a short prompt fits without truncation.
-        _appUpdateBanner = new StyledLabel("", scale, fontSize: 11);
-        _appUpdateBanner.AddThemeColorOverride(
-            "font_color",
-            new Color(1.0f, 0.85f, 0.4f)
-        );
-        _appUpdateBanner.AutowrapMode = TextServer.AutowrapMode.Off;
-        _appUpdateBanner.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        _appUpdateBanner.HorizontalAlignment = HorizontalAlignment.Center;
-        _appUpdateBanner.Visible = false;
-        AddChild(_appUpdateBanner);
-
+        // No banner above the orange UPDATE LAUNCHER button. Earlier versions
+        // had a single-line yellow prompt here, but the user found it noisy
+        // and asked us to remove it — the button itself already changes label
+        // (e.g. "UPDATE LAUNCHER → v0.3.19", "Downloading… 42%",
+        // "TAP TO INSTALL") so a separate prompt was redundant.
         _appUpdateButton = new StyledButton("UPDATE LAUNCHER", scale, fontSize: 16, height: 48);
         _appUpdateButton.Visible = false;
         var appUpdateStyle = StyledButton.MakeFilled(
@@ -144,6 +153,13 @@ public class ActionSection : VBoxContainer
         ApplyToggleStyle(_cloudSyncToggle, value);
     }
 
+    public void SetBetaChannelChecked(bool value)
+    {
+        _betaChannelToggle.ButtonPressed = value;
+        _betaChannelToggle.Text = value ? "Beta Channel: ON" : "Beta Channel: OFF";
+        ApplyToggleStyle(_betaChannelToggle, value);
+    }
+
     private void ApplyToggleStyle(Button button, bool on)
     {
         var style = on ? _onStyle : _offStyle;
@@ -161,6 +177,7 @@ public class ActionSection : VBoxContainer
         _launchButton.Visible = true;
         _localBackupToggle.Visible = showCloudSync;
         _cloudSyncToggle.Visible = showCloudSync;
+        _betaChannelToggle.Visible = showCloudSync;
         PushPullRow.Visible = showCloudSync;
         _updateButton.Visible = showUpdate;
         _updateButton.Disabled = false;
@@ -174,6 +191,7 @@ public class ActionSection : VBoxContainer
         _launchButton.Visible = false;
         _localBackupToggle.Visible = false;
         _cloudSyncToggle.Visible = false;
+        _betaChannelToggle.Visible = false;
         PushPullRow.Visible = false;
         _updateButton.Visible = false;
     }
@@ -184,10 +202,10 @@ public class ActionSection : VBoxContainer
         _retryButton.Visible = false;
         _localBackupToggle.Visible = false;
         _cloudSyncToggle.Visible = false;
+        _betaChannelToggle.Visible = false;
         PushPullRow.Visible = false;
         _updateButton.Visible = false;
         _appUpdateButton.Visible = false;
-        _appUpdateBanner.Visible = false;
     }
 
     public void SetPushPullDisabled(bool disabled)
@@ -208,17 +226,11 @@ public class ActionSection : VBoxContainer
         _appUpdateButton.Text = _appUpdateBaseText;
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Visible = true;
-
-        _appUpdateBanner.Text = string.IsNullOrEmpty(version)
-            ? "Update ready ↓"
-            : $"v{version} ready — tap ↓";
-        _appUpdateBanner.Visible = true;
     }
 
     public void HideAppUpdate()
     {
         _appUpdateButton.Visible = false;
-        _appUpdateBanner.Visible = false;
     }
 
     public void SetAppUpdateProgress(double fraction)
@@ -226,27 +238,23 @@ public class ActionSection : VBoxContainer
         _appUpdateButton.Disabled = true;
         var pct = (int)System.Math.Round(System.Math.Clamp(fraction, 0, 1) * 100);
         _appUpdateButton.Text = $"Downloading… {pct}%";
-        _appUpdateBanner.Text = "Downloading…";
     }
 
     public void SetAppUpdateReadyToInstall()
     {
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Text = "TAP TO INSTALL";
-        _appUpdateBanner.Text = "Ready to install ↓";
     }
 
     public void SetAppUpdatePermissionNeeded()
     {
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Text = "ALLOW INSTALL IN SETTINGS";
-        _appUpdateBanner.Text = "Permission needed ↓";
     }
 
     public void SetAppUpdateFailed()
     {
         _appUpdateButton.Disabled = false;
         _appUpdateButton.Text = _appUpdateBaseText + " (retry)";
-        _appUpdateBanner.Text = "Download failed — retry ↓";
     }
 }

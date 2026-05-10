@@ -116,6 +116,7 @@ public class LauncherController
         _view.Actions.RetryPressed += OnRetryPressed;
         _view.Actions.LocalBackupToggled += OnLocalBackupToggled;
         _view.Actions.CloudSyncToggled += OnCloudSyncToggled;
+        _view.Actions.BetaChannelToggled += OnBetaChannelToggled;
         _view.Actions.CloudPushPressed += OnCloudPushPressed;
         _view.Actions.CloudPullPressed += OnCloudPullPressed;
         _view.Actions.CheckForUpdatesPressed += OnCheckForUpdatesPressed;
@@ -127,6 +128,14 @@ public class LauncherController
         if (localBackupPref)
             AppPaths.EnsureExternalDirectories();
         _view.Actions.SetCloudSyncChecked(LauncherModel.LoadCloudSyncPref());
+
+        // Channel pref must be applied to DepotDownloader BEFORE the first
+        // CheckForUpdates / Download runs — branch selection is decided in
+        // PickBestBranch. We persist + reload here on every Start() so the
+        // user's choice survives restarts.
+        var betaPref = LauncherModel.LoadBetaChannelPref();
+        _view.Actions.SetBetaChannelChecked(betaPref);
+        DepotDownloader.PreferBeta = betaPref;
 
         var result = _model.StartSession();
         HandleFastPath(result);
@@ -483,6 +492,23 @@ public class LauncherController
     {
         LauncherModel.SaveCloudSyncPref(pressed);
         LauncherPatches.CloudSyncEnabled = pressed;
+    }
+
+    private void OnBetaChannelToggled(bool pressed)
+    {
+        LauncherModel.SaveBetaChannelPref(pressed);
+        DepotDownloader.PreferBeta = pressed;
+        if (pressed)
+        {
+            _view.AppendLog(
+                "Beta channel enabled — also opt into 'public-beta' in Steam (Library → "
+                    + "Slay the Spire 2 → Properties → Betas) before next update."
+            );
+        }
+        else
+        {
+            _view.AppendLog("Beta channel disabled — following stable (public) branch.");
+        }
     }
 
     private void OnCloudPushPressed()

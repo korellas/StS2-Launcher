@@ -414,6 +414,33 @@ public class LauncherModel : IDisposable
         catch { }
     }
 
+    private static string BetaChannelPrefPath =>
+        Path.Combine(OS.GetDataDir(), "beta_channel_enabled");
+
+    // Default to OFF (stable/public). Beta requires the user to opt into the
+    // matching `public-beta` branch in their Steam client first — otherwise
+    // GetManifestRequestCode fails with "Ensure the account owns this app".
+    // Make them flip the switch deliberately.
+    public static bool LoadBetaChannelPref()
+    {
+        try
+        {
+            if (File.Exists(BetaChannelPrefPath))
+                return File.ReadAllText(BetaChannelPrefPath).Trim() == "true";
+        }
+        catch { }
+        return false;
+    }
+
+    public static void SaveBetaChannelPref(bool enabled)
+    {
+        try
+        {
+            File.WriteAllText(BetaChannelPrefPath, enabled ? "true" : "false");
+        }
+        catch { }
+    }
+
     public static GodotObject GetGodotApp()
     {
         try

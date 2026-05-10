@@ -30,6 +30,13 @@ public class DepotDownloader : IDisposable
     private const int MaxRetries = 5;
     private const int MaxConcurrentDownloads = 8;
 
+    // When true, PickBestBranch prefers a beta-named branch (e.g.
+    // STS2's `public-beta`) over plain `public`. The user must also
+    // opt into the corresponding beta in their Steam client; otherwise
+    // GetManifestRequestCode returns 0 and the download fails. Set
+    // from LauncherController based on the persisted launcher pref.
+    public static bool PreferBeta { get; set; } = false;
+
     private readonly SteamConnection _connection;
     private readonly string _gameDir;
     private readonly string _stateDir;
@@ -284,15 +291,11 @@ public class DepotDownloader : IDisposable
                     continue;
             }
 
-            // Slay the Spire 2 ships its rapid-iteration patches on a `beta`
-            // branch and only periodically promotes a snapshot to `public`.
-            // Hardcoding `public` here meant the launcher saw the game as
-            // up-to-date for weeks while the user's Steam install (opted
-            // into beta) had moved many patches ahead. Walk every branch
-            // exposed in the manifest KeyValue and pick whichever has the
-            // most recent `timeupdated` — `public` still wins by default
-            // because it usually re-publishes shortly after a beta drop,
-            // but beta keeps us current in between.
+            // Branch selection is centralized in PickBestBranch and
+            // honors the user's Beta Channel toggle (DepotDownloader
+            // .PreferBeta). Default is `public` (stable). Users who
+            // have opted into the Steam beta can flip the launcher
+            // toggle to follow `public-beta` between stable promos.
             var (selectedBranch, manifestId) = PickBestBranch(manifests);
             if (selectedBranch == null)
                 continue;
@@ -309,19 +312,22 @@ public class DepotDownloader : IDisposable
     // Picks the best (branch name, manifest gid) pair to follow.
     //
     // Steam doesn't populate `timeupdated` for STS2 (every branch reports
-    // 0), so we can't rank by recency. Instead, prefer any beta-flavoured
-    // branch (e.g. STS2's `public-beta`) over plain `public`: this fork
-    // is sideloaded by early-access enthusiasts who keep their Steam
-    // client opted into the beta channel, and they expect the launcher
-    // to follow the same builds. If multiple beta branches exist, the
-    // one with the highest `timeupdated` wins; on ties, the first one
-    // PICS returned. If no beta-named branch is available, fall back to
-    // `public`. Password-gated branches are still skipped — we can't
-    // download from those.
+    // 0), so we can't rank by recency. Behavior depends on PreferBeta:
     //
-    // TODO: surface a Stable/Beta toggle in the launcher UI for users
-    // who want to stay on `public`; for now the audience is overwhelmingly
-    // on beta.
+    //   PreferBeta = false (default):
+    //     Always pick `public`. Safe for users who haven't opted into
+    //     a beta inside the Steam client — protected branches would
+    //     otherwise fail with "Ensure the account owns this app" at
+    //     GetManifestRequestCode time.
+    //
+    //   PreferBeta = true:
+    //     Prefer any beta-flavoured branch (e.g. STS2's `public-beta`)
+    //     over plain `public`. If multiple beta branches exist, pick
+    //     the highest `timeupdated`; on ties, the first PICS returned.
+    //     If no beta-named branch is available, fall back to `public`.
+    //
+    // Password-gated branches are always skipped — we can't download
+    // those without a password we don't have.
     private static (string Branch, ulong ManifestId) PickBestBranch(KeyValue manifests)
     {
         var candidates = new List<(string Name, ulong ManifestId, long TimeUpdated)>();
@@ -354,12 +360,15 @@ public class DepotDownloader : IDisposable
         if (candidates.Count == 0)
             return (null, 0);
 
-        var betas = candidates
-            .Where(c => c.Name.IndexOf("beta", StringComparison.OrdinalIgnoreCase) >= 0)
-            .OrderByDescending(c => c.TimeUpdated)
-            .ToList();
-        if (betas.Count > 0)
-            return (betas[0].Name, betas[0].ManifestId);
+        if (PreferBeta)
+        {
+            var betas = candidates
+                .Where(c => c.Name.IndexOf("beta", StringComparison.OrdinalIgnoreCase) >= 0)
+                .OrderByDescending(c => c.TimeUpdated)
+                .ToList();
+            if (betas.Count > 0)
+                return (betas[0].Name, betas[0].ManifestId);
+        }
 
         var pub = candidates.FirstOrDefault(c => c.Name == "public");
         if (pub.Name != null)
