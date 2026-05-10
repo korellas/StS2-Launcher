@@ -15,6 +15,8 @@ import android.net.Uri;
 
 import android.content.SharedPreferences;
 
+import java.net.URLEncoder;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -530,6 +532,25 @@ public class GodotApp extends GodotActivity {
 			closeParams.rightMargin = (int) (12 * density);
 			topBar.addView(closeButton, closeParams);
 
+			// Korean site-translation toggle. We use Microsoft's
+			// translatetheweb.com — it's reachable from Korea (unlike
+			// Google's `.translate.goog`) and accepts a URL parameter
+			// for whole-page translation (unlike Papago, whose `st=`
+			// is text-only and lands on the home page). Steam's
+			// `?l=koreana` only swaps Steam's own chrome strings; it
+			// won't translate community announcement bodies, which is
+			// what the user actually wants to read.
+			Button translateButton = new Button(this);
+			translateButton.setText("🌐 KO");
+			translateButton.setAllCaps(false);
+			translateButton.setTextColor(0xFFE6E6EA);
+			translateButton.setBackgroundColor(0xFF2D2F35);
+			LinearLayout.LayoutParams translateParams = new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.WRAP_CONTENT,
+					(int) (40 * density));
+			translateParams.rightMargin = (int) (12 * density);
+			topBar.addView(translateButton, translateParams);
+
 			TextView urlLabel = new TextView(this);
 			urlLabel.setText(url);
 			urlLabel.setTextColor(0xFFB0B0BA);
@@ -538,12 +559,6 @@ public class GodotApp extends GodotActivity {
 			urlLabel.setTextSize(11);
 			topBar.addView(urlLabel, new LinearLayout.LayoutParams(
 					0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-			// Steam's own Korean translations are usually better than any
-			// auto-translated proxy, so we let the server pick. The locale
-			// override (`?l=koreana`) is appended below in maybeAddKoreanLocale
-			// when the URL points at a Steam domain. No client-side
-			// translation toggle needed for the common case.
 
 			FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(
 					ViewGroup.LayoutParams.MATCH_PARENT, barHeight,
@@ -600,7 +615,26 @@ public class GodotApp extends GodotActivity {
 			webParams.topMargin = barHeight;
 			overlay.addView(webView, webParams);
 
-			webView.loadUrl(maybeAddKoreanLocale(url));
+			final String originalUrl = url;
+			final boolean[] translateActive = { false };
+			Runnable refreshTranslateButton = () -> translateButton.setText(
+					translateActive[0] ? "🌐 KO ✓" : "🌐 KO");
+
+			webView.loadUrl(maybeAddKoreanLocale(originalUrl));
+
+			translateButton.setOnClickListener(v -> {
+				translateActive[0] = !translateActive[0];
+				refreshTranslateButton.run();
+				// Always navigate from the original (un-localised) URL so the
+				// proxy isn't given a `?l=koreana`-decorated URL it would then
+				// re-translate. The proxy will convert the announcement body
+				// to Korean directly.
+				if (translateActive[0]) {
+					webView.loadUrl(buildSiteTranslatorUrl(originalUrl));
+				} else {
+					webView.loadUrl(maybeAddKoreanLocale(originalUrl));
+				}
+			});
 
 			// Capture system back gestures while the overlay is up — prefer
 			// in-page back navigation, fall back to closing the overlay.
@@ -636,15 +670,12 @@ public class GodotApp extends GodotActivity {
 		runOnUiThread(this::closeWebViewInternal);
 	}
 
-	// Steam serves localised announcement pages directly when given an
-	// `l=koreana` query param. We use this instead of any client-side
-	// translate proxy because (a) Google's `.translate.goog` is region-
-	// blocked in Korea, (b) Naver Papago's `st` param is for free-text
-	// translation and just lands on the Papago home page when given a
-	// URL, and (c) Steam's own translation, when present, is better than
-	// machine translation anyway. For any non-Steam host we leave the
-	// URL alone — those are press articles where there's no equivalent
-	// server-side toggle.
+	// Adds `l=koreana` to Steam URLs so the Steam-rendered chrome
+	// (header, navigation, footer) is in Korean. Note: this does NOT
+	// translate community announcement bodies — those are written by
+	// the developers and stored verbatim. Use the 🌐 KO toggle
+	// (buildSiteTranslatorUrl) for full body translation. For non-Steam
+	// hosts we leave the URL alone.
 	private static String maybeAddKoreanLocale(String url) {
 		if (url == null || url.isEmpty()) {
 			return url;
@@ -682,6 +713,32 @@ public class GodotApp extends GodotActivity {
 			return result;
 		} catch (Exception e) {
 			Log.w(TAG, "maybeAddKoreanLocale failed for " + url, e);
+			return url;
+		}
+	}
+
+	// Wraps an arbitrary URL in Microsoft's translatetheweb.com proxy so
+	// the page is rendered in Korean. We picked Microsoft over the
+	// alternatives because:
+	//   - Google's `.translate.goog` returns "This translation service
+	//     isn't available in your region" for KR clients.
+	//   - Naver Papago has no public bookmarkable URL for site
+	//     translation; `?st=URL` is the text endpoint and just lands on
+	//     the Papago home page.
+	//   - DeepL and Yandex don't expose a stable site-translate URL
+	//     either (DeepL is text-only, Yandex's translate.yandex.com
+	//     wraps results inconsistently for SPA-heavy pages).
+	// translatetheweb.com has been Microsoft's branded site translator
+	// for over a decade and serves Korean targets fine from KR networks.
+	private static String buildSiteTranslatorUrl(String url) {
+		if (url == null || url.isEmpty()) {
+			return url;
+		}
+		try {
+			String encoded = URLEncoder.encode(url, "UTF-8");
+			return "https://www.translatetheweb.com/?from=&to=ko&a=" + encoded;
+		} catch (Exception e) {
+			Log.w(TAG, "buildSiteTranslatorUrl failed for " + url, e);
 			return url;
 		}
 	}
