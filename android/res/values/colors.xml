@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Deep red from the card frame, so masked launcher shapes keep the art's tone. -->
+    <color name="icon_background">#7A1418</color>
+</resources>
