@@ -28,6 +28,7 @@ public class LauncherView
 
         var vpSize = parent.GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
 
+        Localization.Install();
         GameAssets.LogAvailability();
         GameAssets.DescribeTheme(GameAssets.MenuButtonTheme);
         GameAssets.DescribeTheme(GameAssets.SettingsRowTheme);
@@ -44,8 +45,8 @@ public class LauncherView
         {
             AnchorLeft = 0.5f,
             AnchorRight = 0.5f,
-            AnchorTop = 0.58f,
-            AnchorBottom = 0.58f,
+            AnchorTop = 0.55f,
+            AnchorBottom = 0.55f,
             GrowHorizontal = Control.GrowDirection.Both,
             GrowVertical = Control.GrowDirection.Both,
         };
@@ -54,7 +55,11 @@ public class LauncherView
         parent.AddChild(menu);
         _menu = menu;
 
-        _statusLabel = new StyledLabel("Initializing...", scale, fontSize: 15);
+        var title = new StyledLabel(Localization.Tr("LAUNCHER_TITLE"), scale, fontSize: 30);
+        menu.AddChild(title);
+        menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(10 * scale)) });
+
+        _statusLabel = new StyledLabel(Localization.Tr("STATUS_INITIALIZING"), scale, fontSize: 15);
         _statusLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _statusLabel.Modulate = new Color(1f, 1f, 1f, 0.72f);
         menu.AddChild(_statusLabel);
@@ -78,18 +83,18 @@ public class LauncherView
         // Settings controls are built by ActionSection but belong in a submenu,
         // so they are reparented rather than duplicated: every signal the
         // controller already connected keeps working untouched.
-        var settingsOverlay = new SubmenuOverlay("Settings", scale, widthRatio: 0.5f, heightRatio: 0.7f);
+        var settingsOverlay = new SubmenuOverlay(Localization.Tr("MENU_SETTINGS"), scale, widthRatio: 0.62f, heightRatio: 0.7f);
         Actions.RemoveChild(Actions.SettingsGroup);
         settingsOverlay.Content.AddChild(Actions.SettingsGroup);
         parent.AddChild(settingsOverlay);
 
-        var newsOverlay = new SubmenuOverlay("News", scale);
+        var newsOverlay = new SubmenuOverlay(Localization.Tr("MENU_NEWS"), scale);
         News = new NewsSection(scale);
         News.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         newsOverlay.Content.AddChild(News);
         parent.AddChild(newsOverlay);
 
-        var consoleOverlay = new SubmenuOverlay("Console", scale);
+        var consoleOverlay = new SubmenuOverlay(Localization.Tr("MENU_CONSOLE"), scale);
         Log = new LogView(scale);
         Log.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         Log.GuiInput += DismissKeyboard;
@@ -97,7 +102,7 @@ public class LauncherView
 
         // Copy dumps the whole log to the clipboard: selecting text in a
         // RichTextLabel by touch is fiddly enough that one tap is worth keeping.
-        var copyLogsButton = new GameMenuButton("Copy to clipboard", scale, fontSize: 15);
+        var copyLogsButton = new GameMenuButton(Localization.Tr("ACTION_COPY_LOG"), scale, fontSize: 15);
         copyLogsButton.Pressed += () =>
         {
             DisplayServer.ClipboardSet(Log.GetParsedText());
@@ -110,15 +115,15 @@ public class LauncherView
         // an obvious primary action instead of four equal-weight lines.
         menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(14 * scale)) });
 
-        var newsEntry = new GameMenuButton("News", scale);
+        var newsEntry = new GameMenuButton(Localization.Tr("MENU_NEWS"), scale);
         newsEntry.Pressed += newsOverlay.Open;
         menu.AddChild(newsEntry);
 
-        var settingsEntry = new GameMenuButton("Settings", scale);
+        var settingsEntry = new GameMenuButton(Localization.Tr("MENU_SETTINGS"), scale);
         settingsEntry.Pressed += settingsOverlay.Open;
         menu.AddChild(settingsEntry);
 
-        var consoleEntry = new GameMenuButton("Console", scale);
+        var consoleEntry = new GameMenuButton(Localization.Tr("MENU_CONSOLE"), scale);
         consoleEntry.Pressed += consoleOverlay.Open;
         menu.AddChild(consoleEntry);
 

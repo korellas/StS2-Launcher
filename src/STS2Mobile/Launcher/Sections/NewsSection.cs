@@ -12,10 +12,10 @@ namespace STS2Mobile.Launcher.Sections;
 // is updated by the controller once SteamNewsClient.FetchAsync resolves.
 public class NewsSection : VBoxContainer
 {
-    private static readonly Color StatusColor = new(0.55f, 0.55f, 0.6f);
-    private static readonly Color TitleColor = new(0.85f, 0.85f, 0.9f);
-    private static readonly Color DateColor = new(0.5f, 0.5f, 0.55f);
-    private static readonly Color HoverColor = new(1.0f, 0.8f, 0.3f);
+    private static readonly Color StatusColor = new(0.36f, 0.28f, 0.19f);
+    private static readonly Color TitleColor = LauncherTheme.Ink;
+    private static readonly Color DateColor = new(0.42f, 0.33f, 0.22f);
+    private static readonly Color HoverColor = new(0.62f, 0.34f, 0.08f);
 
     private readonly float _scale;
     private readonly StyledLabel _statusLabel;
@@ -26,11 +26,11 @@ public class NewsSection : VBoxContainer
         _scale = scale;
         AddThemeConstantOverride("separation", (int)(4 * scale));
 
-        var header = new StyledLabel("Steam News", scale, fontSize: 14);
-        header.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.65f));
+        var header = new StyledLabel(Localization.Tr("NEWS_HEADER"), scale, fontSize: 19, align: HorizontalAlignment.Left);
+        header.AddThemeColorOverride("font_color", StatusColor);
         AddChild(header);
 
-        _statusLabel = new StyledLabel("Loading…", scale, fontSize: 11);
+        _statusLabel = new StyledLabel(Localization.Tr("NEWS_LOADING"), scale, fontSize: 17);
         _statusLabel.AddThemeColorOverride("font_color", StatusColor);
         AddChild(_statusLabel);
 
@@ -89,7 +89,7 @@ public class NewsSection : VBoxContainer
 
         var transparent = StyledButton.MakeFilled(Colors.Transparent, 0);
         var hoverStyle = StyledButton.MakeFilled(
-            new Color(1f, 1f, 1f, 0.06f),
+            new Color(0.35f, 0.24f, 0.12f, 0.10f),
             (int)(3 * _scale)
         );
         btn.AddThemeStyleboxOverride("normal", transparent);
@@ -111,7 +111,7 @@ public class NewsSection : VBoxContainer
         inner.AddThemeConstantOverride("separation", (int)(2 * _scale));
         inner.MouseFilter = MouseFilterEnum.Ignore;
 
-        var title = new StyledLabel(item.Title, _scale, fontSize: 14);
+        var title = new StyledLabel(item.Title, _scale, fontSize: 21, align: HorizontalAlignment.Left);
         title.AddThemeColorOverride("font_color", TitleColor);
         title.AutowrapMode = TextServer.AutowrapMode.Off;
         title.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
@@ -119,7 +119,7 @@ public class NewsSection : VBoxContainer
         title.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(title);
 
-        var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 10);
+        var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 15, align: HorizontalAlignment.Left);
         date.AddThemeColorOverride("font_color", DateColor);
         date.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(date);

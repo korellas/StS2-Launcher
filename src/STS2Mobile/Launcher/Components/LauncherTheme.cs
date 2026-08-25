@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Godot;
+using STS2Mobile.Launcher;
 
 namespace STS2Mobile.Launcher.Components;
 
@@ -96,7 +97,11 @@ public static class LauncherTheme
     // game's Korean face, which Kreon has no glyphs for.
     public static void ApplyGameFont(Control control, int fontSize, float scale, bool bold = false)
     {
-        var path = bold ? GameAssets.FontBold : GameAssets.FontRegular;
+        // Kreon carries no Hangul, so Korean has to use the face the game itself
+        // switches to; otherwise every character renders as a box.
+        var path = Localization.IsKorean
+            ? GameAssets.FontKorean
+            : (bold ? GameAssets.FontBold : GameAssets.FontRegular);
         var gameFont = GameAssets.Load<Font>(path);
         if (gameFont != null)
         {

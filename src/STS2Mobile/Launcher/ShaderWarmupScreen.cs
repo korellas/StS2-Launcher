@@ -109,7 +109,7 @@ public class ShaderWarmupScreen : Control
         column.AddThemeConstantOverride("separation", (int)(18 * _scale));
         AddChild(column);
 
-        _statusLabel = new StyledLabel("Compiling shaders", _scale, fontSize: 26);
+        _statusLabel = new StyledLabel(Localization.Tr("STATUS_COMPILING_SHADERS"), _scale, fontSize: 26);
         column.AddChild(_statusLabel);
 
         // Sized here rather than in the component so the bar tracks the viewport
@@ -124,7 +124,7 @@ public class ShaderWarmupScreen : Control
         _progressBar.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
         column.AddChild(_progressBar);
 
-        _detailLabel = new StyledLabel("Enumerating resources", _scale, fontSize: 14);
+        _detailLabel = new StyledLabel(Localization.Tr("STATUS_ENUMERATING"), _scale, fontSize: 14);
         _detailLabel.Modulate = LauncherTheme.Dim;
         column.AddChild(_detailLabel);
     }

@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using STS2Mobile.Launcher;
 
 namespace STS2Mobile.Launcher.Components;
 
@@ -49,7 +50,7 @@ public class SubmenuOverlay : Control
         titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         header.AddChild(titleLabel);
 
-        var close = new GameMenuButton("Close", scale, fontSize: 20, onParchment: true);
+        var close = new GameMenuButton(Localization.Tr("ACTION_CLOSE"), scale, fontSize: 20, onParchment: true);
         close.CustomMinimumSize = new Vector2((int)(90 * scale), 0);
         close.Pressed += Hide;
         header.AddChild(close);

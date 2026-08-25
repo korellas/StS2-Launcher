@@ -1,4 +1,5 @@
 using Godot;
+using STS2Mobile.Launcher;
 
 namespace STS2Mobile.Launcher.Components;
 
@@ -24,6 +25,14 @@ public class GameMenuButton : Button
             // this every entry renders at Godot's default and looks like fine
             // print next to the artwork.
             AddThemeFontSizeOverride("font_size", (int)(fontSize * scale));
+
+            // The theme's font has no Hangul; swap it out rather than render boxes.
+            if (Localization.IsKorean)
+            {
+                var korean = GameAssets.Load<Font>(GameAssets.FontKorean);
+                if (korean != null)
+                    AddThemeFontOverride("font", korean);
+            }
             if (onParchment)
                 AddThemeColorOverride("font_color", LauncherTheme.Ink);
             return;
