@@ -26,11 +26,11 @@ public class NewsSection : VBoxContainer
         _scale = scale;
         AddThemeConstantOverride("separation", (int)(4 * scale));
 
-        var header = new StyledLabel(Localization.Tr("NEWS_HEADER"), scale, fontSize: 19, align: HorizontalAlignment.Left);
+        var header = new StyledLabel(Localization.Tr("NEWS_HEADER"), scale, fontSize: 19, align: HorizontalAlignment.Left, onParchment: true);
         header.AddThemeColorOverride("font_color", StatusColor);
         AddChild(header);
 
-        _statusLabel = new StyledLabel(Localization.Tr("NEWS_LOADING"), scale, fontSize: 17);
+        _statusLabel = new StyledLabel(Localization.Tr("NEWS_LOADING"), scale, fontSize: 17, onParchment: true);
         _statusLabel.AddThemeColorOverride("font_color", StatusColor);
         AddChild(_statusLabel);
 
@@ -46,7 +46,7 @@ public class NewsSection : VBoxContainer
 
         if (items == null || items.Count == 0)
         {
-            _statusLabel.Text = "(no recent announcements)";
+            _statusLabel.Text = Localization.Tr("NEWS_EMPTY");
             _statusLabel.Visible = true;
             return;
         }
@@ -60,7 +60,7 @@ public class NewsSection : VBoxContainer
     public void SetFailed()
     {
         ClearItems();
-        _statusLabel.Text = "(news unavailable)";
+        _statusLabel.Text = Localization.Tr("NEWS_UNAVAILABLE");
         _statusLabel.Visible = true;
     }
 
@@ -111,7 +111,7 @@ public class NewsSection : VBoxContainer
         inner.AddThemeConstantOverride("separation", (int)(2 * _scale));
         inner.MouseFilter = MouseFilterEnum.Ignore;
 
-        var title = new StyledLabel(item.Title, _scale, fontSize: 21, align: HorizontalAlignment.Left);
+        var title = new StyledLabel(item.Title, _scale, fontSize: 21, align: HorizontalAlignment.Left, onParchment: true);
         title.AddThemeColorOverride("font_color", TitleColor);
         title.AutowrapMode = TextServer.AutowrapMode.Off;
         title.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
@@ -119,7 +119,7 @@ public class NewsSection : VBoxContainer
         title.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(title);
 
-        var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 15, align: HorizontalAlignment.Left);
+        var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 15, align: HorizontalAlignment.Left, onParchment: true);
         date.AddThemeColorOverride("font_color", DateColor);
         date.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(date);

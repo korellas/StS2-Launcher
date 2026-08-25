@@ -14,7 +14,7 @@ public class StyledProgressBar : ProgressBar
         AddThemeStyleboxOverride("background", LauncherTheme.Pill(LauncherTheme.TrackFill, heightPx));
         AddThemeStyleboxOverride("fill", LauncherTheme.Pill(LauncherTheme.Gold, heightPx));
 
-        LauncherTheme.ApplyFont(this, 12, scale);
+        LauncherTheme.ApplyGameFont(this, 12, scale);
         AddThemeColorOverride("font_color", LauncherTheme.Cream);
     }
 }

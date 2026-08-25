@@ -135,13 +135,13 @@ public class ShaderWarmupScreen : Control
 
         try
         {
-            _statusLabel.Text = "Scanning for shaders...";
+            _statusLabel.Text = Localization.Tr("STATUS_SCANNING_SHADERS");
             await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
 
             var materials = await CollectMaterialsAsync();
             PatchHelper.Log($"[ShaderWarmup] Collected {materials.Count} materials to warm");
 
-            _statusLabel.Text = "Compiling shaders...";
+            _statusLabel.Text = Localization.Tr("STATUS_COMPILING_SHADERS");
 
             if (materials.Count == 0)
             {
@@ -203,7 +203,7 @@ public class ShaderWarmupScreen : Control
             viewport.QueueFree();
 
             _progressBar.Value = 100;
-            _statusLabel.Text = "Done!";
+            _statusLabel.Text = Localization.Tr("STATUS_DONE");
             _detailLabel.Text = $"Compiled {total} shaders in {sw.ElapsedMilliseconds}ms";
             PatchHelper.Log(
                 $"[ShaderWarmup] Completed: {total} materials in {sw.ElapsedMilliseconds}ms"

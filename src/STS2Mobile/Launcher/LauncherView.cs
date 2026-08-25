@@ -55,7 +55,7 @@ public class LauncherView
         parent.AddChild(menu);
         _menu = menu;
 
-        var title = new StyledLabel(Localization.Tr("LAUNCHER_TITLE"), scale, fontSize: 30);
+        var title = new StyledLabel("Slay the Spire II Launcher", scale, fontSize: 30);
         menu.AddChild(title);
         menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(10 * scale)) });
 

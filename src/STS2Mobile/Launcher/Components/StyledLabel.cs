@@ -8,16 +8,24 @@ public class StyledLabel : Label
         string text,
         float scale,
         int fontSize = 15,
-        HorizontalAlignment align = HorizontalAlignment.Center
+        HorizontalAlignment align = HorizontalAlignment.Center,
+        bool onParchment = false
     )
     {
         Text = text;
         HorizontalAlignment = align;
-        LauncherTheme.ApplyFont(this, fontSize, scale);
+        LauncherTheme.ApplyGameFont(this, fontSize, scale);
+
+        if (onParchment)
+        {
+            // Dark text on light paper needs no shadow, and adding one smears it.
+            AddThemeColorOverride("font_color", LauncherTheme.Ink);
+            return;
+        }
+
         AddThemeColorOverride("font_color", LauncherTheme.Cream);
 
-        // The art behind this is busy; a shadow keeps the text legible without
-        // needing a panel behind every label.
+        // Over the artwork a shadow is what keeps text legible without a panel.
         AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.75f));
         AddThemeConstantOverride("shadow_offset_x", 0);
         AddThemeConstantOverride("shadow_offset_y", (int)(2 * scale));

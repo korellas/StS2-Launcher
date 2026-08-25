@@ -99,8 +99,7 @@ public class ActionSection : VBoxContainer
 
         // Given a heading of their own, these read as "what do I do with my saves"
         // rather than two unexplained actions under the checkboxes.
-        _cloudHeader = new StyledLabel(Localization.Tr("SETTING_CLOUD_HEADER"), scale, fontSize: 18, align: HorizontalAlignment.Left);
-        _cloudHeader.AddThemeColorOverride("font_color", LauncherTheme.Ink);
+        _cloudHeader = new StyledLabel(Localization.Tr("SETTING_CLOUD_HEADER"), scale, fontSize: 18, align: HorizontalAlignment.Left, onParchment: true);
         _cloudHeader.Visible = false;
         SettingsGroup.AddChild(_cloudHeader);
 
@@ -177,7 +176,7 @@ public class ActionSection : VBoxContainer
         _cloudHeader.Visible = showCloudSync;
         _updateButton.Visible = showUpdate;
         _updateButton.Disabled = false;
-        _updateButton.Text = "CHECK FOR UPDATES";
+        _updateButton.Text = Localization.Tr("SETTING_CHECK_UPDATES");
         _retryButton.Visible = false;
     }
 
@@ -243,13 +242,13 @@ public class ActionSection : VBoxContainer
     public void SetAppUpdateReadyToInstall()
     {
         _appUpdateButton.Disabled = false;
-        _appUpdateButton.Text = "TAP TO INSTALL";
+        _appUpdateButton.Text = Localization.Tr("UPDATE_TAP_TO_INSTALL");
     }
 
     public void SetAppUpdatePermissionNeeded()
     {
         _appUpdateButton.Disabled = false;
-        _appUpdateButton.Text = "ALLOW INSTALL IN SETTINGS";
+        _appUpdateButton.Text = Localization.Tr("UPDATE_ALLOW_INSTALL");
     }
 
     public void SetAppUpdateFailed()

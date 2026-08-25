@@ -95,7 +95,7 @@ public class LoadingOverlay : CanvasLayer
             ),
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        _textLabel.AddThemeFontSizeOverride("font_size", (int)(16f * scale));
+        LauncherTheme.ApplyGameFont(_textLabel, 16, scale);
         _textLabel.AddThemeColorOverride("font_color", new Color(0.85f, 0.85f, 0.92f, 0.85f));
         _textLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.75f));
         _textLabel.AddThemeConstantOverride("shadow_offset_x", (int)(1 * scale));

@@ -44,9 +44,7 @@ public class SubmenuOverlay : Control
         Content.AddChild(header);
         Content.MoveChild(header, 0);
 
-        var titleLabel = new StyledLabel(title, scale, fontSize: 24, align: HorizontalAlignment.Left);
-        titleLabel.AddThemeColorOverride("font_color", LauncherTheme.Ink);
-        titleLabel.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0));
+        var titleLabel = new StyledLabel(title, scale, fontSize: 24, align: HorizontalAlignment.Left, onParchment: true);
         titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         header.AddChild(titleLabel);
 

@@ -9,7 +9,7 @@ public class StyledButton : Button
         Text = text;
         float heightPx = height * scale;
         CustomMinimumSize = new Vector2(0, (int)heightPx);
-        LauncherTheme.ApplyFont(this, fontSize, scale);
+        LauncherTheme.ApplyGameFont(this, fontSize, scale);
 
         AddThemeColorOverride("font_color", LauncherTheme.Cream);
         AddThemeColorOverride("font_hover_color", LauncherTheme.Gold);

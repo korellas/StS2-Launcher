@@ -39,6 +39,14 @@ public static class Localization
         ["STATUS_COMPILING_SHADERS"] = "셰이더 컴파일 중",
         ["STATUS_ENUMERATING"] = "리소스 확인 중",
         ["WELCOME_BACK"] = "{0}님, 환영합니다",
+        ["STATE_ON"] = "켬",
+        ["STATE_OFF"] = "끔",
+        ["NEWS_EMPTY"] = "(최근 공지 없음)",
+        ["NEWS_UNAVAILABLE"] = "(소식을 불러올 수 없음)",
+        ["STATUS_SCANNING_SHADERS"] = "셰이더 검색 중",
+        ["STATUS_DONE"] = "완료",
+        ["UPDATE_TAP_TO_INSTALL"] = "눌러서 설치",
+        ["UPDATE_ALLOW_INSTALL"] = "설정에서 설치 허용 필요",
     };
 
     // English doubles as the key documentation: every key used anywhere must
@@ -68,6 +76,14 @@ public static class Localization
         ["STATUS_COMPILING_SHADERS"] = "Compiling shaders",
         ["STATUS_ENUMERATING"] = "Enumerating resources",
         ["WELCOME_BACK"] = "Welcome back, {0}",
+        ["STATE_ON"] = "ON",
+        ["STATE_OFF"] = "OFF",
+        ["NEWS_EMPTY"] = "(no recent announcements)",
+        ["NEWS_UNAVAILABLE"] = "(news unavailable)",
+        ["STATUS_SCANNING_SHADERS"] = "Scanning for shaders",
+        ["STATUS_DONE"] = "Done",
+        ["UPDATE_TAP_TO_INSTALL"] = "TAP TO INSTALL",
+        ["UPDATE_ALLOW_INSTALL"] = "ALLOW INSTALL IN SETTINGS",
     };
 
     private static bool _installed;
