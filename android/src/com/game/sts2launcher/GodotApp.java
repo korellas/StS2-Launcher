@@ -5,6 +5,8 @@ import org.godotengine.godot.GodotActivity;
 
 import android.content.Intent;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.Log;
@@ -375,7 +377,12 @@ public class GodotApp extends GodotActivity {
 	public void quitApp() {
 		Log.i(TAG, "Quit requested, exiting app");
 		finishAndRemoveTask();
-		Runtime.getRuntime().exit(0);
+
+		// finishAndRemoveTask posts the teardown to the main looper, so exiting on
+		// the next line would kill the process before onDestroy ran. Queueing the
+		// exit behind it lets the lifecycle finish first. The exit is still needed:
+		// Godot's process does not reliably unwind once the activity is gone.
+		new Handler(Looper.getMainLooper()).post(() -> Runtime.getRuntime().exit(0));
 	}
 
 	public void restartApp() {
