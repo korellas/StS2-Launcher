@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using Godot;
 using HarmonyLib;
+using STS2Mobile.Audio;
 using STS2Mobile.Steam;
 
 namespace STS2Mobile.Patches;
@@ -75,6 +76,10 @@ public static class AppLifecyclePatches
 
             int masterBus = AudioServer.GetBusIndex("Master");
             AudioServer.SetBusMute(masterBus, true);
+
+            // FMOD drives its own AAudio stream and is unaffected by the bus mute
+            // above or by SetMasterVol, so stop its events explicitly.
+            FmodAudioControl.Suspend();
 
             var node = (Node)__instance;
             node.GetTree().Paused = true;
@@ -184,6 +189,7 @@ public static class AppLifecyclePatches
             // Restore FMOD and Godot audio to user's saved volume levels
             int masterBus = AudioServer.GetBusIndex("Master");
             AudioServer.SetBusMute(masterBus, false);
+            FmodAudioControl.Resume();
             try
             {
                 var nGameInstance = MegaCrit.Sts2.Core.Nodes.NGame.Instance;
