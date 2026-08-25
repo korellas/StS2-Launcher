@@ -1,7 +1,6 @@
 using System;
-using System.Collections.Concurrent;
 using System.Reflection;
-using System.Threading;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 using HarmonyLib;
@@ -21,20 +20,6 @@ public static class LauncherPatches
     internal static bool CloudSyncEnabled = true;
     internal static string SavedAccountName;
     internal static string SavedRefreshToken;
-
-    // Per-file timeout for cloud sync. On a fresh install the game can request >100
-    // history files; without a bound a stuck Steam RPC would freeze startup forever.
-    private static readonly TimeSpan CloudSyncTimeout = TimeSpan.FromSeconds(10);
-
-    // History files are purely for the "past runs" UI and are not needed to show the
-    // main menu. We defer them to a background queue that drains after the game is
-    // done starting up, so their cloud pulls don't block the critical path.
-    private static readonly ConcurrentQueue<(
-        ISaveStore local,
-        ICloudSaveStore cloud,
-        string path
-    )> _deferredHistorySyncs = new();
-    private static int _deferredSyncDrainStarted;
 
     private static bool IsHistoryPath(string path) =>
         path != null && (path.Contains("/history/") || path.Contains("\\history\\"));
@@ -89,11 +74,7 @@ public static class LauncherPatches
 
         try
         {
-            var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
-            var cloudStore = new SteamKit2CloudSaveStore(SavedAccountName, SavedRefreshToken);
-            var wrappedStore = new CloudSaveStore(localStore, cloudStore);
-
-            __result = new SaveManager(wrappedStore);
+            __result = ConstructCloudSaveManager();
             PatchHelper.Log("[Cloud] Created SaveManager with SteamKit2 cloud store");
             return false;
         }
@@ -104,6 +85,23 @@ public static class LauncherPatches
             );
             return true;
         }
+    }
+
+    // Behind a non-inlined call boundary on purpose. SteamKit2CloudSaveStore implements
+    // ICloudSaveStore from sts2.dll, so a game update that adds an interface member makes
+    // loading the type fail outright (TypeLoadException: VTable setup failed). Inlined here,
+    // the JIT resolves that type while compiling ConstructDefaultPrefix — before execution
+    // reaches the try — so the fallback below never runs, SaveManager.Instance stays broken,
+    // and the game hangs on the loading screen with the exception swallowed by TaskHelper.
+    // Keeping it separate downgrades interface drift to "cloud saves off" instead of a hang.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static SaveManager ConstructCloudSaveManager()
+    {
+        var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
+        var cloudStore = new SteamKit2CloudSaveStore(SavedAccountName, SavedRefreshToken);
+        var wrappedStore = new CloudSaveStore(localStore, cloudStore);
+
+        return new SaveManager(wrappedStore);
     }
 
     public static bool SyncCloudToLocalPrefix(
@@ -119,74 +117,17 @@ public static class LauncherPatches
         // path for correctness.
         if (IsHistoryPath(path))
         {
-            _deferredHistorySyncs.Enqueue((__instance.LocalStore, __instance.CloudStore, path));
+            DeferredHistorySync.Enqueue(__instance.LocalStore, __instance.CloudStore, path);
             __result = Task.CompletedTask;
             return false;
         }
 
-        __result = AutoSyncWithTimeout(__instance.LocalStore, __instance.CloudStore, path);
+        __result = DeferredHistorySync.AutoSyncWithTimeout(
+            __instance.LocalStore,
+            __instance.CloudStore,
+            path
+        );
         return false;
-    }
-
-    private static async Task AutoSyncWithTimeout(ISaveStore local, ICloudSaveStore cloud, string path)
-    {
-        using var cts = new CancellationTokenSource(CloudSyncTimeout);
-        var syncTask = CloudSyncCoordinator.AutoSyncFileAsync(local, cloud, path);
-        var completed = await Task.WhenAny(syncTask, Task.Delay(CloudSyncTimeout, cts.Token));
-        if (completed == syncTask)
-        {
-            cts.Cancel();
-            await syncTask;
-            return;
-        }
-
-        PatchHelper.Log($"[Cloud] Sync timed out after {CloudSyncTimeout.TotalSeconds:F0}s: {path}");
-    }
-
-    // Drains the deferred history queue with bounded concurrency. Called once after
-    // the game finishes starting so the UI is already interactive while these pull.
-    internal static void StartDeferredHistoryDrain()
-    {
-        if (Interlocked.Exchange(ref _deferredSyncDrainStarted, 1) == 1)
-            return;
-        _ = Task.Run(DrainDeferredHistoryAsync);
-    }
-
-    private static async Task DrainDeferredHistoryAsync()
-    {
-        var initialCount = _deferredHistorySyncs.Count;
-        if (initialCount == 0)
-            return;
-
-        PatchHelper.Log($"[Cloud] Draining {initialCount} deferred history files in background");
-
-        using var throttle = new SemaphoreSlim(4);
-        var tasks = new System.Collections.Generic.List<Task>();
-
-        while (_deferredHistorySyncs.TryDequeue(out var item))
-        {
-            await throttle.WaitAsync();
-            tasks.Add(
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        await AutoSyncWithTimeout(item.local, item.cloud, item.path);
-                    }
-                    catch (Exception ex)
-                    {
-                        PatchHelper.Log($"[Cloud] Deferred sync failed {item.path}: {ex.Message}");
-                    }
-                    finally
-                    {
-                        throttle.Release();
-                    }
-                })
-            );
-        }
-
-        await Task.WhenAll(tasks);
-        PatchHelper.Log($"[Cloud] Deferred history drain complete ({initialCount} files)");
     }
 
     private static async Task RunLauncherThenGame(object game)
@@ -238,7 +179,7 @@ public static class LauncherPatches
 
         // Start the background history sync drain so `profile*/saves/history/*.run*`
         // files pull in the background while the game initialises.
-        StartDeferredHistoryDrain();
+        DeferredHistorySync.StartDrain();
 
         try
         {

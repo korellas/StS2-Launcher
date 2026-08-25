@@ -239,6 +239,13 @@ public class SteamKit2CloudSaveStore : ICloudSaveStore, ISaveStore, IDisposable
 
     public bool IsFilePersisted(string path) => _cache.IsFilePersisted(path);
 
+    // Added to ICloudSaveStore by a game update after our reference build. This store is
+    // only constructed when the user has cloud sync enabled and Steam credentials exist
+    // (LauncherPatches.ConstructDefaultPrefix), so it is always enabled when this can be
+    // called. Reporting false would make SaveManager.ShouldOverwriteCloudWithLocal()
+    // replace the user's cloud saves with local ones.
+    public bool HasUserEnabledCloudSync() => true;
+
     public void BeginSaveBatch()
     {
         lock (_batchLock)
