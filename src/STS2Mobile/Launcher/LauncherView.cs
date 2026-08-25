@@ -44,10 +44,8 @@ public class LauncherView
         {
             AnchorLeft = 0.5f,
             AnchorRight = 0.5f,
-            // The artwork carries the game's logo across the middle of the
-            // screen, so the entries sit under it the way the game's own menu does.
-            AnchorTop = 0.74f,
-            AnchorBottom = 0.74f,
+            AnchorTop = 0.58f,
+            AnchorBottom = 0.58f,
             GrowHorizontal = Control.GrowDirection.Both,
             GrowVertical = Control.GrowDirection.Both,
         };
