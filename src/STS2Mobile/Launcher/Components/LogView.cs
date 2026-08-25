@@ -9,6 +9,10 @@ public class LogView : RichTextLabel
         CustomMinimumSize = new Vector2(0, (int)(120 * scale));
         ScrollFollowing = true;
         BbcodeEnabled = true;
+        // Enable text selection so users can drag to highlight + copy logs
+        // when reporting bugs. Without this RichTextLabel ignores all touch
+        // input besides scroll.
+        SelectionEnabled = true;
         AddThemeFontSizeOverride("normal_font_size", (int)(11 * scale));
         AddThemeColorOverride("default_color", new Color(0.6f, 0.6f, 0.65f));
 

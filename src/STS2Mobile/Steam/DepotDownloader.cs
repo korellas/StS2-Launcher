@@ -30,6 +30,13 @@ public class DepotDownloader : IDisposable
     private const int MaxRetries = 5;
     private const int MaxConcurrentDownloads = 8;
 
+    // When true, PickBestBranch prefers a beta-named branch (e.g.
+    // STS2's `public-beta`) over plain `public`. The user must also
+    // opt into the corresponding beta in their Steam client; otherwise
+    // GetManifestRequestCode returns 0 and the download fails. Set
+    // from LauncherController based on the persisted launcher pref.
+    public static bool PreferBeta { get; set; } = false;
+
     private readonly SteamConnection _connection;
     private readonly string _gameDir;
     private readonly string _stateDir;
@@ -64,7 +71,15 @@ public class DepotDownloader : IDisposable
         {
             Directory.CreateDirectory(_stateDir);
 
-            ulong accessToken = _connection.AppAccessToken;
+            // Refresh the PICS access token before every check. Steam rotates
+            // these tokens on the server side when an app publishes a new
+            // build; reusing the one we got at login time makes Steam reply
+            // with the cached PICS snapshot from token-issue time and the
+            // new manifest is invisible to us. Free 1 RPC each check, gone.
+            ulong accessToken = await RefreshAppAccessTokenAsync();
+
+            // Force a fresh PICS read instead of accepting SteamKit2's cached
+            // last-known revision: pass MetaDataOnly=false and re-request.
             var infoResult = await _connection.Apps.PICSGetProductInfo(
                 new[] { new SteamApps.PICSRequest(AppId, accessToken) },
                 Enumerable.Empty<SteamApps.PICSRequest>()
@@ -84,12 +99,16 @@ public class DepotDownloader : IDisposable
                 throw new Exception("Failed to get app info from Steam");
 
             _appInfoCache[AppId] = appInfo;
+            LogAvailableBranches(appInfo.KeyValues["depots"]);
+
             var depots = await ParseDepotsAsync(appInfo.KeyValues["depots"]);
 
-            foreach (var (depotId, manifestId) in depots)
+            foreach (var (depotId, manifestId, _) in depots)
             {
                 ct.ThrowIfCancellationRequested();
-                if (LoadCachedManifestId(depotId) != manifestId)
+                var cached = LoadCachedManifestId(depotId);
+                Log($"Compare depot {depotId}: cached={cached} latest={manifestId}");
+                if (cached != manifestId)
                 {
                     Log($"Update available: depot {depotId} manifest changed");
                     return true;
@@ -102,6 +121,53 @@ public class DepotDownloader : IDisposable
         finally
         {
             _connection.ResumeIdleTimeout();
+        }
+    }
+
+    private async Task<ulong> RefreshAppAccessTokenAsync()
+    {
+        try
+        {
+            var tokenResult = await _connection.Apps.PICSGetAccessTokens(AppId, null);
+            if (tokenResult.AppTokens.TryGetValue(AppId, out var token))
+            {
+                _connection.AppAccessToken = token;
+                return token;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Token refresh failed, falling back to cached token: {ex.Message}");
+        }
+        return _connection.AppAccessToken;
+    }
+
+    // Diagnostic: dump every branch we can see across all depots so the
+    // logcat shows exactly what PICS returned. Helps debug "stuck on up to
+    // date" reports without re-pushing a build.
+    private void LogAvailableBranches(KeyValue depotSection)
+    {
+        if (depotSection == KeyValue.Invalid)
+        {
+            Log("PICS returned no depot section");
+            return;
+        }
+        foreach (var depot in depotSection.Children)
+        {
+            if (!uint.TryParse(depot.Name, out _))
+                continue;
+            var manifests = depot["manifests"];
+            if (manifests == KeyValue.Invalid)
+                continue;
+            foreach (var branch in manifests.Children)
+            {
+                var gid = branch["gid"]?.Value ?? "?";
+                var time = branch["timeupdated"]?.Value ?? "0";
+                var pwd = branch["pwdrequired"]?.Value ?? branch["password"]?.Value ?? "0";
+                Log(
+                    $"PICS branch: depot={depot.Name} branch={branch.Name} gid={gid} timeupdated={time} pwd={pwd}"
+                );
+            }
         }
     }
 
@@ -158,10 +224,10 @@ public class DepotDownloader : IDisposable
 
             Log($"Using {_servers.Count} CDN servers");
 
-            foreach (var (depotId, manifestId) in depots)
+            foreach (var (depotId, manifestId, branch) in depots)
             {
                 ct.ThrowIfCancellationRequested();
-                await DownloadDepotAsync(depotId, manifestId, ct);
+                await DownloadDepotAsync(depotId, manifestId, branch, ct);
             }
 
             Log("All game files downloaded!");
@@ -175,11 +241,11 @@ public class DepotDownloader : IDisposable
         }
     }
 
-    private async Task<List<(uint DepotId, ulong ManifestId)>> ParseDepotsAsync(
+    private async Task<List<(uint DepotId, ulong ManifestId, string Branch)>> ParseDepotsAsync(
         KeyValue depotSection
     )
     {
-        var result = new List<(uint, ulong)>();
+        var result = new List<(uint, ulong, string)>();
 
         foreach (var depot in depotSection.Children)
         {
@@ -225,18 +291,91 @@ public class DepotDownloader : IDisposable
                     continue;
             }
 
-            var gidNode = manifests["public"]["gid"];
-            if (gidNode == KeyValue.Invalid || gidNode.Value == null)
+            // Branch selection is centralized in PickBestBranch and
+            // honors the user's Beta Channel toggle (DepotDownloader
+            // .PreferBeta). Default is `public` (stable). Users who
+            // have opted into the Steam beta can flip the launcher
+            // toggle to follow `public-beta` between stable promos.
+            var (selectedBranch, manifestId) = PickBestBranch(manifests);
+            if (selectedBranch == null)
                 continue;
 
-            if (!ulong.TryParse(gidNode.Value, out var manifestId))
-                continue;
-
-            Log($"Found depot {depotId} manifest {manifestId}");
-            result.Add((depotId, manifestId));
+            Log(
+                $"Found depot {depotId} manifest {manifestId} (branch={selectedBranch})"
+            );
+            result.Add((depotId, manifestId, selectedBranch));
         }
 
         return result;
+    }
+
+    // Picks the best (branch name, manifest gid) pair to follow.
+    //
+    // Steam doesn't populate `timeupdated` for STS2 (every branch reports
+    // 0), so we can't rank by recency. Behavior depends on PreferBeta:
+    //
+    //   PreferBeta = false (default):
+    //     Always pick `public`. Safe for users who haven't opted into
+    //     a beta inside the Steam client — protected branches would
+    //     otherwise fail with "Ensure the account owns this app" at
+    //     GetManifestRequestCode time.
+    //
+    //   PreferBeta = true:
+    //     Prefer any beta-flavoured branch (e.g. STS2's `public-beta`)
+    //     over plain `public`. If multiple beta branches exist, pick
+    //     the highest `timeupdated`; on ties, the first PICS returned.
+    //     If no beta-named branch is available, fall back to `public`.
+    //
+    // Password-gated branches are always skipped — we can't download
+    // those without a password we don't have.
+    private static (string Branch, ulong ManifestId) PickBestBranch(KeyValue manifests)
+    {
+        var candidates = new List<(string Name, ulong ManifestId, long TimeUpdated)>();
+
+        foreach (var branch in manifests.Children)
+        {
+            if (string.IsNullOrEmpty(branch.Name))
+                continue;
+
+            var gidNode = branch["gid"];
+            if (gidNode == KeyValue.Invalid || gidNode.Value == null)
+                continue;
+            if (!ulong.TryParse(gidNode.Value, out var manifestId))
+                continue;
+
+            var pwdRequired = branch["pwdrequired"]?.Value;
+            if (pwdRequired != null && pwdRequired != "0")
+                continue;
+            if (branch["password"] != KeyValue.Invalid)
+                continue;
+
+            long timeUpdated = 0;
+            var timeNode = branch["timeupdated"];
+            if (timeNode != KeyValue.Invalid && timeNode.Value != null)
+                long.TryParse(timeNode.Value, out timeUpdated);
+
+            candidates.Add((branch.Name, manifestId, timeUpdated));
+        }
+
+        if (candidates.Count == 0)
+            return (null, 0);
+
+        if (PreferBeta)
+        {
+            var betas = candidates
+                .Where(c => c.Name.IndexOf("beta", StringComparison.OrdinalIgnoreCase) >= 0)
+                .OrderByDescending(c => c.TimeUpdated)
+                .ToList();
+            if (betas.Count > 0)
+                return (betas[0].Name, betas[0].ManifestId);
+        }
+
+        var pub = candidates.FirstOrDefault(c => c.Name == "public");
+        if (pub.Name != null)
+            return (pub.Name, pub.ManifestId);
+
+        var first = candidates.OrderByDescending(c => c.TimeUpdated).First();
+        return (first.Name, first.ManifestId);
     }
 
     private async Task<SteamApps.PICSProductInfoCallback.PICSProductInfo> GetAppInfoAsync(
@@ -292,7 +431,11 @@ public class DepotDownloader : IDisposable
         return null;
     }
 
-    private async Task<ulong> GetManifestRequestCodeAsync(uint depotId, ulong manifestId)
+    private async Task<ulong> GetManifestRequestCodeAsync(
+        uint depotId,
+        ulong manifestId,
+        string branch
+    )
     {
         if (
             _manifestRequestCodes.TryGetValue(depotId, out var cached)
@@ -302,25 +445,33 @@ public class DepotDownloader : IDisposable
             return cached.Code;
         }
 
+        var branchName = string.IsNullOrEmpty(branch) ? "public" : branch;
         var code = await _connection.Content.GetManifestRequestCode(
             depotId,
             AppId,
             manifestId,
-            "public"
+            branchName
         );
         if (code == 0)
             throw new Exception(
-                $"Failed to get manifest request code for depot {depotId}. "
-                    + "Ensure the account owns this app."
+                $"Couldn't access depot {depotId} on branch '{branchName}'. "
+                    + "If this is the beta channel, opt in via Steam first: "
+                    + "Library → Slay the Spire 2 → Properties → Betas → "
+                    + "select 'public-beta' (no password). Then retry."
             );
 
         _manifestRequestCodes[depotId] = (code, DateTime.UtcNow.AddMinutes(5));
         return code;
     }
 
-    private async Task DownloadDepotAsync(uint depotId, ulong manifestId, CancellationToken ct)
+    private async Task DownloadDepotAsync(
+        uint depotId,
+        ulong manifestId,
+        string branch,
+        CancellationToken ct
+    )
     {
-        Log($"Processing depot {depotId}...");
+        Log($"Processing depot {depotId} (branch={branch})...");
 
         bool isUpdate = LoadCachedManifestId(depotId) != manifestId;
 
@@ -329,7 +480,7 @@ public class DepotDownloader : IDisposable
             throw new Exception($"Failed to get depot key for {depotId}: {keyResult.Result}");
         var depotKey = keyResult.DepotKey;
 
-        var manifestRequestCode = await GetManifestRequestCodeAsync(depotId, manifestId);
+        var manifestRequestCode = await GetManifestRequestCodeAsync(depotId, manifestId, branch);
 
         Log($"Downloading manifest for depot {depotId}...");
         DepotManifest manifest = null;

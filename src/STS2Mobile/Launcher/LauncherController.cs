@@ -116,6 +116,7 @@ public class LauncherController
         _view.Actions.RetryPressed += OnRetryPressed;
         _view.Actions.LocalBackupToggled += OnLocalBackupToggled;
         _view.Actions.CloudSyncToggled += OnCloudSyncToggled;
+        _view.Actions.BetaChannelToggled += OnBetaChannelToggled;
         _view.Actions.CloudPushPressed += OnCloudPushPressed;
         _view.Actions.CloudPullPressed += OnCloudPullPressed;
         _view.Actions.CheckForUpdatesPressed += OnCheckForUpdatesPressed;
@@ -128,12 +129,38 @@ public class LauncherController
             AppPaths.EnsureExternalDirectories();
         _view.Actions.SetCloudSyncChecked(LauncherModel.LoadCloudSyncPref());
 
+        // Channel pref must be applied to DepotDownloader BEFORE the first
+        // CheckForUpdates / Download runs — branch selection is decided in
+        // PickBestBranch. We persist + reload here on every Start() so the
+        // user's choice survives restarts.
+        var betaPref = LauncherModel.LoadBetaChannelPref();
+        _view.Actions.SetBetaChannelChecked(betaPref);
+        DepotDownloader.PreferBeta = betaPref;
+
         var result = _model.StartSession();
         HandleFastPath(result);
 
         // Lazy, non-blocking APK update check. Runs in the background and only
         // updates the version label — PLAY/LAUNCH is never gated on this task.
         _ = AutoCheckAppUpdateAsync();
+
+        // Lazy, non-blocking Steam community news fetch. Same pattern: failures
+        // collapse the section to "(news unavailable)" and never block launch.
+        _ = AutoFetchSteamNewsAsync();
+    }
+
+    private async Task AutoFetchSteamNewsAsync()
+    {
+        try
+        {
+            var items = await SteamNewsClient.FetchAsync();
+            _runOnMainThread(() => _view.News.SetItems(items));
+        }
+        catch (Exception ex)
+        {
+            PatchHelper.Log($"[News] Steam news fetch failed: {ex.Message}");
+            _runOnMainThread(() => _view.News.SetFailed());
+        }
     }
 
     private async Task AutoCheckAppUpdateAsync()
@@ -465,6 +492,23 @@ public class LauncherController
     {
         LauncherModel.SaveCloudSyncPref(pressed);
         LauncherPatches.CloudSyncEnabled = pressed;
+    }
+
+    private void OnBetaChannelToggled(bool pressed)
+    {
+        LauncherModel.SaveBetaChannelPref(pressed);
+        DepotDownloader.PreferBeta = pressed;
+        if (pressed)
+        {
+            _view.AppendLog(
+                "Beta channel enabled — also opt into 'public-beta' in Steam (Library → "
+                    + "Slay the Spire 2 → Properties → Betas) before next update."
+            );
+        }
+        else
+        {
+            _view.AppendLog("Beta channel disabled — following stable (public) branch.");
+        }
     }
 
     private void OnCloudPushPressed()

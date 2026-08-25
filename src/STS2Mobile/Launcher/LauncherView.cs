@@ -13,6 +13,7 @@ public class LauncherView
     public CodeSection Code { get; }
     public DownloadSection Download { get; }
     public ActionSection Actions { get; }
+    public NewsSection News { get; }
     public LogView Log { get; }
 
     private readonly StyledLabel _statusLabel;
@@ -33,7 +34,7 @@ public class LauncherView
         bg.GuiInput += DismissKeyboard;
         parent.AddChild(bg);
 
-        _panel = new StyledPanel(scale, widthRatio: 0.9f);
+        _panel = new StyledPanel(scale, widthRatio: 0.95f);
         _panel.UpdateSizeFromViewport(vpSize);
         _panel.Panel.GuiInput += DismissKeyboard;
         parent.AddChild(_panel);
@@ -99,14 +100,49 @@ public class LauncherView
         fmodCredit.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.55f));
         fmodContainer.AddChild(fmodCredit);
 
+        // Center column: Steam News. Lives between controls and console
+        // so it can use the horizontal space landscape mode gives us. The
+        // 3:3 split with the console gives titles enough width to render in
+        // a single line without ellipsis-truncation.
+        var newsCol = new VBoxContainer();
+        newsCol.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        newsCol.SizeFlagsStretchRatio = 3f;
+        newsCol.AddThemeConstantOverride("separation", (int)(6 * scale));
+        hbox.AddChild(newsCol);
+
+        News = new NewsSection(scale);
+        News.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+        newsCol.AddChild(News);
+
+        // Right column: console log. Same flex weight as news so the two
+        // share the panel evenly after controls take their fixed share.
         var right = new VBoxContainer();
         right.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        right.SizeFlagsStretchRatio = 4f;
+        right.SizeFlagsStretchRatio = 3f;
+        right.AddThemeConstantOverride("separation", (int)(6 * scale));
         hbox.AddChild(right);
+
+        // Console header row: title on the left, Copy button on the right.
+        // Copy puts the entire log into the system clipboard so users can
+        // paste it into a bug report — selection-and-copy on a touchscreen
+        // RichTextLabel is fiddly enough that a one-tap dump is worth it.
+        var logHeader = new HBoxContainer();
+        logHeader.AddThemeConstantOverride("separation", (int)(8 * scale));
+        right.AddChild(logHeader);
 
         var logTitle = new StyledLabel("Console", scale, fontSize: 14);
         logTitle.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.65f));
-        right.AddChild(logTitle);
+        logTitle.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        logHeader.AddChild(logTitle);
+
+        var copyLogsButton = new StyledButton("Copy", scale, fontSize: 11, height: 26);
+        copyLogsButton.CustomMinimumSize = new Vector2((int)(60 * scale), (int)(26 * scale));
+        copyLogsButton.Pressed += () =>
+        {
+            DisplayServer.ClipboardSet(Log.GetParsedText());
+            Log.AppendLog("[copied console contents to clipboard]");
+        };
+        logHeader.AddChild(copyLogsButton);
 
         Log = new LogView(scale);
         Log.SizeFlagsVertical = Control.SizeFlags.ExpandFill;

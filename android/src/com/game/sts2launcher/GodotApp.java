@@ -15,6 +15,8 @@ import android.net.Uri;
 
 import android.content.SharedPreferences;
 
+import java.net.URLEncoder;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -34,6 +36,19 @@ import javax.crypto.spec.GCMParameterSpec;
 import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.util.Base64;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import org.fmod.FMOD;
 
@@ -51,6 +66,10 @@ public class GodotApp extends GodotActivity {
 	private static GodotApp instance;
 	private WifiManager.MulticastLock multicastLock;
 	private String gameDir;
+	// WebView shown over the Godot SurfaceView for in-app article viewing
+	// (Steam community announcements, etc.). Null when no overlay is active.
+	private FrameLayout webViewOverlay;
+	private WebView activeWebView;
 	// Flipped true once Godot has produced its first frame so the Android splash can
 	// finally dismiss. Without this the system splash disappears as soon as the Activity
 	// view becomes visible, exposing several seconds of black Godot SurfaceView while
@@ -474,6 +493,288 @@ public class GodotApp extends GodotActivity {
 		} else {
 			requestPermissions(new String[] { android.Manifest.permission.WRITE_EXTERNAL_STORAGE }, 1);
 		}
+	}
+
+	// Opens the given URL in a WebView overlay on top of the Godot view.
+	// Used for in-app viewing of Steam community announcements so the user
+	// doesn't lose the launcher state by getting kicked into a browser app.
+	// Idempotent: closes any existing overlay before opening a new one.
+	public void showWebView(String url) {
+		if (url == null || url.isEmpty()) {
+			return;
+		}
+		runOnUiThread(() -> {
+			closeWebViewInternal();
+
+			float density = getResources().getDisplayMetrics().density;
+			int barHeight = (int) (52 * density);
+
+			FrameLayout overlay = new FrameLayout(this);
+			overlay.setBackgroundColor(0xFF111114);
+			overlay.setClickable(true);
+
+			// Top bar: close button + URL label, anchored above the WebView.
+			LinearLayout topBar = new LinearLayout(this);
+			topBar.setOrientation(LinearLayout.HORIZONTAL);
+			topBar.setBackgroundColor(0xFF1F2024);
+			topBar.setGravity(Gravity.CENTER_VERTICAL);
+			topBar.setPadding(
+					(int) (12 * density), 0, (int) (12 * density), 0);
+
+			Button closeButton = new Button(this);
+			closeButton.setText("✕  Close");
+			closeButton.setAllCaps(false);
+			closeButton.setTextColor(0xFFE6E6EA);
+			closeButton.setBackgroundColor(0xFF2D2F35);
+			LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.WRAP_CONTENT,
+					(int) (40 * density));
+			closeParams.rightMargin = (int) (12 * density);
+			topBar.addView(closeButton, closeParams);
+
+			// Korean site-translation toggle. We use Microsoft's
+			// translatetheweb.com — it's reachable from Korea (unlike
+			// Google's `.translate.goog`) and accepts a URL parameter
+			// for whole-page translation (unlike Papago, whose `st=`
+			// is text-only and lands on the home page). Steam's
+			// `?l=koreana` only swaps Steam's own chrome strings; it
+			// won't translate community announcement bodies, which is
+			// what the user actually wants to read.
+			Button translateButton = new Button(this);
+			translateButton.setText("🌐 KO");
+			translateButton.setAllCaps(false);
+			translateButton.setTextColor(0xFFE6E6EA);
+			translateButton.setBackgroundColor(0xFF2D2F35);
+			LinearLayout.LayoutParams translateParams = new LinearLayout.LayoutParams(
+					ViewGroup.LayoutParams.WRAP_CONTENT,
+					(int) (40 * density));
+			translateParams.rightMargin = (int) (12 * density);
+			topBar.addView(translateButton, translateParams);
+
+			TextView urlLabel = new TextView(this);
+			urlLabel.setText(url);
+			urlLabel.setTextColor(0xFFB0B0BA);
+			urlLabel.setSingleLine(true);
+			urlLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
+			urlLabel.setTextSize(11);
+			topBar.addView(urlLabel, new LinearLayout.LayoutParams(
+					0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+			FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(
+					ViewGroup.LayoutParams.MATCH_PARENT, barHeight,
+					Gravity.TOP);
+			overlay.addView(topBar, topBarParams);
+
+			// Indeterminate progress strip just under the bar while pages load.
+			ProgressBar progress = new ProgressBar(
+					this, null, android.R.attr.progressBarStyleHorizontal);
+			progress.setIndeterminate(true);
+			FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(
+					ViewGroup.LayoutParams.MATCH_PARENT,
+					(int) (3 * density),
+					Gravity.TOP);
+			progressParams.topMargin = barHeight;
+			overlay.addView(progress, progressParams);
+
+			WebView webView = new WebView(this);
+			WebSettings settings = webView.getSettings();
+			settings.setJavaScriptEnabled(true);
+			settings.setDomStorageEnabled(true);
+			settings.setLoadWithOverviewMode(true);
+			settings.setUseWideViewPort(true);
+			settings.setBuiltInZoomControls(true);
+			settings.setDisplayZoomControls(false);
+			settings.setMixedContentMode(
+					WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+			webView.setWebViewClient(new WebViewClient() {
+				@Override
+				public void onPageFinished(WebView view, String finishedUrl) {
+					progress.setVisibility(View.GONE);
+					urlLabel.setText(finishedUrl);
+				}
+
+				@Override
+				public void onPageStarted(
+						WebView view, String startedUrl,
+						android.graphics.Bitmap favicon) {
+					progress.setVisibility(View.VISIBLE);
+				}
+
+				@Override
+				public void onReceivedError(
+						WebView view, int errorCode,
+						String description, String failingUrl) {
+					progress.setVisibility(View.GONE);
+				}
+			});
+			webView.setWebChromeClient(new WebChromeClient());
+			FrameLayout.LayoutParams webParams = new FrameLayout.LayoutParams(
+					ViewGroup.LayoutParams.MATCH_PARENT,
+					ViewGroup.LayoutParams.MATCH_PARENT,
+					Gravity.TOP);
+			webParams.topMargin = barHeight;
+			overlay.addView(webView, webParams);
+
+			final String originalUrl = url;
+			final boolean[] translateActive = { false };
+			Runnable refreshTranslateButton = () -> translateButton.setText(
+					translateActive[0] ? "🌐 KO ✓" : "🌐 KO");
+
+			webView.loadUrl(maybeAddKoreanLocale(originalUrl));
+
+			translateButton.setOnClickListener(v -> {
+				translateActive[0] = !translateActive[0];
+				refreshTranslateButton.run();
+				// Always navigate from the original (un-localised) URL so the
+				// proxy isn't given a `?l=koreana`-decorated URL it would then
+				// re-translate. The proxy will convert the announcement body
+				// to Korean directly.
+				if (translateActive[0]) {
+					webView.loadUrl(buildSiteTranslatorUrl(originalUrl));
+				} else {
+					webView.loadUrl(maybeAddKoreanLocale(originalUrl));
+				}
+			});
+
+			// Capture system back gestures while the overlay is up — prefer
+			// in-page back navigation, fall back to closing the overlay.
+			webView.setFocusableInTouchMode(true);
+			webView.requestFocus();
+			webView.setOnKeyListener((v, keyCode, event) -> {
+				if (event.getAction() == KeyEvent.ACTION_DOWN
+						&& keyCode == KeyEvent.KEYCODE_BACK) {
+					if (webView.canGoBack()) {
+						webView.goBack();
+					} else {
+						closeWebViewInternal();
+					}
+					return true;
+				}
+				return false;
+			});
+
+			closeButton.setOnClickListener(v -> closeWebViewInternal());
+
+			FrameLayout root = (FrameLayout) findViewById(android.R.id.content);
+			root.addView(overlay, new FrameLayout.LayoutParams(
+					ViewGroup.LayoutParams.MATCH_PARENT,
+					ViewGroup.LayoutParams.MATCH_PARENT));
+
+			webViewOverlay = overlay;
+			activeWebView = webView;
+			Log.i(TAG, "showWebView: opened " + url);
+		});
+	}
+
+	public void closeWebView() {
+		runOnUiThread(this::closeWebViewInternal);
+	}
+
+	// Adds `l=koreana` to Steam URLs so the Steam-rendered chrome
+	// (header, navigation, footer) is in Korean. Note: this does NOT
+	// translate community announcement bodies — those are written by
+	// the developers and stored verbatim. Use the 🌐 KO toggle
+	// (buildSiteTranslatorUrl) for full body translation. For non-Steam
+	// hosts we leave the URL alone.
+	private static String maybeAddKoreanLocale(String url) {
+		if (url == null || url.isEmpty()) {
+			return url;
+		}
+		try {
+			Uri u = Uri.parse(url);
+			String host = u.getHost();
+			if (host == null) {
+				return url;
+			}
+			boolean isSteam =
+					host.equals("steamcommunity.com")
+							|| host.endsWith(".steamcommunity.com")
+							|| host.equals("store.steampowered.com")
+							|| host.endsWith(".steampowered.com");
+			if (!isSteam) {
+				return url;
+			}
+			// Don't double-add or stomp on an explicit user choice.
+			String existing = u.getQueryParameter("l");
+			if (existing != null) {
+				return url;
+			}
+			String separator = (u.getQuery() == null || u.getQuery().isEmpty())
+					? "?"
+					: "&";
+			String fragment = u.getFragment();
+			String base = fragment == null
+					? url
+					: url.substring(0, url.length() - (fragment.length() + 1));
+			String result = base + separator + "l=koreana";
+			if (fragment != null) {
+				result += "#" + fragment;
+			}
+			return result;
+		} catch (Exception e) {
+			Log.w(TAG, "maybeAddKoreanLocale failed for " + url, e);
+			return url;
+		}
+	}
+
+	// Wraps an arbitrary URL in Microsoft's translatetheweb.com proxy so
+	// the page is rendered in Korean. We picked Microsoft over the
+	// alternatives because:
+	//   - Google's `.translate.goog` returns "This translation service
+	//     isn't available in your region" for KR clients.
+	//   - Naver Papago has no public bookmarkable URL for site
+	//     translation; `?st=URL` is the text endpoint and just lands on
+	//     the Papago home page.
+	//   - DeepL and Yandex don't expose a stable site-translate URL
+	//     either (DeepL is text-only, Yandex's translate.yandex.com
+	//     wraps results inconsistently for SPA-heavy pages).
+	// translatetheweb.com has been Microsoft's branded site translator
+	// for over a decade and serves Korean targets fine from KR networks.
+	private static String buildSiteTranslatorUrl(String url) {
+		if (url == null || url.isEmpty()) {
+			return url;
+		}
+		try {
+			String encoded = URLEncoder.encode(url, "UTF-8");
+			return "https://www.translatetheweb.com/?from=&to=ko&a=" + encoded;
+		} catch (Exception e) {
+			Log.w(TAG, "buildSiteTranslatorUrl failed for " + url, e);
+			return url;
+		}
+	}
+
+	private void closeWebViewInternal() {
+		if (webViewOverlay == null) {
+			return;
+		}
+		ViewGroup parent = (ViewGroup) webViewOverlay.getParent();
+		if (parent != null) {
+			parent.removeView(webViewOverlay);
+		}
+		if (activeWebView != null) {
+			activeWebView.stopLoading();
+			activeWebView.loadUrl("about:blank");
+			activeWebView.removeAllViews();
+			activeWebView.destroy();
+		}
+		webViewOverlay = null;
+		activeWebView = null;
+		updateWindowAppearance.run();
+	}
+
+	@Override
+	public void onBackPressed() {
+		// Surface back-press through to the WebView while the overlay is up;
+		// the OnKeyListener inside the overlay handles dismissal/back.
+		if (activeWebView != null) {
+			if (activeWebView.canGoBack()) {
+				activeWebView.goBack();
+			} else {
+				closeWebViewInternal();
+			}
+			return;
+		}
+		super.onBackPressed();
 	}
 
 	public void deleteKeystoreKey() {
