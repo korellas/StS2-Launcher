@@ -28,6 +28,7 @@ public class FpsOverlay : CanvasLayer
     private const int DetailWidth = 148;
     private const int FontSize = 15;
     private const int PanelPadding = 10;
+    private const int ColumnGap = 8;
 
     // Keeps a 100% reading off the very top edge, so a full bar still reads as a
     // line rather than merging with the row above.
@@ -44,7 +45,9 @@ public class FpsOverlay : CanvasLayer
     private const float LoadAlertThreshold = 90f;
     private const float TempAlertThreshold = 50f;
 
-    private static readonly Color PanelColor = new(0f, 0f, 0f, 0.5f);
+
+    private static readonly Color PanelColor = new(0.02f, 0.02f, 0.04f, 0.72f);
+    private static readonly Color PanelBorder = new(0.55f, 0.55f, 0.62f, 0.28f);
     private static readonly Color TextColor = new(1f, 1f, 1f, 0.92f);
     private static readonly Color NormalLine = new(0.45f, 0.95f, 0.55f, 0.95f);
     private static readonly Color AlertLine = new(1f, 0.35f, 0.3f, 0.98f);
@@ -61,8 +64,11 @@ public class FpsOverlay : CanvasLayer
     private double _sampleTimer;
     private int _framesSinceSample;
 
-    private readonly float[] _frameTimes = new float[600];
+    // Roughly four seconds at 60 fps; long enough to catch a hitch, short
+    // enough that one recovers quickly.
+    private readonly float[] _frameTimes = new float[240];
     private int _frameTimeCount;
+    private int _frameTimeHead;
     private float _fpsSum;
     private int _fpsSamples;
 
@@ -80,9 +86,8 @@ public class FpsOverlay : CanvasLayer
     {
         int panelWidth = LabelWidth + ValueWidth + GraphWidth + DetailWidth + PanelPadding * 2;
 
-        var panel = new ColorRect
+        var panel = new PanelContainer
         {
-            Color = PanelColor,
             MouseFilter = Control.MouseFilterEnum.Ignore,
             AnchorLeft = 1f,
             AnchorRight = 1f,
@@ -91,6 +96,10 @@ public class FpsOverlay : CanvasLayer
             OffsetTop = TopOffset,
             OffsetBottom = TopOffset + RowHeight * 4 + PanelPadding * 2,
         };
+        var panelStyle = new StyleBoxFlat { BgColor = PanelColor, BorderColor = PanelBorder };
+        panelStyle.SetCornerRadiusAll(10);
+        panelStyle.SetBorderWidthAll(1);
+        panel.AddThemeStyleboxOverride("panel", panelStyle);
         AddChild(panel);
 
         var rows = new VBoxContainer
@@ -106,12 +115,10 @@ public class FpsOverlay : CanvasLayer
         rows.AddThemeConstantOverride("separation", 0);
         panel.AddChild(rows);
 
-        // fps and temperature carry their unit in the value itself; the two
-        // bare percentages are the ones that need naming.
-        _fpsRow = StatRow.Add(rows, "fps", "", FpsMin, FpsBaseMax, alertAbove: null);
+        _fpsRow = StatRow.Add(rows, "fps", "FPS", FpsMin, FpsBaseMax, alertAbove: null);
         _cpuRow = StatRow.Add(rows, "cpu", "CPU", LoadMin, LoadMax, LoadAlertThreshold);
         _gpuRow = StatRow.Add(rows, "gpu", "GPU", LoadMin, LoadMax, LoadAlertThreshold);
-        _tempRow = StatRow.Add(rows, "temp", "", TempMin, TempMax, TempAlertThreshold);
+        _tempRow = StatRow.Add(rows, "temp", "TEMP", TempMin, TempMax, TempAlertThreshold);
     }
 
     private void Attach(SceneTree tree)
@@ -137,8 +144,11 @@ public class FpsOverlay : CanvasLayer
         _lastFrameUsec = now;
 
         _framesSinceSample++;
+
+        _frameTimes[_frameTimeHead] = (float)delta;
+        _frameTimeHead = (_frameTimeHead + 1) % _frameTimes.Length;
         if (_frameTimeCount < _frameTimes.Length)
-            _frameTimes[_frameTimeCount++] = (float)delta;
+            _frameTimeCount++;
 
         _sampleTimer += delta;
         if (_sampleTimer < SampleInterval)
@@ -156,7 +166,7 @@ public class FpsOverlay : CanvasLayer
         _fpsSamples++;
 
         float average = _fpsSum / _fpsSamples;
-        _fpsRow.Push(fps, $"{fps:F0} fps", $"avg {average:F0}   low {WorstFps():F0}");
+        _fpsRow.Push(fps, $"{fps:F0}", $"avg {average:F0}   low {WorstFps():F0}");
 
         float? cpu = _stats.ReadCpuPercent(elapsed);
         float? ram = _stats.ReadRamMegabytes();
@@ -170,22 +180,21 @@ public class FpsOverlay : CanvasLayer
         _tempRow.Push(temp, temp is float t ? $"{t:F1} °C" : null, ThermalStatus());
     }
 
-    // Worst frame in the recent window, as fps. This is where stutter shows up
+    // Longest frame in the recent window, as fps. This is where stutter shows up
     // even when the average looks healthy.
+    //
+    // The window is a ring buffer rather than a grow-then-reset list: the old
+    // version kept every sample until it filled, so a single multi-second frame
+    // pinned the reading for as long as it took to refill. Long frames are still
+    // counted — a stall is a real reading — they just age out of the window.
     private float WorstFps()
     {
-        if (_frameTimeCount == 0)
-            return 0f;
-
         float worst = 0f;
         for (int i = 0; i < _frameTimeCount; i++)
         {
             if (_frameTimes[i] > worst)
                 worst = _frameTimes[i];
         }
-
-        if (_frameTimeCount >= _frameTimes.Length)
-            _frameTimeCount = 0;
 
         return worst > 0f ? 1f / worst : 0f;
     }
@@ -245,7 +254,7 @@ public class FpsOverlay : CanvasLayer
                 Name = name,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             };
-            row.AddThemeConstantOverride("separation", 0);
+            row.AddThemeConstantOverride("separation", ColumnGap);
             parent.AddChild(row);
 
             var caption = MakeLabel(LabelWidth, HorizontalAlignment.Left);
@@ -259,6 +268,9 @@ public class FpsOverlay : CanvasLayer
             {
                 CustomMinimumSize = new Vector2(GraphWidth, RowHeight),
                 MouseFilter = Control.MouseFilterEnum.Ignore,
+                // Line2D happily paints past its parent's bounds, which let the
+                // fps trace spill over the row above and out of the panel.
+                ClipContents = true,
             };
             row.AddChild(graph);
 
