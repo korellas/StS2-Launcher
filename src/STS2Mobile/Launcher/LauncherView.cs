@@ -127,6 +127,11 @@ public class LauncherView
         consoleEntry.Pressed += consoleOverlay.Open;
         menu.AddChild(consoleEntry);
 
+        var quitEntry = new GameMenuButton(Localization.Tr("MENU_QUIT"), scale);
+        quitEntry.Pressed += () =>
+            ShowConfirmation(Localization.Tr("QUIT_CONFIRM"), QuitApp);
+        menu.AddChild(quitEntry);
+
         // Footer: version on the left, FMOD attribution on the right. The credit
         // is required by the FMOD licence, so it stays on screen even though the
         // rest of the chrome moved into submenus.
@@ -235,6 +240,20 @@ public class LauncherView
         {
             PatchHelper.Log($"Failed to load FMOD logo: {ex.Message}");
             return null;
+        }
+    }
+
+    // Same exit path the game's own Quit takes, so leaving from the launcher and
+    // leaving from the game behave identically.
+    private static void QuitApp()
+    {
+        try
+        {
+            LauncherModel.GetGodotApp()?.Call("quitApp");
+        }
+        catch (Exception ex)
+        {
+            PatchHelper.Log($"[Launcher] quit failed: {ex.Message}");
         }
     }
 

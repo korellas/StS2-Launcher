@@ -31,9 +31,9 @@ public static class LauncherTheme
 
     public static readonly Color TrackFill = new(0f, 0f, 0f, 0.55f);
 
-    // The art is bright enough to swamp white text, so it is dimmed rather than
-    // shown at full strength.
-    public static readonly Color ArtTint = new(0.74f, 0.74f, 0.78f);
+    // Shown at full strength: the menu sits over the darker lower half of the
+    // artwork and carries its own shadow, so dimming only made the screen muddy.
+    public static readonly Color ArtTint = new(1f, 1f, 1f);
 
     private static FontFile _font;
     private static bool _fontTried;

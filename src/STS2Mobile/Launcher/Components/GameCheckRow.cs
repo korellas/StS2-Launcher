@@ -40,9 +40,9 @@ public class GameCheckRow : Button
         }
 
         LauncherTheme.ApplyGameFont(this, fontSize, scale);
-        AddThemeColorOverride("font_color", LauncherTheme.Ink);
-        AddThemeColorOverride("font_hover_color", LauncherTheme.Ink);
-        AddThemeColorOverride("font_pressed_color", LauncherTheme.Ink);
+        AddThemeColorOverride("font_color", LauncherTheme.Cream);
+        AddThemeColorOverride("font_hover_color", LauncherTheme.Gold);
+        AddThemeColorOverride("font_pressed_color", LauncherTheme.Gold);
 
         Toggled += _ => Refresh();
         Refresh();

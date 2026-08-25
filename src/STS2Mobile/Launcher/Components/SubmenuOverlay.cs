@@ -44,12 +44,12 @@ public class SubmenuOverlay : Control
         Content.AddChild(header);
         Content.MoveChild(header, 0);
 
-        var titleLabel = new StyledLabel(title, scale, fontSize: 24, align: HorizontalAlignment.Left, onParchment: true);
+        var titleLabel = new StyledLabel(title, scale, fontSize: 26, align: HorizontalAlignment.Left);
+        titleLabel.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         header.AddChild(titleLabel);
 
-        var close = new GameMenuButton(Localization.Tr("ACTION_CLOSE"), scale, fontSize: 20, onParchment: true);
-        close.CustomMinimumSize = new Vector2((int)(90 * scale), 0);
+        var close = new GameBackButton(scale);
         close.Pressed += Hide;
         header.AddChild(close);
     }
@@ -66,7 +66,7 @@ public class SubmenuOverlay : Control
         var size = ViewportRelativeSize();
         int pad = (int)(28 * scale);
 
-        var texture = GameAssets.Load<Texture2D>(GameAssets.SubmenuPanel);
+        var texture = GameAssets.Load<Texture2D>(GameAssets.PopupPanel);
         if (texture != null)
         {
             var patch = new NinePatchRect

@@ -99,7 +99,7 @@ public class ActionSection : VBoxContainer
 
         // Given a heading of their own, these read as "what do I do with my saves"
         // rather than two unexplained actions under the checkboxes.
-        _cloudHeader = new StyledLabel(Localization.Tr("SETTING_CLOUD_HEADER"), scale, fontSize: 18, align: HorizontalAlignment.Left, onParchment: true);
+        _cloudHeader = new StyledLabel(Localization.Tr("SETTING_CLOUD_HEADER"), scale, fontSize: 18, align: HorizontalAlignment.Left);
         _cloudHeader.Visible = false;
         SettingsGroup.AddChild(_cloudHeader);
 
@@ -107,19 +107,19 @@ public class ActionSection : VBoxContainer
         pushPullRow.Visible = false;
         pushPullRow.AddThemeConstantOverride("separation", (int)(6 * scale));
 
-        _pushButton = new GameMenuButton(Localization.Tr("SETTING_UPLOAD_SAVES"), scale, fontSize: 21, onParchment: true);
+        _pushButton = new GameMenuButton(Localization.Tr("SETTING_UPLOAD_SAVES"), scale, fontSize: 21);
         _pushButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _pushButton.Pressed += () => CloudPushPressed?.Invoke();
         pushPullRow.AddChild(_pushButton);
 
-        _pullButton = new GameMenuButton(Localization.Tr("SETTING_DOWNLOAD_SAVES"), scale, fontSize: 21, onParchment: true);
+        _pullButton = new GameMenuButton(Localization.Tr("SETTING_DOWNLOAD_SAVES"), scale, fontSize: 21);
         _pullButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _pullButton.Pressed += () => CloudPullPressed?.Invoke();
         pushPullRow.AddChild(_pullButton);
 
         SettingsGroup.AddChild(pushPullRow);
 
-        _updateButton = new GameMenuButton(Localization.Tr("SETTING_CHECK_UPDATES"), scale, fontSize: 22, onParchment: true);
+        _updateButton = new GameMenuButton(Localization.Tr("SETTING_CHECK_UPDATES"), scale, fontSize: 22);
         _updateButton.Visible = false;
         _updateButton.Pressed += () => CheckForUpdatesPressed?.Invoke();
         SettingsGroup.AddChild(_updateButton);

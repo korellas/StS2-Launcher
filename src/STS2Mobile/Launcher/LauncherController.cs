@@ -51,8 +51,10 @@ public class LauncherController
             {
                 _view.Download.SetProgress(
                     p.Percentage,
-                    $"{LauncherModel.FormatSize(p.DownloadedBytes)} / {LauncherModel.FormatSize(p.TotalBytes)} ({p.Percentage:F1}%)"
+                    $"{LauncherModel.FormatSize(p.DownloadedBytes)} / {LauncherModel.FormatSize(p.TotalBytes)}",
+                    p.DownloadedBytes
                 );
+                _view.Download.SetCurrentFile(p.CurrentFile);
                 _view.AppendLog(p.CurrentFile);
             });
         _model.DownloadLogReceived += msg => _runOnMainThread(() => _view.AppendLog(msg));

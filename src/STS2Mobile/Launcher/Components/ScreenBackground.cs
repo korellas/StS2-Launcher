@@ -36,8 +36,8 @@ public class ScreenBackground : ColorRect
         var vignette = new TextureRect
         {
             Texture = LauncherTheme.Vignette(
-                new Color(0f, 0f, 0f, 0.30f),
-                new Color(0f, 0f, 0f, 0.68f)
+                new Color(0f, 0f, 0f, 0.08f),
+                new Color(0f, 0f, 0f, 0.45f)
             ),
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.Scale,
