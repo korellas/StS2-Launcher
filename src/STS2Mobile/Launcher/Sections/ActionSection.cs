@@ -28,8 +28,6 @@ public class ActionSection : VBoxContainer
     private readonly Button _updateButton;
     private readonly Button _appUpdateButton;
     private string _appUpdateBaseText = "UPDATE LAUNCHER";
-    private readonly StyleBoxFlat _offStyle;
-    private readonly StyleBoxFlat _onStyle;
 
     // Toggles and cloud actions live in this group so LauncherView can reparent
     // them into a Settings submenu, leaving only PLAY-level actions on the menu.
@@ -46,31 +44,21 @@ public class ActionSection : VBoxContainer
         _retryButton.Pressed += () => RetryPressed?.Invoke();
         AddChild(_retryButton);
 
-        var r = (int)(4 * scale);
-        var bw = System.Math.Max(1, (int)(2 * scale));
-        _offStyle = StyledButton.MakeOutline(new Color(0.7f, 0.25f, 0.25f), r, bw);
-        _onStyle = StyledButton.MakeOutline(new Color(0.25f, 0.65f, 0.3f), r, bw);
 
-        _localBackupToggle = new GameMenuButton("Local Backup: OFF", scale, fontSize: 22, onParchment: true);
+        _localBackupToggle = new GameCheckRow("Local Backup", scale);
         _localBackupToggle.ToggleMode = true;
         _localBackupToggle.Visible = false;
-        ApplyToggleStyle(_localBackupToggle, false);
         _localBackupToggle.Toggled += pressed =>
         {
-            _localBackupToggle.Text = pressed ? "Local Backup: ON" : "Local Backup: OFF";
-            ApplyToggleStyle(_localBackupToggle, pressed);
             LocalBackupToggled?.Invoke(pressed);
         };
         SettingsGroup.AddChild(_localBackupToggle);
 
-        _cloudSyncToggle = new GameMenuButton("Auto Sync: OFF", scale, fontSize: 22, onParchment: true);
+        _cloudSyncToggle = new GameCheckRow("Auto Sync", scale);
         _cloudSyncToggle.ToggleMode = true;
         _cloudSyncToggle.Visible = false;
-        ApplyToggleStyle(_cloudSyncToggle, false);
         _cloudSyncToggle.Toggled += pressed =>
         {
-            _cloudSyncToggle.Text = pressed ? "Auto Sync: ON" : "Auto Sync: OFF";
-            ApplyToggleStyle(_cloudSyncToggle, pressed);
             CloudSyncToggled?.Invoke(pressed);
         };
         SettingsGroup.AddChild(_cloudSyncToggle);
@@ -80,27 +68,21 @@ public class ActionSection : VBoxContainer
         // The user MUST opt into the same beta channel inside the Steam
         // client first; otherwise GetManifestRequestCode fails with
         // "Ensure the account owns this app" on protected branches.
-        _betaChannelToggle = new GameMenuButton("Beta Channel: OFF", scale, fontSize: 22, onParchment: true);
+        _betaChannelToggle = new GameCheckRow("Beta Channel", scale);
         _betaChannelToggle.ToggleMode = true;
         _betaChannelToggle.Visible = false;
-        ApplyToggleStyle(_betaChannelToggle, false);
         _betaChannelToggle.Toggled += pressed =>
         {
-            _betaChannelToggle.Text = pressed ? "Beta Channel: ON" : "Beta Channel: OFF";
-            ApplyToggleStyle(_betaChannelToggle, pressed);
             BetaChannelToggled?.Invoke(pressed);
         };
         SettingsGroup.AddChild(_betaChannelToggle);
 
         // Debug aid, so it stays available whether or not Steam is connected.
-        _fpsOverlayToggle = new GameMenuButton("FPS Overlay: OFF", scale, fontSize: 22, onParchment: true);
+        _fpsOverlayToggle = new GameCheckRow("FPS Overlay", scale);
         _fpsOverlayToggle.ToggleMode = true;
         _fpsOverlayToggle.Visible = false;
-        ApplyToggleStyle(_fpsOverlayToggle, false);
         _fpsOverlayToggle.Toggled += pressed =>
         {
-            _fpsOverlayToggle.Text = pressed ? "FPS Overlay: ON" : "FPS Overlay: OFF";
-            ApplyToggleStyle(_fpsOverlayToggle, pressed);
             FpsOverlayToggled?.Invoke(pressed);
         };
         SettingsGroup.AddChild(_fpsOverlayToggle);
@@ -146,39 +128,23 @@ public class ActionSection : VBoxContainer
     public void SetLocalBackupChecked(bool value)
     {
         _localBackupToggle.ButtonPressed = value;
-        _localBackupToggle.Text = value ? "Local Backup: ON" : "Local Backup: OFF";
-        ApplyToggleStyle(_localBackupToggle, value);
     }
 
     public void SetCloudSyncChecked(bool value)
     {
         _cloudSyncToggle.ButtonPressed = value;
-        _cloudSyncToggle.Text = value ? "Auto Sync: ON" : "Auto Sync: OFF";
-        ApplyToggleStyle(_cloudSyncToggle, value);
     }
 
     public void SetFpsOverlayChecked(bool value)
     {
         _fpsOverlayToggle.ButtonPressed = value;
-        _fpsOverlayToggle.Text = value ? "FPS Overlay: ON" : "FPS Overlay: OFF";
-        ApplyToggleStyle(_fpsOverlayToggle, value);
     }
 
     public void SetBetaChannelChecked(bool value)
     {
         _betaChannelToggle.ButtonPressed = value;
-        _betaChannelToggle.Text = value ? "Beta Channel: ON" : "Beta Channel: OFF";
-        ApplyToggleStyle(_betaChannelToggle, value);
     }
 
-    private void ApplyToggleStyle(Button button, bool on)
-    {
-        var style = on ? _onStyle : _offStyle;
-        button.AddThemeStyleboxOverride("normal", style);
-        button.AddThemeStyleboxOverride("hover", style);
-        button.AddThemeStyleboxOverride("pressed", style);
-        button.AddThemeStyleboxOverride("disabled", style);
-    }
 
     private HBoxContainer PushPullRow => (HBoxContainer)_pushButton.GetParent();
 

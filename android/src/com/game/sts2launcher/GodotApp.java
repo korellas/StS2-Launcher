@@ -96,11 +96,16 @@ public class GodotApp extends GodotActivity {
 		gameDir = new File(getFilesDir(), "game").getAbsolutePath();
 
 		SplashScreen splash = SplashScreen.installSplashScreen(this);
-		splash.setKeepOnScreenCondition(() -> !godotReady.get());
+		// Dismiss as soon as Android is ready: the activity's windowBackground is
+		// the key art, so releasing the icon splash early shows artwork during
+		// Godot's boot rather than a static icon.
+		splash.setKeepOnScreenCondition(() -> false);
 		EdgeToEdge.enable(this);
 
 		// Must be called before any native FMOD calls.
 		FMOD.init(this);
+
+		versionChanged = isNewVersion();
 
 		setupAssemblies();
 		extractAssetFile("FMOD_LOGOS/FMOD Logo White - Transparent Background.png", "fmod_logo.png");
@@ -121,6 +126,10 @@ public class GodotApp extends GodotActivity {
 		}
 	}
 
+	// Whether this launch is the first on a newly installed APK. Read once and
+	// cached: isNewVersion() records the new code, so a second call returns false.
+	private boolean versionChanged;
+
 	private boolean isNewVersion() {
 		SharedPreferences prefs = getSharedPreferences("sts2mobile", MODE_PRIVATE);
 		int lastVersion = prefs.getInt("installed_version_code", -1);
@@ -140,8 +149,6 @@ public class GodotApp extends GodotActivity {
 	private void setupAssemblies() {
 		File srcDir = findAssembliesDir();
 		File destDir = new File(getFilesDir(), ".godot/mono/publish/arm64");
-
-		boolean versionChanged = isNewVersion();
 
 		File patcherMarker = new File(destDir, "STS2Mobile.dll");
 		File sts2Marker = new File(destDir, "sts2.dll");
@@ -242,7 +249,7 @@ public class GodotApp extends GodotActivity {
 	// Extracts a single file from APK assets to the files directory.
 	private void extractAssetFile(String assetPath, String destName) {
 		File dest = new File(getFilesDir(), destName);
-		if (dest.exists())
+		if (dest.exists() && !versionChanged)
 			return;
 		try (InputStream in = getAssets().open(assetPath);
 				OutputStream out = new FileOutputStream(dest)) {

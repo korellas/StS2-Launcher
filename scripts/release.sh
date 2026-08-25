@@ -63,7 +63,25 @@ fi
 # Derive next version code by bumping the current one by one — release tags
 # should strictly increase version_code so Android will accept the update.
 CURRENT_CODE=$(grep '^export_version_code=' "$GRADLE_PROPS" | cut -d= -f2)
-NEW_CODE=$((CURRENT_CODE + 1))
+
+# Derive the code from the version name rather than incrementing the previous
+# one, so the two can never drift: sideloaded test builds had pushed the device's
+# code past the release lineage, which made the next release a downgrade that
+# Android refuses to install.
+#
+# Android's guide suggests major*10000 + minor*100 + patch, but this fork is
+# still on major 0, so that yields three-digit codes that collide with the codes
+# local builds already reached. Shifting each field up two digits keeps the same
+# idea with room to spare: 0.3.26 -> 30026, 0.4.0 -> 40000, 1.0.0 -> 1000000.
+VERSION_CORE=${VERSION%%-*}
+IFS='.' read -r V_MAJOR V_MINOR V_PATCH <<< "$VERSION_CORE"
+NEW_CODE=$((10#${V_MAJOR:-0} * 1000000 + 10#${V_MINOR:-0} * 10000 + 10#${V_PATCH:-0}))
+
+if [[ "$NEW_CODE" -le "$CURRENT_CODE" ]]; then
+    echo "ERROR: derived version code $NEW_CODE is not above the current $CURRENT_CODE." >&2
+    echo "Android refuses downgrades; pick a higher version than $(grep '^export_version_name=' "$GRADLE_PROPS" | cut -d= -f2)." >&2
+    exit 1
+fi
 
 echo "→ Releasing v$VERSION (version_code $CURRENT_CODE -> $NEW_CODE)"
 

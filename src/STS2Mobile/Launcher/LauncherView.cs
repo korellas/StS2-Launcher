@@ -50,13 +50,18 @@ public class LauncherView
             GrowVertical = Control.GrowDirection.Both,
         };
         menu.CustomMinimumSize = new Vector2((int)(320 * scale), 0);
-        menu.AddThemeConstantOverride("separation", (int)(6 * scale));
+        menu.AddThemeConstantOverride("separation", (int)(2 * scale));
         parent.AddChild(menu);
         _menu = menu;
 
-        _statusLabel = new StyledLabel("Initializing...", scale, fontSize: 17);
+        _statusLabel = new StyledLabel("Initializing...", scale, fontSize: 15);
         _statusLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _statusLabel.Modulate = new Color(1f, 1f, 1f, 0.72f);
         menu.AddChild(_statusLabel);
+
+        // Breathing room between the greeting and the entries, so PLAY reads as
+        // the first item of a menu rather than the next line of a paragraph.
+        menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(26 * scale)) });
 
         Login = new LoginSection(scale);
         menu.AddChild(Login);
@@ -100,6 +105,10 @@ public class LauncherView
         };
         consoleOverlay.Content.AddChild(copyLogsButton);
         parent.AddChild(consoleOverlay);
+
+        // Secondary entries sit closer together than PLAY does, giving the menu
+        // an obvious primary action instead of four equal-weight lines.
+        menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(14 * scale)) });
 
         var newsEntry = new GameMenuButton("News", scale);
         newsEntry.Pressed += newsOverlay.Open;
