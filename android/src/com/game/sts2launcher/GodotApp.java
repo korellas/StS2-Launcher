@@ -368,6 +368,16 @@ public class GodotApp extends GodotActivity {
 		}
 	}
 
+	// Ends the app rather than bouncing back to the launcher. finishAndRemoveTask
+	// drops the task from recents so this reads as a deliberate exit, and the
+	// explicit exit follows because Godot's process does not reliably unwind on
+	// its own once the activity is gone.
+	public void quitApp() {
+		Log.i(TAG, "Quit requested, exiting app");
+		finishAndRemoveTask();
+		Runtime.getRuntime().exit(0);
+	}
+
 	public void restartApp() {
 		Log.i(TAG, "Restarting app...");
 		Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());

@@ -242,7 +242,10 @@ public static class AppLifecyclePatches
         }
     }
 
-    // Replaces the default quit (force-kill) with a clean app restart via GodotApp.
+    // The game's own Quit force-kills the process, which Android can surface as a
+    // crash, so it is intercepted. This used to restart the app instead, because
+    // the launcher is only shown by the GameStartupWrapper patch and a restart was
+    // the only way back to it — but quitting should quit, so it now ends the app.
     // Saves are already written by the original Quit() callers before this runs.
     public static bool QuitPrefix(object __instance)
     {
@@ -254,11 +257,11 @@ public static class AppLifecyclePatches
             }
             catch { }
 
-            PatchHelper.Log("NGame.Quit intercepted, restarting app");
+            PatchHelper.Log("NGame.Quit intercepted, exiting app");
             var jcw = Engine.GetSingleton("JavaClassWrapper");
             var wrapper = (GodotObject)jcw.Call("wrap", "com.game.sts2launcher.GodotApp");
             var godotApp = (GodotObject)wrapper.Call("getInstance");
-            godotApp.Call("restartApp");
+            godotApp.Call("quitApp");
             return false;
         }
         catch (Exception ex)
