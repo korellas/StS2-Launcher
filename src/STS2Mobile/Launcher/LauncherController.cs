@@ -117,6 +117,7 @@ public class LauncherController
         _view.Actions.LocalBackupToggled += OnLocalBackupToggled;
         _view.Actions.CloudSyncToggled += OnCloudSyncToggled;
         _view.Actions.BetaChannelToggled += OnBetaChannelToggled;
+        _view.Actions.FpsOverlayToggled += OnFpsOverlayToggled;
         _view.Actions.CloudPushPressed += OnCloudPushPressed;
         _view.Actions.CloudPullPressed += OnCloudPullPressed;
         _view.Actions.CheckForUpdatesPressed += OnCheckForUpdatesPressed;
@@ -136,6 +137,10 @@ public class LauncherController
         var betaPref = LauncherModel.LoadBetaChannelPref();
         _view.Actions.SetBetaChannelChecked(betaPref);
         DepotDownloader.PreferBeta = betaPref;
+
+        var fpsOverlayPref = LauncherModel.LoadFpsOverlayPref();
+        _view.Actions.SetFpsOverlayChecked(fpsOverlayPref);
+        LauncherPatches.FpsOverlayEnabled = fpsOverlayPref;
 
         var result = _model.StartSession();
         HandleFastPath(result);
@@ -492,6 +497,12 @@ public class LauncherController
     {
         LauncherModel.SaveCloudSyncPref(pressed);
         LauncherPatches.CloudSyncEnabled = pressed;
+    }
+
+    private void OnFpsOverlayToggled(bool pressed)
+    {
+        LauncherModel.SaveFpsOverlayPref(pressed);
+        LauncherPatches.FpsOverlayEnabled = pressed;
     }
 
     private void OnBetaChannelToggled(bool pressed)

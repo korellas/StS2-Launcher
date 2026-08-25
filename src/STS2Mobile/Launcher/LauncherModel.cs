@@ -441,6 +441,30 @@ public class LauncherModel : IDisposable
         catch { }
     }
 
+    private static string FpsOverlayPrefPath =>
+        Path.Combine(OS.GetDataDir(), "fps_overlay_enabled");
+
+    // Debug aid, off by default.
+    public static bool LoadFpsOverlayPref()
+    {
+        try
+        {
+            if (File.Exists(FpsOverlayPrefPath))
+                return File.ReadAllText(FpsOverlayPrefPath).Trim() == "true";
+        }
+        catch { }
+        return false;
+    }
+
+    public static void SaveFpsOverlayPref(bool enabled)
+    {
+        try
+        {
+            File.WriteAllText(FpsOverlayPrefPath, enabled ? "true" : "false");
+        }
+        catch { }
+    }
+
     public static GodotObject GetGodotApp()
     {
         try

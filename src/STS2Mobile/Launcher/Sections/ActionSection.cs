@@ -11,6 +11,7 @@ public class ActionSection : VBoxContainer
     public event Action<bool> LocalBackupToggled;
     public event Action<bool> CloudSyncToggled;
     public event Action<bool> BetaChannelToggled;
+    public event Action<bool> FpsOverlayToggled;
     public event Action CloudPushPressed;
     public event Action CloudPullPressed;
     public event Action CheckForUpdatesPressed;
@@ -21,6 +22,7 @@ public class ActionSection : VBoxContainer
     private readonly StyledButton _localBackupToggle;
     private readonly StyledButton _cloudSyncToggle;
     private readonly StyledButton _betaChannelToggle;
+    private readonly StyledButton _fpsOverlayToggle;
     private readonly Button _pushButton;
     private readonly Button _pullButton;
     private readonly Button _updateButton;
@@ -86,6 +88,19 @@ public class ActionSection : VBoxContainer
             BetaChannelToggled?.Invoke(pressed);
         };
         AddChild(_betaChannelToggle);
+
+        // Debug aid, so it stays available whether or not Steam is connected.
+        _fpsOverlayToggle = new StyledButton("FPS Overlay: OFF", scale, fontSize: 14, height: 44);
+        _fpsOverlayToggle.ToggleMode = true;
+        _fpsOverlayToggle.Visible = false;
+        ApplyToggleStyle(_fpsOverlayToggle, false);
+        _fpsOverlayToggle.Toggled += pressed =>
+        {
+            _fpsOverlayToggle.Text = pressed ? "FPS Overlay: ON" : "FPS Overlay: OFF";
+            ApplyToggleStyle(_fpsOverlayToggle, pressed);
+            FpsOverlayToggled?.Invoke(pressed);
+        };
+        AddChild(_fpsOverlayToggle);
 
         var pushPullRow = new HBoxContainer();
         pushPullRow.Visible = false;
@@ -153,6 +168,13 @@ public class ActionSection : VBoxContainer
         ApplyToggleStyle(_cloudSyncToggle, value);
     }
 
+    public void SetFpsOverlayChecked(bool value)
+    {
+        _fpsOverlayToggle.ButtonPressed = value;
+        _fpsOverlayToggle.Text = value ? "FPS Overlay: ON" : "FPS Overlay: OFF";
+        ApplyToggleStyle(_fpsOverlayToggle, value);
+    }
+
     public void SetBetaChannelChecked(bool value)
     {
         _betaChannelToggle.ButtonPressed = value;
@@ -178,6 +200,7 @@ public class ActionSection : VBoxContainer
         _localBackupToggle.Visible = showCloudSync;
         _cloudSyncToggle.Visible = showCloudSync;
         _betaChannelToggle.Visible = showCloudSync;
+        _fpsOverlayToggle.Visible = true;
         PushPullRow.Visible = showCloudSync;
         _updateButton.Visible = showUpdate;
         _updateButton.Disabled = false;
@@ -192,6 +215,7 @@ public class ActionSection : VBoxContainer
         _localBackupToggle.Visible = false;
         _cloudSyncToggle.Visible = false;
         _betaChannelToggle.Visible = false;
+        _fpsOverlayToggle.Visible = false;
         PushPullRow.Visible = false;
         _updateButton.Visible = false;
     }
@@ -203,6 +227,7 @@ public class ActionSection : VBoxContainer
         _localBackupToggle.Visible = false;
         _cloudSyncToggle.Visible = false;
         _betaChannelToggle.Visible = false;
+        _fpsOverlayToggle.Visible = false;
         PushPullRow.Visible = false;
         _updateButton.Visible = false;
         _appUpdateButton.Visible = false;

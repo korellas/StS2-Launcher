@@ -18,6 +18,7 @@ namespace STS2Mobile.Patches;
 public static class LauncherPatches
 {
     internal static bool CloudSyncEnabled = true;
+    internal static bool FpsOverlayEnabled;
     internal static string SavedAccountName;
     internal static string SavedRefreshToken;
 
@@ -149,6 +150,15 @@ public static class LauncherPatches
         // happening during the 25s game boot. Parented to tree.Root so it
         // survives the scene transition the game performs in GameStartup.
         var overlay = LoadingOverlay.Show(tree, "Loading");
+
+        // Debug performance overlay, opt-in from the launcher. Shown here rather
+        // than in the launcher itself because a static menu's frame rate says
+        // nothing useful.
+        if (FpsOverlayEnabled)
+        {
+            FpsOverlay.Show(tree);
+            PatchHelper.Log("[Overlay] FPS overlay enabled");
+        }
 
         var instanceField = typeof(SaveManager).GetField(
             "_instance",

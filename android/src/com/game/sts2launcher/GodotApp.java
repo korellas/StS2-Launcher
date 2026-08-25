@@ -4,7 +4,9 @@ import org.godotengine.godot.Godot;
 import org.godotengine.godot.GodotActivity;
 
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.activity.EdgeToEdge;
@@ -327,6 +329,34 @@ public class GodotApp extends GodotActivity {
 
 	public String getVersionName() {
 		return BuildConfig.VERSION_NAME;
+	}
+
+	// Thermal throttling level reported by the platform, for the debug overlay.
+	// PowerManager.getCurrentThermalStatus() is available to normal apps from
+	// API 29; returns an empty string when unavailable so callers can hide the field.
+	public String getThermalStatus() {
+		try {
+			if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+				return "";
+			}
+			PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+			if (pm == null) {
+				return "";
+			}
+			switch (pm.getCurrentThermalStatus()) {
+				case PowerManager.THERMAL_STATUS_NONE:      return "NONE";
+				case PowerManager.THERMAL_STATUS_LIGHT:     return "LIGHT";
+				case PowerManager.THERMAL_STATUS_MODERATE:  return "MODERATE";
+				case PowerManager.THERMAL_STATUS_SEVERE:    return "SEVERE";
+				case PowerManager.THERMAL_STATUS_CRITICAL:  return "CRITICAL";
+				case PowerManager.THERMAL_STATUS_EMERGENCY: return "EMERGENCY";
+				case PowerManager.THERMAL_STATUS_SHUTDOWN:  return "SHUTDOWN";
+				default:                                    return "";
+			}
+		} catch (Exception e) {
+			Log.w(TAG, "getThermalStatus failed", e);
+			return "";
+		}
 	}
 
 	public void restartApp() {
