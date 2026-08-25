@@ -19,8 +19,6 @@ public class LauncherView
     private readonly StyledLabel _statusLabel;
     private readonly StyledLabel _versionLabel;
     private readonly Control _parent;
-    private readonly StyledPanel _panel;
-    private float _panelBaseY;
 
     public LauncherView(Control parent, float scale)
     {
@@ -30,67 +28,122 @@ public class LauncherView
 
         var vpSize = parent.GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
 
+        GameAssets.LogAvailability();
+        GameAssets.DescribeTheme(GameAssets.MenuButtonTheme);
+        GameAssets.DescribeTheme(GameAssets.SettingsRowTheme);
+
         var bg = new ScreenBackground();
         bg.GuiInput += DismissKeyboard;
         parent.AddChild(bg);
 
-        _panel = new StyledPanel(scale, widthRatio: 0.95f);
-        _panel.UpdateSizeFromViewport(vpSize);
-        _panel.Panel.GuiInput += DismissKeyboard;
-        parent.AddChild(_panel);
-        _panelBaseY = _panel.Position.Y;
+        // The old layout was one screen-filling panel split into three columns,
+        // which hid the artwork and read as a utility dialog rather than a game
+        // menu. Now the entries sit directly on the art like the game's own menu,
+        // and the dense parts (news, settings, console) open as submenus.
+        var menu = new VBoxContainer
+        {
+            AnchorLeft = 0.5f,
+            AnchorRight = 0.5f,
+            // The artwork carries the game's logo across the middle of the
+            // screen, so the entries sit under it the way the game's own menu does.
+            AnchorTop = 0.74f,
+            AnchorBottom = 0.74f,
+            GrowHorizontal = Control.GrowDirection.Both,
+            GrowVertical = Control.GrowDirection.Both,
+        };
+        menu.CustomMinimumSize = new Vector2((int)(320 * scale), 0);
+        menu.AddThemeConstantOverride("separation", (int)(6 * scale));
+        parent.AddChild(menu);
+        _menu = menu;
 
-        var hbox = new HBoxContainer();
-        hbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        hbox.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        hbox.AddThemeConstantOverride("separation", (int)(16 * scale));
-        _panel.Content.AddChild(hbox);
-
-        var leftCenter = new CenterContainer();
-        leftCenter.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        leftCenter.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        leftCenter.SizeFlagsStretchRatio = 1f;
-        hbox.AddChild(leftCenter);
-
-        var left = new VBoxContainer();
-        left.CustomMinimumSize = new Vector2((int)(200 * scale), 0);
-        left.AddThemeConstantOverride("separation", (int)(10 * scale));
-        leftCenter.AddChild(left);
-
-        var title = new StyledLabel("StS2 Launcher", scale, fontSize: 26);
-        left.AddChild(title);
-
-        _versionLabel = new StyledLabel("", scale, fontSize: 11);
-        _versionLabel.AddThemeColorOverride("font_color", new Color(0.55f, 0.55f, 0.6f));
-        left.AddChild(_versionLabel);
-
-        left.AddChild(new HSeparator());
-
-        _statusLabel = new StyledLabel("Initializing...", scale);
+        _statusLabel = new StyledLabel("Initializing...", scale, fontSize: 17);
         _statusLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        left.AddChild(_statusLabel);
+        menu.AddChild(_statusLabel);
 
         Login = new LoginSection(scale);
-        left.AddChild(Login);
+        menu.AddChild(Login);
 
         Code = new CodeSection(scale);
-        left.AddChild(Code);
+        menu.AddChild(Code);
 
         Download = new DownloadSection(scale);
-        left.AddChild(Download);
+        menu.AddChild(Download);
 
         Actions = new ActionSection(scale);
-        left.AddChild(Actions);
+        menu.AddChild(Actions);
 
-        // FMOD attribution (required by FMOD EULA).
-        var fmodContainer = new VBoxContainer();
-        fmodContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        fmodContainer.Alignment = BoxContainer.AlignmentMode.End;
-        left.AddChild(fmodContainer);
+        // Settings controls are built by ActionSection but belong in a submenu,
+        // so they are reparented rather than duplicated: every signal the
+        // controller already connected keeps working untouched.
+        var settingsOverlay = new SubmenuOverlay("Settings", scale, widthRatio: 0.5f, heightRatio: 0.7f);
+        Actions.RemoveChild(Actions.SettingsGroup);
+        settingsOverlay.Content.AddChild(Actions.SettingsGroup);
+        parent.AddChild(settingsOverlay);
+
+        var newsOverlay = new SubmenuOverlay("News", scale);
+        News = new NewsSection(scale);
+        News.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+        newsOverlay.Content.AddChild(News);
+        parent.AddChild(newsOverlay);
+
+        var consoleOverlay = new SubmenuOverlay("Console", scale);
+        Log = new LogView(scale);
+        Log.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+        Log.GuiInput += DismissKeyboard;
+        consoleOverlay.Content.AddChild(Log);
+
+        // Copy dumps the whole log to the clipboard: selecting text in a
+        // RichTextLabel by touch is fiddly enough that one tap is worth keeping.
+        var copyLogsButton = new GameMenuButton("Copy to clipboard", scale, fontSize: 15);
+        copyLogsButton.Pressed += () =>
+        {
+            DisplayServer.ClipboardSet(Log.GetParsedText());
+            Log.AppendLog("[copied console contents to clipboard]");
+        };
+        consoleOverlay.Content.AddChild(copyLogsButton);
+        parent.AddChild(consoleOverlay);
+
+        var newsEntry = new GameMenuButton("News", scale);
+        newsEntry.Pressed += newsOverlay.Open;
+        menu.AddChild(newsEntry);
+
+        var settingsEntry = new GameMenuButton("Settings", scale);
+        settingsEntry.Pressed += settingsOverlay.Open;
+        menu.AddChild(settingsEntry);
+
+        var consoleEntry = new GameMenuButton("Console", scale);
+        consoleEntry.Pressed += consoleOverlay.Open;
+        menu.AddChild(consoleEntry);
+
+        // Footer: version on the left, FMOD attribution on the right. The credit
+        // is required by the FMOD licence, so it stays on screen even though the
+        // rest of the chrome moved into submenus.
+        var footer = new HBoxContainer
+        {
+            AnchorLeft = 0f,
+            AnchorRight = 1f,
+            AnchorTop = 1f,
+            AnchorBottom = 1f,
+            OffsetLeft = (int)(18 * scale),
+            OffsetRight = -(int)(18 * scale),
+            OffsetTop = -(int)(46 * scale),
+            OffsetBottom = -(int)(8 * scale),
+            GrowVertical = Control.GrowDirection.Begin,
+        };
+        parent.AddChild(footer);
+
+        _versionLabel = new StyledLabel("", scale, fontSize: 11, align: HorizontalAlignment.Left);
+        _versionLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _versionLabel.SizeFlagsVertical = Control.SizeFlags.ShrinkEnd;
+        footer.AddChild(_versionLabel);
+
+        var fmodBox = new VBoxContainer();
+        fmodBox.Alignment = BoxContainer.AlignmentMode.End;
+        footer.AddChild(fmodBox);
 
         var fmodLogo = LoadFmodLogo(scale);
         if (fmodLogo != null)
-            fmodContainer.AddChild(fmodLogo);
+            fmodBox.AddChild(fmodLogo);
 
         var fmodCredit = new StyledLabel(
             "Made using FMOD Studio by Firelight Technologies Pty Ltd.",
@@ -98,57 +151,10 @@ public class LauncherView
             fontSize: 8
         );
         fmodCredit.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.55f));
-        fmodContainer.AddChild(fmodCredit);
-
-        // Center column: Steam News. Lives between controls and console
-        // so it can use the horizontal space landscape mode gives us. The
-        // 3:3 split with the console gives titles enough width to render in
-        // a single line without ellipsis-truncation.
-        var newsCol = new VBoxContainer();
-        newsCol.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        newsCol.SizeFlagsStretchRatio = 3f;
-        newsCol.AddThemeConstantOverride("separation", (int)(6 * scale));
-        hbox.AddChild(newsCol);
-
-        News = new NewsSection(scale);
-        News.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        newsCol.AddChild(News);
-
-        // Right column: console log. Same flex weight as news so the two
-        // share the panel evenly after controls take their fixed share.
-        var right = new VBoxContainer();
-        right.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        right.SizeFlagsStretchRatio = 3f;
-        right.AddThemeConstantOverride("separation", (int)(6 * scale));
-        hbox.AddChild(right);
-
-        // Console header row: title on the left, Copy button on the right.
-        // Copy puts the entire log into the system clipboard so users can
-        // paste it into a bug report — selection-and-copy on a touchscreen
-        // RichTextLabel is fiddly enough that a one-tap dump is worth it.
-        var logHeader = new HBoxContainer();
-        logHeader.AddThemeConstantOverride("separation", (int)(8 * scale));
-        right.AddChild(logHeader);
-
-        var logTitle = new StyledLabel("Console", scale, fontSize: 14);
-        logTitle.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.65f));
-        logTitle.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        logHeader.AddChild(logTitle);
-
-        var copyLogsButton = new StyledButton("Copy", scale, fontSize: 11, height: 26);
-        copyLogsButton.CustomMinimumSize = new Vector2((int)(60 * scale), (int)(26 * scale));
-        copyLogsButton.Pressed += () =>
-        {
-            DisplayServer.ClipboardSet(Log.GetParsedText());
-            Log.AppendLog("[copied console contents to clipboard]");
-        };
-        logHeader.AddChild(copyLogsButton);
-
-        Log = new LogView(scale);
-        Log.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        Log.GuiInput += DismissKeyboard;
-        right.AddChild(Log);
+        fmodBox.AddChild(fmodCredit);
     }
+
+    private VBoxContainer _menu;
 
     private readonly float _scale;
 
@@ -177,11 +183,15 @@ public class LauncherView
             var vpSize = _parent.GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
             var scale = vpSize.Y / windowSize.Y;
             var offset = kbHeight * scale * 0.5f;
-            _panel.Position = new Vector2(_panel.Position.X, _panelBaseY - offset);
+            // The menu is anchored rather than absolutely positioned now, so
+            // nudge it with the anchor offset instead of moving a panel.
+            _menu.OffsetTop = -offset;
+            _menu.OffsetBottom = -offset;
         }
         else
         {
-            _panel.Position = new Vector2(_panel.Position.X, _panelBaseY);
+            _menu.OffsetTop = 0;
+            _menu.OffsetBottom = 0;
         }
     }
 

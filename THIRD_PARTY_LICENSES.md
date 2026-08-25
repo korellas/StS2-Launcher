@@ -47,3 +47,10 @@ Spine runtime binaries are included in APK builds but not in this source reposit
 - **License**: Apache 2.0
 - **Copyright**: (c) The Android Open Source Project
 - **Source**: https://github.com/androidx/androidx
+
+## Cinzel
+
+Bundled at `android/assets/launcher_font.ttf` and used by the launcher when the
+game's own font is unavailable. Copyright 2020 The Cinzel Project Authors
+(https://github.com/NDISCOVER/Cinzel), licensed under the SIL Open Font License
+1.1. Full text: `android/assets/launcher_font-OFL.txt`.

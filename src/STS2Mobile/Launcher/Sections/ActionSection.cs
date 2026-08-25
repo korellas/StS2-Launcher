@@ -19,21 +19,29 @@ public class ActionSection : VBoxContainer
 
     private readonly Button _launchButton;
     private readonly Button _retryButton;
-    private readonly StyledButton _localBackupToggle;
-    private readonly StyledButton _cloudSyncToggle;
-    private readonly StyledButton _betaChannelToggle;
-    private readonly StyledButton _fpsOverlayToggle;
+    private readonly Button _localBackupToggle;
+    private readonly Button _cloudSyncToggle;
+    private readonly Button _betaChannelToggle;
+    private readonly Button _fpsOverlayToggle;
     private readonly Button _pushButton;
     private readonly Button _pullButton;
     private readonly Button _updateButton;
-    private readonly StyledButton _appUpdateButton;
+    private readonly Button _appUpdateButton;
     private string _appUpdateBaseText = "UPDATE LAUNCHER";
     private readonly StyleBoxFlat _offStyle;
     private readonly StyleBoxFlat _onStyle;
 
+    // Toggles and cloud actions live in this group so LauncherView can reparent
+    // them into a Settings submenu, leaving only PLAY-level actions on the menu.
+    public VBoxContainer SettingsGroup { get; }
+
     public ActionSection(float scale)
     {
-        _retryButton = new StyledButton("RETRY", scale);
+        SettingsGroup = new VBoxContainer();
+        SettingsGroup.AddThemeConstantOverride("separation", (int)(8 * scale));
+        AddChild(SettingsGroup);
+
+        _retryButton = new GameMenuButton("RETRY", scale, fontSize: 34, primary: true);
         _retryButton.Visible = false;
         _retryButton.Pressed += () => RetryPressed?.Invoke();
         AddChild(_retryButton);
@@ -43,7 +51,7 @@ public class ActionSection : VBoxContainer
         _offStyle = StyledButton.MakeOutline(new Color(0.7f, 0.25f, 0.25f), r, bw);
         _onStyle = StyledButton.MakeOutline(new Color(0.25f, 0.65f, 0.3f), r, bw);
 
-        _localBackupToggle = new StyledButton("Local Backup: OFF", scale, fontSize: 14, height: 44);
+        _localBackupToggle = new GameMenuButton("Local Backup: OFF", scale, fontSize: 22, onParchment: true);
         _localBackupToggle.ToggleMode = true;
         _localBackupToggle.Visible = false;
         ApplyToggleStyle(_localBackupToggle, false);
@@ -53,9 +61,9 @@ public class ActionSection : VBoxContainer
             ApplyToggleStyle(_localBackupToggle, pressed);
             LocalBackupToggled?.Invoke(pressed);
         };
-        AddChild(_localBackupToggle);
+        SettingsGroup.AddChild(_localBackupToggle);
 
-        _cloudSyncToggle = new StyledButton("Auto Sync: OFF", scale, fontSize: 14, height: 44);
+        _cloudSyncToggle = new GameMenuButton("Auto Sync: OFF", scale, fontSize: 22, onParchment: true);
         _cloudSyncToggle.ToggleMode = true;
         _cloudSyncToggle.Visible = false;
         ApplyToggleStyle(_cloudSyncToggle, false);
@@ -65,19 +73,14 @@ public class ActionSection : VBoxContainer
             ApplyToggleStyle(_cloudSyncToggle, pressed);
             CloudSyncToggled?.Invoke(pressed);
         };
-        AddChild(_cloudSyncToggle);
+        SettingsGroup.AddChild(_cloudSyncToggle);
 
         // Channel toggle. Off (default) → follow Steam's `public` branch.
         // On → prefer any beta-named branch (e.g. STS2's `public-beta`).
         // The user MUST opt into the same beta channel inside the Steam
         // client first; otherwise GetManifestRequestCode fails with
         // "Ensure the account owns this app" on protected branches.
-        _betaChannelToggle = new StyledButton(
-            "Beta Channel: OFF",
-            scale,
-            fontSize: 14,
-            height: 44
-        );
+        _betaChannelToggle = new GameMenuButton("Beta Channel: OFF", scale, fontSize: 22, onParchment: true);
         _betaChannelToggle.ToggleMode = true;
         _betaChannelToggle.Visible = false;
         ApplyToggleStyle(_betaChannelToggle, false);
@@ -87,10 +90,10 @@ public class ActionSection : VBoxContainer
             ApplyToggleStyle(_betaChannelToggle, pressed);
             BetaChannelToggled?.Invoke(pressed);
         };
-        AddChild(_betaChannelToggle);
+        SettingsGroup.AddChild(_betaChannelToggle);
 
         // Debug aid, so it stays available whether or not Steam is connected.
-        _fpsOverlayToggle = new StyledButton("FPS Overlay: OFF", scale, fontSize: 14, height: 44);
+        _fpsOverlayToggle = new GameMenuButton("FPS Overlay: OFF", scale, fontSize: 22, onParchment: true);
         _fpsOverlayToggle.ToggleMode = true;
         _fpsOverlayToggle.Visible = false;
         ApplyToggleStyle(_fpsOverlayToggle, false);
@@ -100,55 +103,41 @@ public class ActionSection : VBoxContainer
             ApplyToggleStyle(_fpsOverlayToggle, pressed);
             FpsOverlayToggled?.Invoke(pressed);
         };
-        AddChild(_fpsOverlayToggle);
+        SettingsGroup.AddChild(_fpsOverlayToggle);
 
         var pushPullRow = new HBoxContainer();
         pushPullRow.Visible = false;
         pushPullRow.AddThemeConstantOverride("separation", (int)(6 * scale));
 
-        _pushButton = new StyledButton("Push to Cloud", scale, fontSize: 14, height: 44);
+        _pushButton = new GameMenuButton("Push to Cloud", scale, fontSize: 22, onParchment: true);
         _pushButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _pushButton.Pressed += () => CloudPushPressed?.Invoke();
         pushPullRow.AddChild(_pushButton);
 
-        _pullButton = new StyledButton("Pull from Cloud", scale, fontSize: 14, height: 44);
+        _pullButton = new GameMenuButton("Pull from Cloud", scale, fontSize: 22, onParchment: true);
         _pullButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _pullButton.Pressed += () => CloudPullPressed?.Invoke();
         pushPullRow.AddChild(_pullButton);
 
-        AddChild(pushPullRow);
+        SettingsGroup.AddChild(pushPullRow);
 
-        _updateButton = new StyledButton("CHECK FOR UPDATES", scale, fontSize: 16, height: 48);
+        _updateButton = new GameMenuButton("Check for Updates", scale, fontSize: 22, onParchment: true);
         _updateButton.Visible = false;
         _updateButton.Pressed += () => CheckForUpdatesPressed?.Invoke();
-        AddChild(_updateButton);
+        SettingsGroup.AddChild(_updateButton);
 
         // No banner above the orange UPDATE LAUNCHER button. Earlier versions
         // had a single-line yellow prompt here, but the user found it noisy
         // and asked us to remove it — the button itself already changes label
         // (e.g. "UPDATE LAUNCHER → v0.3.19", "Downloading… 42%",
         // "TAP TO INSTALL") so a separate prompt was redundant.
-        _appUpdateButton = new StyledButton("UPDATE LAUNCHER", scale, fontSize: 16, height: 48);
+        _appUpdateButton = new GameMenuButton("UPDATE LAUNCHER", scale, fontSize: 26);
         _appUpdateButton.Visible = false;
-        var appUpdateStyle = StyledButton.MakeFilled(
-            new Color(0.85f, 0.6f, 0.15f),
-            (int)(4 * scale)
-        );
-        var appUpdateHover = StyledButton.MakeFilled(
-            new Color(0.95f, 0.7f, 0.2f),
-            (int)(4 * scale)
-        );
-        var appUpdatePressed = StyledButton.MakeFilled(
-            new Color(0.7f, 0.5f, 0.1f),
-            (int)(4 * scale)
-        );
-        _appUpdateButton.AddThemeStyleboxOverride("normal", appUpdateStyle);
-        _appUpdateButton.AddThemeStyleboxOverride("hover", appUpdateHover);
-        _appUpdateButton.AddThemeStyleboxOverride("pressed", appUpdatePressed);
+        _appUpdateButton.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         _appUpdateButton.Pressed += () => AppUpdatePressed?.Invoke();
         AddChild(_appUpdateButton);
 
-        _launchButton = new StyledButton("LAUNCH", scale, fontSize: 16, height: 48);
+        _launchButton = new GameMenuButton("PLAY", scale, fontSize: 40, primary: true);
         _launchButton.Visible = false;
         _launchButton.Pressed += () => LaunchPressed?.Invoke();
         AddChild(_launchButton);
