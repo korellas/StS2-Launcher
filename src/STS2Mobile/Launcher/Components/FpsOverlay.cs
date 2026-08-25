@@ -26,7 +26,9 @@ public class FpsOverlay : CanvasLayer
     private const int LabelWidth = 38;
     private const int ValueWidth = 76;
     private const int DetailWidth = 148;
-    private const int FontSize = 15;
+    private const int CaptionSize = 12;
+    private const int ValueSize = 17;
+    private const int DetailSize = 13;
     private const int PanelPadding = 10;
     private const int ColumnGap = 8;
 
@@ -49,8 +51,19 @@ public class FpsOverlay : CanvasLayer
     private static readonly Color PanelColor = new(0.02f, 0.02f, 0.04f, 0.72f);
     private static readonly Color PanelBorder = new(0.55f, 0.55f, 0.62f, 0.28f);
     private static readonly Color TextColor = new(1f, 1f, 1f, 0.92f);
-    private static readonly Color NormalLine = new(0.45f, 0.95f, 0.55f, 0.95f);
-    private static readonly Color AlertLine = new(1f, 0.35f, 0.3f, 0.98f);
+    private static readonly Color AlertLine = new(1f, 0.36f, 0.32f, 0.98f);
+
+    // One hue per metric. A single colour for all four made the rows blur
+    // together; these are distinct at a glance but stay within one palette.
+    private static readonly Color FpsAccent = new(0.42f, 0.88f, 0.95f, 0.95f);
+    private static readonly Color CpuAccent = new(0.98f, 0.78f, 0.36f, 0.95f);
+    private static readonly Color GpuAccent = new(0.68f, 0.62f, 0.98f, 0.95f);
+    private static readonly Color TempAccent = new(0.98f, 0.58f, 0.35f, 0.95f);
+
+    private static readonly Color CaptionColor = new(0.68f, 0.70f, 0.76f, 0.85f);
+    private static readonly Color DetailColor = new(0.78f, 0.80f, 0.85f, 0.80f);
+    private static readonly Color MidlineColor = new(1f, 1f, 1f, 0.10f);
+    private static readonly Color SeparatorColor = new(1f, 1f, 1f, 0.07f);
 
     private readonly SystemStatsReader _stats = new();
 
@@ -94,7 +107,7 @@ public class FpsOverlay : CanvasLayer
             OffsetLeft = -(panelWidth + RightMargin),
             OffsetRight = -RightMargin,
             OffsetTop = TopOffset,
-            OffsetBottom = TopOffset + RowHeight * 4 + PanelPadding * 2,
+            OffsetBottom = TopOffset + RowHeight * 4 + 3 + PanelPadding * 2,
         };
         var panelStyle = new StyleBoxFlat { BgColor = PanelColor, BorderColor = PanelBorder };
         panelStyle.SetCornerRadiusAll(10);
@@ -115,10 +128,24 @@ public class FpsOverlay : CanvasLayer
         rows.AddThemeConstantOverride("separation", 0);
         panel.AddChild(rows);
 
-        _fpsRow = StatRow.Add(rows, "fps", "FPS", FpsMin, FpsBaseMax, alertAbove: null);
-        _cpuRow = StatRow.Add(rows, "cpu", "CPU", LoadMin, LoadMax, LoadAlertThreshold);
-        _gpuRow = StatRow.Add(rows, "gpu", "GPU", LoadMin, LoadMax, LoadAlertThreshold);
-        _tempRow = StatRow.Add(rows, "temp", "TEMP", TempMin, TempMax, TempAlertThreshold);
+        _fpsRow = StatRow.Add(rows, "fps", "FPS", FpsMin, FpsBaseMax, FpsAccent, alertAbove: null);
+        AddSeparator(rows);
+        _cpuRow = StatRow.Add(rows, "cpu", "CPU", LoadMin, LoadMax, CpuAccent, LoadAlertThreshold);
+        AddSeparator(rows);
+        _gpuRow = StatRow.Add(rows, "gpu", "GPU", LoadMin, LoadMax, GpuAccent, LoadAlertThreshold);
+        AddSeparator(rows);
+        _tempRow = StatRow.Add(rows, "temp", "TEMP", TempMin, TempMax, TempAccent, TempAlertThreshold);
+    }
+
+    private static void AddSeparator(Control parent)
+    {
+        var line = new ColorRect
+        {
+            Color = SeparatorColor,
+            CustomMinimumSize = new Vector2(0, 1),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        parent.AddChild(line);
     }
 
     private void Attach(SceneTree tree)
@@ -230,10 +257,12 @@ public class FpsOverlay : CanvasLayer
         private readonly Label _value;
         private readonly Label _detail;
         private readonly Sparkline _graph;
+        private readonly float? _alertAbove;
         private bool _everReadable;
 
-        private StatRow(HBoxContainer container, Label value, Sparkline graph, Label detail)
+        private StatRow(HBoxContainer container, Label value, Sparkline graph, Label detail, float? alertAbove)
         {
+            _alertAbove = alertAbove;
             _container = container;
             _value = value;
             _graph = graph;
@@ -246,6 +275,7 @@ public class FpsOverlay : CanvasLayer
             string label,
             float min,
             float max,
+            Color accent,
             float? alertAbove
         )
         {
@@ -257,14 +287,15 @@ public class FpsOverlay : CanvasLayer
             row.AddThemeConstantOverride("separation", ColumnGap);
             parent.AddChild(row);
 
-            var caption = MakeLabel(LabelWidth, HorizontalAlignment.Left);
+            var caption = MakeLabel(LabelWidth, HorizontalAlignment.Left, CaptionSize);
             caption.Text = label;
+            caption.AddThemeColorOverride("font_color", CaptionColor);
             row.AddChild(caption);
 
-            var value = MakeLabel(ValueWidth, HorizontalAlignment.Right);
+            var value = MakeLabel(ValueWidth, HorizontalAlignment.Right, ValueSize);
             row.AddChild(value);
 
-            var graph = new Sparkline(min, max, alertAbove)
+            var graph = new Sparkline(min, max, accent, alertAbove)
             {
                 CustomMinimumSize = new Vector2(GraphWidth, RowHeight),
                 MouseFilter = Control.MouseFilterEnum.Ignore,
@@ -274,13 +305,14 @@ public class FpsOverlay : CanvasLayer
             };
             row.AddChild(graph);
 
-            var detail = MakeLabel(DetailWidth, HorizontalAlignment.Right);
+            var detail = MakeLabel(DetailWidth, HorizontalAlignment.Right, DetailSize);
+            detail.AddThemeColorOverride("font_color", DetailColor);
             row.AddChild(detail);
 
-            return new StatRow(row, value, graph, detail);
+            return new StatRow(row, value, graph, detail, alertAbove);
         }
 
-        private static Label MakeLabel(int width, HorizontalAlignment align)
+        private static Label MakeLabel(int width, HorizontalAlignment align, int size)
         {
             var label = new Label
             {
@@ -293,7 +325,7 @@ public class FpsOverlay : CanvasLayer
                 AutowrapMode = TextServer.AutowrapMode.Off,
             };
             label.AddThemeColorOverride("font_color", TextColor);
-            label.AddThemeFontSizeOverride("font_size", FontSize);
+            label.AddThemeFontSizeOverride("font_size", size);
             return label;
         }
 
@@ -312,6 +344,8 @@ public class FpsOverlay : CanvasLayer
             _everReadable = true;
             _container.Visible = true;
             _value.Text = valueText;
+            if (_alertAbove is float threshold)
+                _value.AddThemeColorOverride("font_color", v >= threshold ? AlertLine : TextColor);
             _detail.Text = detailText ?? "";
             _graph.Push(v);
         }
@@ -323,21 +357,35 @@ public class FpsOverlay : CanvasLayer
     {
         private readonly float[] _samples = new float[HistoryLength];
         private readonly Line2D _line = new();
+        private readonly Line2D _midline = new();
+        private readonly Polygon2D _fill = new();
         private readonly float _min;
         private readonly float _max;
+        private readonly Color _accent;
         private readonly float? _alertAbove;
         private int _count;
         private int _head;
 
-        public Sparkline(float min, float max, float? alertAbove)
+        public Sparkline(float min, float max, Color accent, float? alertAbove)
         {
             _min = min;
             _max = max;
+            _accent = accent;
             _alertAbove = alertAbove;
 
+            // Drawn back to front: the reference line, the filled area, then the
+            // trace. A bare 2px line read as a scribble; the fill gives the shape
+            // a body and makes low values legible at a glance.
+            _midline.Width = 1f;
+            _midline.DefaultColor = MidlineColor;
+            AddChild(_midline);
+
+            _fill.Color = new Color(_accent, 0.18f);
+            AddChild(_fill);
+
             _line.Width = 2f;
-            _line.DefaultColor = NormalLine;
-            _line.Antialiased = false;
+            _line.DefaultColor = _accent;
+            _line.Antialiased = true;
             AddChild(_line);
         }
 
@@ -349,7 +397,11 @@ public class FpsOverlay : CanvasLayer
                 _count++;
 
             if (_alertAbove is float threshold)
-                _line.DefaultColor = value >= threshold ? AlertLine : NormalLine;
+            {
+                var colour = value >= threshold ? AlertLine : _accent;
+                _line.DefaultColor = colour;
+                _fill.Color = new Color(colour, 0.18f);
+            }
 
             Rebuild();
         }
@@ -387,6 +439,16 @@ public class FpsOverlay : CanvasLayer
             }
 
             _line.Points = points;
+
+            // Close the trace down to the baseline to get a filled area.
+            var polygon = new Vector2[points.Length + 2];
+            points.CopyTo(polygon, 0);
+            polygon[^2] = new Vector2(points[^1].X, top + plotHeight);
+            polygon[^1] = new Vector2(points[0].X, top + plotHeight);
+            _fill.Polygon = polygon;
+
+            float midY = top + plotHeight * 0.5f;
+            _midline.Points = new[] { new Vector2(0, midY), new Vector2(size.X, midY) };
         }
     }
 }
