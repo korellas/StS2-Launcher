@@ -60,8 +60,10 @@ public class SubmenuOverlay : Control
     // the two are different nodes, so the frame cannot simply be returned.
     private Container BuildFrame(Control parent, float scale, float widthRatio, float heightRatio)
     {
-        var vp = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
-        var size = new Vector2((int)(vp.X * widthRatio), (int)(vp.Y * heightRatio));
+        _widthRatio = widthRatio;
+        _heightRatio = heightRatio;
+
+        var size = ViewportRelativeSize();
         int pad = (int)(28 * scale);
 
         var texture = GameAssets.Load<Texture2D>(GameAssets.SubmenuPanel);
@@ -85,6 +87,7 @@ public class SubmenuOverlay : Control
             patch.AddChild(margin);
             margin.SetAnchorsPreset(LayoutPreset.FullRect);
             parent.AddChild(patch);
+            _frame = patch;
             parent.AddChild(patch);
 
             var holder = new VBoxContainer();
@@ -97,6 +100,7 @@ public class SubmenuOverlay : Control
 
         var panel = new PanelContainer { CustomMinimumSize = size, MouseFilter = MouseFilterEnum.Stop };
         parent.AddChild(panel);
+        _frame = panel;
         parent.AddChild(panel);
         panel.AddThemeStyleboxOverride("panel", LauncherTheme.Panel(scale));
         var fallbackMargin = new MarginContainer();
@@ -118,7 +122,24 @@ public class SubmenuOverlay : Control
             Hide();
     }
 
-    public void Open() => Visible = true;
+    private float _widthRatio;
+    private float _heightRatio;
+    private Control _frame;
+
+    private Vector2 ViewportRelativeSize()
+    {
+        var vp = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
+        return new Vector2((int)(vp.X * _widthRatio), (int)(vp.Y * _heightRatio));
+    }
+
+    // Folding the device changes the viewport without recreating the activity, so
+    // the panel has to re-read its size rather than keep the one it was built with.
+    public void Open()
+    {
+        if (_frame != null)
+            _frame.CustomMinimumSize = ViewportRelativeSize();
+        Visible = true;
+    }
 
     public new void Hide() => Visible = false;
 }
