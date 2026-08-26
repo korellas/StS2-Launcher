@@ -24,7 +24,14 @@ public class StyledDialog : ColorRect
         center.SetAnchorsPreset(LayoutPreset.FullRect);
         AddChild(center);
 
-        var body = BuildPanel(center, scale);
+        // The panel and the ribbons are siblings inside a fixed-size frame, so the
+        // ribbons can hang over the panel's bottom edge the way the game draws
+        // them. Kept inside the panel they sat in a tidy row well above it.
+        var size = new Vector2((int)(560 * scale), (int)(420 * scale));
+        var frame = new Control { CustomMinimumSize = size, MouseFilter = MouseFilterEnum.Ignore };
+        center.AddChild(frame);
+
+        var body = BuildPanel(frame, scale);
 
         var heading = new StyledLabel(title ?? Localization.Tr("DIALOG_CONFIRM_TITLE"), scale, fontSize: 28);
         heading.AddThemeColorOverride("font_color", TitleGold);
@@ -36,38 +43,53 @@ public class StyledDialog : ColorRect
         text.VerticalAlignment = VerticalAlignment.Center;
         body.AddChild(text);
 
-        var buttons = new HBoxContainer();
-        buttons.AddThemeConstantOverride("margin_bottom", 0);
-        body.AddChild(buttons);
-
         // Decline sits left of accept, matching the game's own prompts.
-        var cancel = new GameRibbonButton(Localization.Tr("DIALOG_NO"), scale, confirm: false);
-        cancel.Pressed += () =>
+        AddRibbon(frame, scale, confirm: false, Localization.Tr("DIALOG_NO"), () =>
         {
             Cancelled?.Invoke();
             QueueFree();
-        };
-        buttons.AddChild(cancel);
-
-        // A spacer rather than a separation constant: the game pushes its two
-        // ribbons to opposite corners of the panel.
-        buttons.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
-
-        var confirm = new GameRibbonButton(Localization.Tr("DIALOG_YES"), scale, confirm: true);
-        confirm.Pressed += () =>
+        });
+        AddRibbon(frame, scale, confirm: true, Localization.Tr("DIALOG_YES"), () =>
         {
             Confirmed?.Invoke();
             QueueFree();
+        });
+    }
+
+    private static void AddRibbon(Control frame, float scale, bool confirm, string label, Action onPressed)
+    {
+        var button = new GameRibbonButton(label, scale, confirm)
+        {
+            AnchorTop = 1f,
+            AnchorBottom = 1f,
+            GrowVertical = GrowDirection.Both,
+            // Straddles the panel's lower edge rather than sitting inside it.
+            OffsetTop = (int)(-34 * scale),
+            OffsetBottom = (int)(24 * scale),
         };
-        buttons.AddChild(confirm);
+
+        if (confirm)
+        {
+            button.AnchorLeft = 1f;
+            button.AnchorRight = 1f;
+            button.GrowHorizontal = GrowDirection.Begin;
+            button.OffsetRight = (int)(-24 * scale);
+            button.OffsetLeft = (int)(-214 * scale);
+        }
+        else
+        {
+            button.OffsetLeft = (int)(24 * scale);
+            button.OffsetRight = (int)(214 * scale);
+        }
+
+        button.Pressed += onPressed;
+        frame.AddChild(button);
     }
 
     private static VBoxContainer BuildPanel(Control parent, float scale)
     {
-        var panel = new PanelContainer
-        {
-            CustomMinimumSize = new Vector2((int)(520 * scale), (int)(460 * scale)),
-        };
+        var panel = new PanelContainer();
+        panel.SetAnchorsPreset(LayoutPreset.FullRect);
 
         var texture = GameAssets.Load<Texture2D>(GameAssets.PopupPanel);
         if (texture != null)
@@ -76,14 +98,14 @@ public class StyledDialog : ColorRect
             float inset = Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f;
             style.SetTextureMarginAll(inset);
             style.SetContentMarginAll(36 * scale);
-            // The ribbons hang over the panel's bottom edge, as the game draws them.
-            style.ContentMarginBottom = 6 * scale;
+            style.ContentMarginBottom = 78 * scale;
             panel.AddThemeStyleboxOverride("panel", style);
         }
         else
         {
             var style = LauncherTheme.Panel(scale);
             style.SetContentMarginAll((int)(30 * scale));
+            style.ContentMarginBottom = (int)(78 * scale);
             panel.AddThemeStyleboxOverride("panel", style);
         }
 

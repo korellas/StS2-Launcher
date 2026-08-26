@@ -26,6 +26,10 @@ public class NewsArticleView : VBoxContainer
     private string _originalBody = "";
     private bool _showingTranslation;
 
+    // Set once a request fails, so a device without a translation service doesn't
+    // spend a spinner on every article that gets opened.
+    private static bool _translationUnavailable;
+
     public NewsArticleView(float scale)
     {
         _scale = scale;
@@ -64,7 +68,7 @@ public class NewsArticleView : VBoxContainer
             BbcodeEnabled = true,
             FitContent = true,
             ScrollActive = false,
-            SelectionEnabled = true,
+            SelectionEnabled = false,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
         };
@@ -92,6 +96,9 @@ public class NewsArticleView : VBoxContainer
         _translateButton.Text = Localization.Tr("NEWS_TRANSLATE");
         _translateButton.Disabled = string.IsNullOrWhiteSpace(_originalBody);
         Visible = true;
+
+        if (Localization.IsKorean && !_translationUnavailable && !_translateButton.Disabled)
+            Translate();
     }
 
     private void Translate()
@@ -117,6 +124,18 @@ public class NewsArticleView : VBoxContainer
         _translateButton.Disabled = true;
         _translateButton.Text = Localization.Tr("NEWS_TRANSLATING");
         _poll.Start();
+    }
+
+    private void ReportUnavailable()
+    {
+        _translationUnavailable = true;
+        _translateButton.Disabled = false;
+        _translateButton.Text = Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE");
+
+        var reason = _translation.Capabilities();
+        PatchHelper.Log($"[Translate] unavailable — {reason}");
+        _body.Text = $"[color=#c8a06a]{Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE")}: {reason}[/color]\n\n"
+            + _originalBody;
     }
 
     private void OnPoll()

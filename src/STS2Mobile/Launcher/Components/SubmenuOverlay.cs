@@ -36,15 +36,18 @@ public class SubmenuOverlay : Control
         _widthRatio = widthRatio;
         _heightRatio = heightRatio;
 
-        var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
-        row.AddThemeConstantOverride("separation", (int)(-18 * scale));
-        center.AddChild(row);
+        var frame = BuildFrame(center, scale, widthRatio, heightRatio);
 
-        var back = new GameBackButton(scale) { SizeFlagsVertical = SizeFlags.ShrinkCenter };
+        var back = new GameBackButton(scale)
+        {
+            AnchorTop = 0.5f,
+            AnchorBottom = 0.5f,
+            GrowVertical = GrowDirection.Both,
+            OffsetLeft = (int)(34 * scale),
+            OffsetRight = (int)(150 * scale),
+        };
         back.Pressed += Hide;
-        row.AddChild(back);
-
-        var frame = BuildFrame(row, scale, widthRatio, heightRatio);
+        AddChild(back);
 
         var header = new HBoxContainer();
         header.AddThemeConstantOverride("separation", (int)(12 * scale));
@@ -61,11 +64,19 @@ public class SubmenuOverlay : Control
         frame.AddChild(scroll);
         LauncherTheme.ApplyGameScrollbar(scroll, scale);
 
+        var gutter = new MarginContainer
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+        };
+        gutter.AddThemeConstantOverride("margin_right", (int)(22 * scale));
+        scroll.AddChild(gutter);
+
         Content = new VBoxContainer();
         Content.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         Content.SizeFlagsVertical = SizeFlags.ExpandFill;
         Content.AddThemeConstantOverride("separation", (int)(10 * scale));
-        scroll.AddChild(Content);
+        gutter.AddChild(Content);
 
         var titleLabel = new StyledLabel(title, scale, fontSize: 26, align: HorizontalAlignment.Left);
         titleLabel.AddThemeColorOverride("font_color", LauncherTheme.Gold);
