@@ -27,7 +27,7 @@ public class StyledDialog : ColorRect
         // The panel and the ribbons are siblings inside a fixed-size frame, so the
         // ribbons can hang over the panel's bottom edge the way the game draws
         // them. Kept inside the panel they sat in a tidy row well above it.
-        var size = new Vector2((int)(560 * scale), (int)(420 * scale));
+        var size = new Vector2((int)(560 * scale), (int)(380 * scale));
         var frame = new Control { CustomMinimumSize = size, MouseFilter = MouseFilterEnum.Ignore };
         center.AddChild(frame);
 
@@ -64,8 +64,8 @@ public class StyledDialog : ColorRect
             AnchorBottom = 1f,
             GrowVertical = GrowDirection.Both,
             // Straddles the panel's lower edge rather than sitting inside it.
-            OffsetTop = (int)(-34 * scale),
-            OffsetBottom = (int)(24 * scale),
+            OffsetTop = (int)(-84 * scale),
+            OffsetBottom = (int)(-26 * scale),
         };
 
         if (confirm)
@@ -98,7 +98,7 @@ public class StyledDialog : ColorRect
             float inset = Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f;
             style.SetTextureMarginAll(inset);
             style.SetContentMarginAll(36 * scale);
-            style.ContentMarginBottom = 78 * scale;
+            style.ContentMarginBottom = 96 * scale;
             panel.AddThemeStyleboxOverride("panel", style);
         }
         else

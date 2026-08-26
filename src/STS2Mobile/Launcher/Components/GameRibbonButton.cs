@@ -10,7 +10,6 @@ public class GameRibbonButton : Button
     public GameRibbonButton(string text, float scale, bool confirm)
     {
         Text = text;
-        Flat = true;
         CustomMinimumSize = new Vector2((int)(190 * scale), (int)(58 * scale));
 
         var sprite = GameAssets.Load<Texture2D>(

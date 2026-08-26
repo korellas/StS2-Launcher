@@ -40,8 +40,8 @@ public class SubmenuOverlay : Control
 
         var back = new GameBackButton(scale)
         {
-            AnchorTop = 0.5f,
-            AnchorBottom = 0.5f,
+            AnchorTop = 0.66f,
+            AnchorBottom = 0.66f,
             GrowVertical = GrowDirection.Both,
             OffsetLeft = (int)(34 * scale),
             OffsetRight = (int)(150 * scale),

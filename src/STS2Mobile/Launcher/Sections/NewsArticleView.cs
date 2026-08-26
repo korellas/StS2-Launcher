@@ -69,8 +69,10 @@ public class NewsArticleView : VBoxContainer
             FitContent = true,
             ScrollActive = false,
             SelectionEnabled = false,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
+            CustomMinimumSize = new Vector2(0, (int)(240 * scale)),
         };
         LauncherTheme.ApplyGameFont(_body, 18, scale);
         _body.AddThemeColorOverride("default_color", LauncherTheme.Cream);

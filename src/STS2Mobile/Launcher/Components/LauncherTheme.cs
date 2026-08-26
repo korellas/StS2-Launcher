@@ -124,36 +124,33 @@ public static class LauncherTheme
         control.AddThemeFontSizeOverride("font_size", (int)(fontSize * scale));
     }
 
-    // Dresses a ScrollContainer's vertical bar in the game's own track and train
-    // sprites; Godot's default bar is a flat grey slab that reads as a different
-    // application.
+    // Styles a ScrollContainer's vertical bar to match the panels it sits in.
+    //
+    // The game's own scrollbar sprites were tried first and rendered as a white
+    // slab: they are atlas entries, and StyleBoxTexture ignores an AtlasTexture's
+    // region. Flat boxes in the same palette are predictable, which a borrowed
+    // texture was not.
     public static void ApplyGameScrollbar(ScrollContainer container, float scale)
     {
         var bar = container.GetVScrollBar();
         if (bar == null)
             return;
 
-        bar.CustomMinimumSize = new Vector2((int)(14 * scale), 0);
+        float width = 10 * scale;
+        bar.CustomMinimumSize = new Vector2((int)width, 0);
 
-        var track = GameAssets.Load<Texture2D>(GameAssets.ScrollTrack);
-        var grabber = GameAssets.Load<Texture2D>(GameAssets.ScrollGrabber);
-        if (track == null || grabber == null)
-            return;
+        var track = new StyleBoxFlat { BgColor = new Color(0f, 0f, 0f, 0.28f) };
+        track.SetCornerRadiusAll((int)(width / 2f));
+        bar.AddThemeStyleboxOverride("scroll", track);
 
-        bar.AddThemeStyleboxOverride("scroll", Stretchable(track));
-        var thumb = Stretchable(grabber);
-        bar.AddThemeStyleboxOverride("grabber", thumb);
-        bar.AddThemeStyleboxOverride("grabber_highlight", thumb);
-        bar.AddThemeStyleboxOverride("grabber_pressed", thumb);
-    }
+        var grabber = new StyleBoxFlat { BgColor = new Color(0.78f, 0.62f, 0.34f, 0.85f) };
+        grabber.SetCornerRadiusAll((int)(width / 2f));
+        bar.AddThemeStyleboxOverride("grabber", grabber);
 
-    // Only the middle of these sprites may stretch, so the rounded caps survive.
-    private static StyleBoxTexture Stretchable(Texture2D texture)
-    {
-        var style = new StyleBoxTexture { Texture = texture };
-        float inset = Math.Max(1f, texture.GetHeight() / 3f);
-        style.SetTextureMarginAll(inset);
-        return style;
+        var active = new StyleBoxFlat { BgColor = new Color(0.92f, 0.75f, 0.42f, 0.95f) };
+        active.SetCornerRadiusAll((int)(width / 2f));
+        bar.AddThemeStyleboxOverride("grabber_highlight", active);
+        bar.AddThemeStyleboxOverride("grabber_pressed", active);
     }
 
     public static StyleBoxFlat Panel(float scale)
