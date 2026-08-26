@@ -55,10 +55,6 @@ public class LauncherView
         parent.AddChild(menu);
         _menu = menu;
 
-        var title = new StyledLabel("Slay the Spire II Launcher", scale, fontSize: 30);
-        menu.AddChild(title);
-        menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(10 * scale)) });
-
         _statusLabel = new StyledLabel(Localization.Tr("STATUS_INITIALIZING"), scale, fontSize: 15);
         _statusLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _statusLabel.Modulate = new Color(1f, 1f, 1f, 0.72f);
@@ -125,7 +121,9 @@ public class LauncherView
 
         var consoleEntry = new GameMenuButton(Localization.Tr("MENU_CONSOLE"), scale);
         consoleEntry.Pressed += consoleOverlay.Open;
+        consoleEntry.Visible = !LauncherModel.GameFilesReady();
         menu.AddChild(consoleEntry);
+        _consoleEntry = consoleEntry;
 
         var quitEntry = new GameMenuButton(Localization.Tr("MENU_QUIT"), scale);
         quitEntry.Pressed += () =>
@@ -172,6 +170,15 @@ public class LauncherView
     }
 
     private VBoxContainer _menu;
+    private Control _consoleEntry;
+
+    // Kept available while the game files are still being fetched: during a
+    // download the console is the only place the per-file detail shows up.
+    public void SetConsoleVisible(bool visible)
+    {
+        if (_consoleEntry != null)
+            _consoleEntry.Visible = visible;
+    }
 
     private readonly float _scale;
 

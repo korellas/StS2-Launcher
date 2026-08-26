@@ -62,6 +62,7 @@ public class LauncherController
             _runOnMainThread(() =>
             {
                 _view.SetStatus("Download complete! Restart to play.");
+                _view.SetConsoleVisible(false);
                 _view.Download.Visible = false;
                 if (LauncherModel.GameFilesReady())
                 {
@@ -359,6 +360,7 @@ public class LauncherController
 
     private async void OnDownloadPressed()
     {
+        _view.SetConsoleVisible(true);
         _view.Download.ShowProgress("Connecting to Steam...");
         await _model.StartDownloadAsync();
     }
