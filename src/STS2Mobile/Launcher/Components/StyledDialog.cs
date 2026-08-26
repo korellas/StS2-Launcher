@@ -16,15 +16,22 @@ public class StyledDialog : ColorRect
 
     // Every figure below is measured off the game's quit prompt rather than
     // guessed, and expressed as a fraction so it holds at any resolution.
-    private const float PanelWidthRatio = 0.320f;
-    private const float PanelHeightRatio = 0.527f;
-    private const float RibbonTop = 0.843f;
-    private const float RibbonBottom = 0.960f;
+    // Measured off the game's own quit prompt: the panel is 32.6% of the screen
+    // wide and 48.3% tall, and each ribbon is 35.3% of the panel's width sitting
+    // at 83.8% of its height.
+    private const float PanelWidthRatio = 0.326f;
+    private const float PanelHeightRatio = 0.483f;
+    private const float RibbonCenterY = 0.838f;
+    // The label may occupy at most this much of the ribbon before the ribbon is
+    // widened to keep it clear of the tapered ends.
+    private const float MaxLabelFill = 0.55f;
+    // Keeps the body clear of the ribbons: their centre line plus half a ribbon.
+    private const float BodyBottomRatio = 0.205f;
     // One width for both ribbons. They used to carry an inner edge each — 0.335
     // on the left and 0.695 on the right — which are not mirror images, so the
     // decline ribbon came out 10% wider than the accept one. Deriving both from
     // a single figure makes that class of drift impossible.
-    private const float RibbonWidthRatio = 0.320f;
+    private const float RibbonWidthRatio = 0.353f;
 
 
     public StyledDialog(string message, float scale, string title = null)
@@ -60,53 +67,58 @@ public class StyledDialog : ColorRect
         text.VerticalAlignment = VerticalAlignment.Center;
         body.AddChild(text);
 
-        // Decline sits left of accept, matching the game's own prompts.
-        AddRibbon(frame, size, scale, confirm: false, Localization.Tr("DIALOG_NO"), () =>
+        // Decline sits left of accept, matching the game's own prompts. Both are
+        // built before either is placed so they can share one width.
+        var decline = new GameRibbonButton(Localization.Tr("DIALOG_NO"), scale, confirm: false);
+        decline.Pressed += () =>
         {
             Cancelled?.Invoke();
             QueueFree();
-        });
-        AddRibbon(frame, size, scale, confirm: true, Localization.Tr("DIALOG_YES"), () =>
+        };
+
+        var accept = new GameRibbonButton(Localization.Tr("DIALOG_YES"), scale, confirm: true);
+        accept.Pressed += () =>
         {
             Confirmed?.Invoke();
             QueueFree();
-        });
+        };
+
+        PlaceRibbons(frame, size, decline, accept);
     }
 
-    private static void AddRibbon(
+    private static void PlaceRibbons(
         Control frame,
         Vector2 panelSize,
-        float scale,
-        bool confirm,
-        string label,
-        Action onPressed
+        GameRibbonButton decline,
+        GameRibbonButton accept
     )
     {
-        var button = new GameRibbonButton(label, scale, confirm);
+        // One width for both, taken from whichever label needs more room. Sizing
+        // each to its own text is what made the pair asymmetric; sizing both to a
+        // fixed fraction is what truncated the longer one.
+        float needed = Mathf.Max(decline.MeasuredTextWidth, accept.MeasuredTextWidth) / MaxLabelFill;
+        float width = Mathf.Max(panelSize.X * RibbonWidthRatio, needed);
 
-        // Height follows the artwork's own aspect rather than the anchor band.
-        // Stretching a ribbon into a box of unrelated proportions is what made
-        // these read as subtly wrong even once the widths agreed.
-        float width = panelSize.X * RibbonWidthRatio;
-        float height = button.SpriteSize.X > 0
-            ? width * button.SpriteSize.Y / button.SpriteSize.X
-            : panelSize.Y * (RibbonBottom - RibbonTop);
+        foreach (var (button, confirm) in new[] { (decline, false), (accept, true) })
+        {
+            // Height follows the artwork's own aspect rather than an anchor band,
+            // so the ribbon is never stretched into unrelated proportions.
+            float height = button.SpriteSize.X > 0
+                ? width * button.SpriteSize.Y / button.SpriteSize.X
+                : panelSize.Y * 0.117f;
 
-        // Pinned to opposite panel edges at a shared centre line, so the pair is
-        // symmetric by construction at any viewport size.
-        float centerY = (RibbonTop + RibbonBottom) * 0.5f;
-        button.AnchorTop = centerY;
-        button.AnchorBottom = centerY;
-        button.OffsetTop = -height * 0.5f;
-        button.OffsetBottom = height * 0.5f;
+            button.AnchorTop = RibbonCenterY;
+            button.AnchorBottom = RibbonCenterY;
+            button.OffsetTop = -height * 0.5f;
+            button.OffsetBottom = height * 0.5f;
 
-        button.AnchorLeft = confirm ? 1f : 0f;
-        button.AnchorRight = confirm ? 1f : 0f;
-        button.OffsetLeft = confirm ? -width : 0f;
-        button.OffsetRight = confirm ? 0f : width;
+            button.AnchorLeft = confirm ? 1f : 0f;
+            button.AnchorRight = confirm ? 1f : 0f;
+            button.OffsetLeft = confirm ? -width : 0f;
+            button.OffsetRight = confirm ? 0f : width;
 
-        button.Pressed += onPressed;
-        frame.AddChild(button);
+            frame.AddChild(button);
+        }
     }
 
     private static VBoxContainer BuildPanel(Control parent, float scale, Vector2 size)
@@ -121,7 +133,7 @@ public class StyledDialog : ColorRect
             float inset = Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f;
             style.SetTextureMarginAll(inset);
             style.SetContentMarginAll(34 * scale);
-            style.ContentMarginBottom = size.Y * (1f - RibbonTop) + 16 * scale;
+            style.ContentMarginBottom = size.Y * BodyBottomRatio + 16 * scale;
             style.ModulateColor = LauncherTheme.PanelSlate;
             panel.AddThemeStyleboxOverride("panel", style);
         }
@@ -129,7 +141,7 @@ public class StyledDialog : ColorRect
         {
             var style = LauncherTheme.Panel(scale);
             style.SetContentMarginAll((int)(30 * scale));
-            style.ContentMarginBottom = (int)(size.Y * (1f - RibbonTop) + 16 * scale);
+            style.ContentMarginBottom = (int)(size.Y * BodyBottomRatio + 16 * scale);
             panel.AddThemeStyleboxOverride("panel", style);
         }
 

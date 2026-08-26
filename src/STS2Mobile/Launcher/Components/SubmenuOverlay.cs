@@ -138,9 +138,7 @@ public class SubmenuOverlay : Control
     private Control _frame;
     private GameBackButton _back;
 
-    // Overlap into the panel, as a fraction of the button's width, so the flag
-    // reads as attached to the panel rather than floating beside it.
-    private const float BackOverlapRatio = 0.30f;
+
 
     private Vector2 ViewportRelativeSize()
     {
@@ -169,10 +167,12 @@ public class SubmenuOverlay : Control
         var panel = ViewportRelativeSize();
         var button = _back.CustomMinimumSize;
 
-        _back.AnchorLeft = 0.5f;
-        _back.AnchorRight = 0.5f;
-        _back.OffsetLeft = -panel.X * 0.5f - button.X * (1f - BackOverlapRatio);
-        _back.OffsetRight = _back.OffsetLeft + button.X;
+        // Flush against the screen's left edge, not the panel's. Hanging it off
+        // the panel put it in mid-air once the panel narrowed.
+        _back.AnchorLeft = 0f;
+        _back.AnchorRight = 0f;
+        _back.OffsetLeft = 0f;
+        _back.OffsetRight = button.X;
 
         _back.AnchorTop = 0.5f;
         _back.AnchorBottom = 0.5f;
