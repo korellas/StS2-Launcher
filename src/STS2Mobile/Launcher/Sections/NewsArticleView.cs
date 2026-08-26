@@ -62,7 +62,7 @@ public class NewsArticleView : VBoxContainer
         _translateStatus = new StyledLabel("", scale, fontSize: 15, HorizontalAlignment.Left);
         _translateStatus.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _translateStatus.AddThemeColorOverride("font_color", new Color(0.85f, 0.66f, 0.42f));
-        _translateStatus.Visible = false;
+        _translateStatus.Text = $"{Localization.Tr("NEWS_TRANSLATE")}: {_translation.Capabilities()}";
         AddChild(_translateStatus);
 
         _title = new StyledLabel("", scale, fontSize: 30, HorizontalAlignment.Left);
@@ -112,7 +112,6 @@ public class NewsArticleView : VBoxContainer
         _title.Text = item.Title;
         _date.Text = formattedDate;
 
-        _translateStatus.Visible = false;
         _originalBody = NewsMarkup.ToGodotBbcode(item.Contents);
         _showingTranslation = false;
         _body.Text = string.IsNullOrWhiteSpace(_originalBody)
@@ -160,7 +159,6 @@ public class NewsArticleView : VBoxContainer
         var reason = _translation.Capabilities();
         PatchHelper.Log($"[Translate] unavailable — {reason}");
         _translateStatus.Text = $"{Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE")}: {reason}";
-        _translateStatus.Visible = true;
     }
 
     private void OnPoll()

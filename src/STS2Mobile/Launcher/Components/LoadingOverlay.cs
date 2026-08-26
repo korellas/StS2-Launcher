@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using STS2Mobile.Launcher;
 
 namespace STS2Mobile.Launcher.Components;
 
@@ -13,13 +14,13 @@ public class LoadingOverlay : CanvasLayer
     private Label _textLabel;
     private float _dotsTimer;
     private int _dotsFrame;
-    private string _baseText = "Loading";
+    private string _baseText = Localization.Tr("STATUS_LOADING");
     private bool _fading;
 
-    public static LoadingOverlay Show(SceneTree tree, string text = "Loading")
+    public static LoadingOverlay Show(SceneTree tree, string text = null)
     {
         var overlay = new LoadingOverlay();
-        overlay._baseText = text;
+        overlay._baseText = text ?? Localization.Tr("STATUS_LOADING");
         overlay.Build(tree);
         tree.Root.AddChild(overlay);
         return overlay;
@@ -95,7 +96,7 @@ public class LoadingOverlay : CanvasLayer
             ),
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        LauncherTheme.ApplyGameFont(_textLabel, 16, scale);
+        LauncherTheme.ApplyGameFont(_textLabel, 28, scale);
         _textLabel.AddThemeColorOverride("font_color", new Color(0.85f, 0.85f, 0.92f, 0.85f));
         _textLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.75f));
         _textLabel.AddThemeConstantOverride("shadow_offset_x", (int)(1 * scale));

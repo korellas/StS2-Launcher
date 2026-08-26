@@ -413,10 +413,10 @@ public class FpsOverlay : CanvasLayer
             _midline.DefaultColor = MidlineColor;
             AddChild(_midline);
 
-            _fill.Color = new Color(_accent, 0.18f);
+            _fill.Color = new Color(_accent, 0.10f);
             AddChild(_fill);
 
-            _line.Width = 2f;
+            _line.Width = 1.6f;
             _line.DefaultColor = _accent;
             _line.Antialiased = true;
             AddChild(_line);
@@ -433,7 +433,7 @@ public class FpsOverlay : CanvasLayer
             {
                 var colour = value >= threshold ? AlertLine : _accent;
                 _line.DefaultColor = colour;
-                _fill.Color = new Color(colour, 0.18f);
+                _fill.Color = new Color(colour, 0.10f);
             }
 
             Rebuild();

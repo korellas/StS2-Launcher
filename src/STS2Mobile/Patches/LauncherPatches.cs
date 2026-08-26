@@ -152,16 +152,8 @@ public static class LauncherPatches
         // game's intro logo or scenes, just tells the user something is still
         // happening during the 25s game boot. Parented to tree.Root so it
         // survives the scene transition the game performs in GameStartup.
-        var overlay = LoadingOverlay.Show(tree, "Loading");
+        var overlay = LoadingOverlay.Show(tree);
 
-        // Debug performance overlay, opt-in from the launcher. Shown here rather
-        // than in the launcher itself because a static menu's frame rate says
-        // nothing useful.
-        if (FpsOverlayEnabled)
-        {
-            FpsOverlay.Show(tree);
-            PatchHelper.Log("[Overlay] FPS overlay enabled");
-        }
 
         var instanceField = typeof(SaveManager).GetField(
             "_instance",
@@ -183,6 +175,16 @@ public static class LauncherPatches
             warmup.Initialize();
             await warmup.WaitForCompletion();
             warmup.QueueFree();
+        }
+
+        // Debug performance overlay, opt-in from the launcher. Held back until
+        // loading is done: a static menu's frame rate says nothing useful, and
+        // during loading the viewport differs from the in-game one, so the card
+        // appeared at the wrong size and then jumped.
+        if (FpsOverlayEnabled)
+        {
+            FpsOverlay.Show(tree);
+            PatchHelper.Log("[Overlay] FPS overlay enabled");
         }
 
         SaveManager.Instance.InitSettingsData();
