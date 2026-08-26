@@ -14,6 +14,15 @@ public class StyledDialog : ColorRect
 
     private static readonly Color TitleGold = new(0.96f, 0.76f, 0.31f);
 
+    // Every figure below is measured off the game's quit prompt rather than
+    // guessed, and expressed as a fraction so it holds at any resolution.
+    private const float PanelWidthRatio = 0.320f;
+    private const float PanelHeightRatio = 0.527f;
+    private const float RibbonTop = 0.843f;
+    private const float RibbonBottom = 0.960f;
+    private const float RibbonInnerEdgeLeft = 0.335f;
+    private const float RibbonInnerEdgeRight = 0.695f;
+
 
     public StyledDialog(string message, float scale, string title = null)
     {
@@ -29,11 +38,14 @@ public class StyledDialog : ColorRect
         // ribbons can hang over the panel's bottom edge the way the game draws
         // them. Kept inside the panel they sat in a tidy row well above it.
         var vp = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
-        var size = new Vector2((int)(vp.X * 0.30f), (int)(vp.Y * 0.46f));
+        // Measured from the game's own quit prompt: 32.0% of the screen wide and
+        // 52.7% tall, which is very slightly portrait rather than the landscape
+        // box this used to be.
+        var size = new Vector2((int)(vp.X * PanelWidthRatio), (int)(vp.Y * PanelHeightRatio));
         var frame = new Control { CustomMinimumSize = size, MouseFilter = MouseFilterEnum.Ignore };
         center.AddChild(frame);
 
-        var body = BuildPanel(frame, scale);
+        var body = BuildPanel(frame, scale, size);
 
         var heading = new StyledLabel(title ?? Localization.Tr("DIALOG_CONFIRM_TITLE"), scale, fontSize: 28);
         heading.AddThemeColorOverride("font_color", TitleGold);
@@ -60,36 +72,25 @@ public class StyledDialog : ColorRect
 
     private static void AddRibbon(Control frame, float scale, bool confirm, string label, Action onPressed)
     {
+        // Anchored on both axes: the ribbons sit inside the panel's lower area,
+        // each a third of its width, not straddling its border as they were.
         var button = new GameRibbonButton(label, scale, confirm)
         {
-            AnchorTop = 1f,
-            AnchorBottom = 1f,
-            GrowVertical = GrowDirection.Both,
-            // Straddles the panel's lower edge rather than sitting inside it.
-            OffsetTop = (int)(-96 * scale),
-            OffsetBottom = (int)(-38 * scale),
+            AnchorTop = RibbonTop,
+            AnchorBottom = RibbonBottom,
+            AnchorLeft = confirm ? RibbonInnerEdgeRight : 0f,
+            AnchorRight = confirm ? 1f : RibbonInnerEdgeLeft,
+            OffsetLeft = 0,
+            OffsetRight = 0,
+            OffsetTop = 0,
+            OffsetBottom = 0,
         };
-
-        // Anchored to fractions of the panel so the pair stays inside it at any
-        // size, rather than to fixed pixel insets.
-        if (confirm)
-        {
-            button.AnchorLeft = 0.52f;
-            button.AnchorRight = 0.99f;
-        }
-        else
-        {
-            button.AnchorLeft = 0.01f;
-            button.AnchorRight = 0.48f;
-        }
-        button.OffsetLeft = 0;
-        button.OffsetRight = 0;
 
         button.Pressed += onPressed;
         frame.AddChild(button);
     }
 
-    private static VBoxContainer BuildPanel(Control parent, float scale)
+    private static VBoxContainer BuildPanel(Control parent, float scale, Vector2 size)
     {
         var panel = new PanelContainer();
         panel.SetAnchorsPreset(LayoutPreset.FullRect);
@@ -101,7 +102,7 @@ public class StyledDialog : ColorRect
             float inset = Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f;
             style.SetTextureMarginAll(inset);
             style.SetContentMarginAll(34 * scale);
-            style.ContentMarginBottom = 104 * scale;
+            style.ContentMarginBottom = size.Y * (1f - RibbonTop) + 16 * scale;
             style.ModulateColor = LauncherTheme.PanelSlate;
             panel.AddThemeStyleboxOverride("panel", style);
         }
@@ -109,7 +110,7 @@ public class StyledDialog : ColorRect
         {
             var style = LauncherTheme.Panel(scale);
             style.SetContentMarginAll((int)(30 * scale));
-            style.ContentMarginBottom = (int)(78 * scale);
+            style.ContentMarginBottom = (int)(size.Y * (1f - RibbonTop) + 16 * scale);
             panel.AddThemeStyleboxOverride("panel", style);
         }
 

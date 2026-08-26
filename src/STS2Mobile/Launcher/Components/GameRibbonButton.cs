@@ -10,7 +10,8 @@ public class GameRibbonButton : Button
     public GameRibbonButton(string text, float scale, bool confirm)
     {
         Text = text;
-        CustomMinimumSize = new Vector2((int)(190 * scale), (int)(58 * scale));
+        // No minimum: the dialog anchors these to measured fractions of the panel.
+        ClipText = true;
 
         var sprite = GameAssets.Load<Texture2D>(
             confirm ? GameAssets.PopupConfirmButton : GameAssets.PopupCancelButton
