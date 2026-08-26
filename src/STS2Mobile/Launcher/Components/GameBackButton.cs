@@ -54,17 +54,24 @@ public class GameBackButton : Button
                     StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                     MouseFilter = MouseFilterEnum.Ignore,
                 };
-                // A square box, because the sprite is square: the arrow then lands
-                // wherever the artwork puts it inside that square, rather than
-                // wherever a guess at its padding puts it. Fitted, not sized, so
-                // it cannot escape the flag if the box is still wrong.
-                float box = height * ArrowCanvasRatio;
+                // Anchors, not offsets. The flag is drawn with KeepAspectCentered
+                // and so follows the control's real rect, while an offset box is
+                // fixed in pixels against a height computed here — so whenever the
+                // layout gave the button a different height than assumed, the flag
+                // shrank and the arrow did not. That is why lowering the ratio did
+                // not visibly shrink it. Anchors track the real rect, so the two
+                // stay locked together whatever size the button ends up.
+                float fractionY = ArrowCanvasRatio;
+                float fractionX = fractionY * ribbon.GetHeight() / ribbon.GetWidth();
 
-                glyph.SetAnchorsPreset(LayoutPreset.TopLeft);
-                glyph.OffsetLeft = width * ArrowCenterX - box * 0.5f;
-                glyph.OffsetTop = (height - box) * 0.5f;
-                glyph.OffsetRight = glyph.OffsetLeft + box;
-                glyph.OffsetBottom = glyph.OffsetTop + box;
+                glyph.AnchorLeft = ArrowCenterX - fractionX * 0.5f;
+                glyph.AnchorRight = ArrowCenterX + fractionX * 0.5f;
+                glyph.AnchorTop = 0.5f - fractionY * 0.5f;
+                glyph.AnchorBottom = 0.5f + fractionY * 0.5f;
+                glyph.OffsetLeft = 0;
+                glyph.OffsetRight = 0;
+                glyph.OffsetTop = 0;
+                glyph.OffsetBottom = 0;
 
                 AddChild(glyph);
             }
