@@ -70,8 +70,10 @@ else
     NEW_NAME="$MAJOR.$MINOR.$PATCH"
     NEW_CODE=$((CURRENT_CODE + 1))
 
-    sed -i "s/^export_version_name=.*/export_version_name=$NEW_NAME/" "$GRADLE_PROPS"
-    sed -i "s/^export_version_code=.*/export_version_code=$NEW_CODE/" "$GRADLE_PROPS"
+    # -i.bak + rm keeps this working on both BSD (macOS) and GNU sed.
+    sed -i.bak "s/^export_version_name=.*/export_version_name=$NEW_NAME/" "$GRADLE_PROPS"
+    sed -i.bak "s/^export_version_code=.*/export_version_code=$NEW_CODE/" "$GRADLE_PROPS"
+    rm -f "$GRADLE_PROPS.bak"
     echo "Version: $CURRENT_NAME ($CURRENT_CODE) -> $NEW_NAME ($NEW_CODE)"
 fi
 

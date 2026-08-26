@@ -93,23 +93,40 @@ public class ShaderWarmupScreen : Control
         var bg = new ScreenBackground();
         AddChild(bg);
 
-        var panel = new StyledPanel(_scale, widthRatio: 0.5f);
-        panel.UpdateSizeFromViewport(vpSize);
-        AddChild(panel);
+        // No panel. The game's own menus put text straight onto the art, and the
+        // half-width, near-full-height slab this used to use made three short
+        // lines look like a dialog box with nothing in it.
+        var column = new VBoxContainer
+        {
+            AnchorLeft = 0.5f,
+            AnchorRight = 0.5f,
+            AnchorTop = 0.62f,
+            AnchorBottom = 0.62f,
+            GrowHorizontal = GrowDirection.Both,
+            GrowVertical = GrowDirection.Both,
+            MouseFilter = MouseFilterEnum.Ignore,
+        };
+        column.AddThemeConstantOverride("separation", (int)(18 * _scale));
+        AddChild(column);
 
-        _statusLabel = new StyledLabel("Compiling shaders...", _scale, fontSize: 20);
-        panel.Content.AddChild(_statusLabel);
+        _statusLabel = new StyledLabel(Localization.Tr("STATUS_COMPILING_SHADERS"), _scale, fontSize: 26);
+        column.AddChild(_statusLabel);
 
+        // Sized here rather than in the component so the bar tracks the viewport
+        // instead of stretching edge to edge on a foldable.
+        var barWidth = (int)(vpSize.X * 0.42f);
         _progressBar = new StyledProgressBar(_scale);
         _progressBar.MinValue = 0;
         _progressBar.MaxValue = 100;
         _progressBar.Value = 0;
-        _progressBar.ShowPercentage = true;
-        panel.Content.AddChild(_progressBar);
+        _progressBar.ShowPercentage = false;
+        _progressBar.CustomMinimumSize = new Vector2(barWidth, _progressBar.CustomMinimumSize.Y);
+        _progressBar.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
+        column.AddChild(_progressBar);
 
-        _detailLabel = new StyledLabel("Enumerating resources...", _scale, fontSize: 12);
-        _detailLabel.Modulate = new Color(0.7f, 0.7f, 0.7f);
-        panel.Content.AddChild(_detailLabel);
+        _detailLabel = new StyledLabel(Localization.Tr("STATUS_ENUMERATING"), _scale, fontSize: 14);
+        _detailLabel.Modulate = LauncherTheme.Dim;
+        column.AddChild(_detailLabel);
     }
 
     private async void RunWarmup()
@@ -118,13 +135,13 @@ public class ShaderWarmupScreen : Control
 
         try
         {
-            _statusLabel.Text = "Scanning for shaders...";
+            _statusLabel.Text = Localization.Tr("STATUS_SCANNING_SHADERS");
             await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
 
             var materials = await CollectMaterialsAsync();
             PatchHelper.Log($"[ShaderWarmup] Collected {materials.Count} materials to warm");
 
-            _statusLabel.Text = "Compiling shaders...";
+            _statusLabel.Text = Localization.Tr("STATUS_COMPILING_SHADERS");
 
             if (materials.Count == 0)
             {
@@ -186,7 +203,7 @@ public class ShaderWarmupScreen : Control
             viewport.QueueFree();
 
             _progressBar.Value = 100;
-            _statusLabel.Text = "Done!";
+            _statusLabel.Text = Localization.Tr("STATUS_DONE");
             _detailLabel.Text = $"Compiled {total} shaders in {sw.ElapsedMilliseconds}ms";
             PatchHelper.Log(
                 $"[ShaderWarmup] Completed: {total} materials in {sw.ElapsedMilliseconds}ms"

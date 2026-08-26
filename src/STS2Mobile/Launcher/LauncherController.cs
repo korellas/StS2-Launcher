@@ -51,8 +51,10 @@ public class LauncherController
             {
                 _view.Download.SetProgress(
                     p.Percentage,
-                    $"{LauncherModel.FormatSize(p.DownloadedBytes)} / {LauncherModel.FormatSize(p.TotalBytes)} ({p.Percentage:F1}%)"
+                    $"{LauncherModel.FormatSize(p.DownloadedBytes)} / {LauncherModel.FormatSize(p.TotalBytes)}",
+                    p.DownloadedBytes
                 );
+                _view.Download.SetCurrentFile(p.CurrentFile);
                 _view.AppendLog(p.CurrentFile);
             });
         _model.DownloadLogReceived += msg => _runOnMainThread(() => _view.AppendLog(msg));
@@ -60,6 +62,7 @@ public class LauncherController
             _runOnMainThread(() =>
             {
                 _view.SetStatus("Download complete! Restart to play.");
+                _view.SetConsoleVisible(false);
                 _view.Download.Visible = false;
                 if (LauncherModel.GameFilesReady())
                 {
@@ -98,7 +101,7 @@ public class LauncherController
                 }
                 else
                 {
-                    _view.Actions.SetUpdateButtonText("UP TO DATE");
+                    _view.Actions.SetUpdateButtonText(Localization.Tr("UPDATE_UP_TO_DATE"));
                 }
             });
         _model.UpdateCheckFailed += msg =>
@@ -117,6 +120,8 @@ public class LauncherController
         _view.Actions.LocalBackupToggled += OnLocalBackupToggled;
         _view.Actions.CloudSyncToggled += OnCloudSyncToggled;
         _view.Actions.BetaChannelToggled += OnBetaChannelToggled;
+        _view.Actions.FpsOverlayToggled += OnFpsOverlayToggled;
+        _view.Actions.OverlayRowToggled += OnOverlayRowToggled;
         _view.Actions.CloudPushPressed += OnCloudPushPressed;
         _view.Actions.CloudPullPressed += OnCloudPullPressed;
         _view.Actions.CheckForUpdatesPressed += OnCheckForUpdatesPressed;
@@ -136,6 +141,17 @@ public class LauncherController
         var betaPref = LauncherModel.LoadBetaChannelPref();
         _view.Actions.SetBetaChannelChecked(betaPref);
         DepotDownloader.PreferBeta = betaPref;
+
+        var fpsOverlayPref = LauncherModel.LoadFpsOverlayPref();
+        _view.Actions.SetFpsOverlayChecked(fpsOverlayPref);
+        LauncherPatches.FpsOverlayEnabled = fpsOverlayPref;
+
+        foreach (var row in new[] { "cpu", "gpu", "temp" })
+        {
+            var enabled = LauncherModel.LoadOverlayRowPref(row);
+            _view.Actions.SetOverlayRowChecked(row, enabled);
+            ApplyOverlayRow(row, enabled);
+        }
 
         var result = _model.StartSession();
         HandleFastPath(result);
@@ -352,6 +368,7 @@ public class LauncherController
 
     private async void OnDownloadPressed()
     {
+        _view.SetConsoleVisible(true);
         _view.Download.ShowProgress("Connecting to Steam...");
         await _model.StartDownloadAsync();
     }
@@ -494,6 +511,34 @@ public class LauncherController
         LauncherPatches.CloudSyncEnabled = pressed;
     }
 
+    private void OnOverlayRowToggled(string row, bool pressed)
+    {
+        LauncherModel.SaveOverlayRowPref(row, pressed);
+        ApplyOverlayRow(row, pressed);
+    }
+
+    private static void ApplyOverlayRow(string row, bool enabled)
+    {
+        switch (row)
+        {
+            case "cpu":
+                LauncherPatches.OverlayShowCpu = enabled;
+                break;
+            case "gpu":
+                LauncherPatches.OverlayShowGpu = enabled;
+                break;
+            case "temp":
+                LauncherPatches.OverlayShowTemp = enabled;
+                break;
+        }
+    }
+
+    private void OnFpsOverlayToggled(bool pressed)
+    {
+        LauncherModel.SaveFpsOverlayPref(pressed);
+        LauncherPatches.FpsOverlayEnabled = pressed;
+    }
+
     private void OnBetaChannelToggled(bool pressed)
     {
         LauncherModel.SaveBetaChannelPref(pressed);
@@ -511,47 +556,71 @@ public class LauncherController
         }
     }
 
-    private void OnCloudPushPressed()
-    {
-        ShowConfirmation(
-            "Push local saves to cloud?\nThis will overwrite your cloud saves.",
+    private void OnCloudPushPressed() =>
+        RunCloudTransfer(
+            "CLOUD_PUSH_CONFIRM",
+            "CLOUD_PUSH_RUNNING",
             () =>
-            {
-                _view.Actions.SetPushPullDisabled(true);
-                _view.AppendLog("Pushing local saves to cloud...");
-                Task.Run(async () =>
-                {
-                    await CloudSyncCoordinator.ManualPushAllAsync(
-                        LauncherPatches.SavedAccountName,
-                        LauncherPatches.SavedRefreshToken
-                    );
-                    _runOnMainThread(() =>
-                    {
-                        _view.AppendLog("Push complete.");
-                        _view.Actions.SetPushPullDisabled(false);
-                    });
-                });
-            }
+                CloudSyncCoordinator.ManualPushAllAsync(
+                    LauncherPatches.SavedAccountName,
+                    LauncherPatches.SavedRefreshToken
+                )
         );
-    }
 
-    private void OnCloudPullPressed()
+    private void OnCloudPullPressed() =>
+        RunCloudTransfer(
+            "CLOUD_PULL_CONFIRM",
+            "CLOUD_PULL_RUNNING",
+            () =>
+                CloudSyncCoordinator.ManualPullAllAsync(
+                    LauncherPatches.SavedAccountName,
+                    LauncherPatches.SavedRefreshToken
+                )
+        );
+
+    // Both transfers previously reported only into the console, which now lives
+    // behind a submenu, and had no error handling: an exception skipped the
+    // re-enable and left the buttons dead until the launcher restarted. Status
+    // goes on screen and the buttons are restored in a finally.
+    private void RunCloudTransfer(string confirmKey, string runningKey, Func<Task<string>> transfer)
     {
         ShowConfirmation(
-            "Pull cloud saves to local?\nThis will overwrite your local saves.",
+            Localization.Tr(confirmKey),
             () =>
             {
                 _view.Actions.SetPushPullDisabled(true);
-                _view.AppendLog("Pulling cloud saves to local...");
+                _view.Actions.SetCloudStatus(Localization.Tr(runningKey));
+                _view.AppendLog(Localization.Tr(runningKey));
+
                 Task.Run(async () =>
                 {
-                    await CloudSyncCoordinator.ManualPullAllAsync(
-                        LauncherPatches.SavedAccountName,
-                        LauncherPatches.SavedRefreshToken
-                    );
+                    string result;
+                    try
+                    {
+                        // The counts come back rather than only landing in the log:
+                        // "done" and "there was nothing in the cloud" looked
+                        // identical on screen, which is exactly the question being
+                        // asked when sync appears not to work.
+                        var parts = (await transfer()).Split('/');
+                        result = Localization.Tr("CLOUD_DONE_COUNTS", parts[0], parts[1], parts[2]);
+                    }
+                    catch (Exception ex)
+                    {
+                        // A type-load failure here names our class but not the
+                        // reason, and the reason is almost always that the game
+                        // added a member to one of the save-store interfaces. The
+                        // requirement list goes on screen as well as into the log,
+                        // because the console is hidden once the game is installed.
+                        var interfaces = SaveStoreDiagnostics.DescribeInterfaces();
+                        result = Localization.Tr("CLOUD_FAILED", ex.Message) + "\n\n" + interfaces;
+                        PatchHelper.Log($"[Cloud] {ex}");
+                        PatchHelper.Log($"[Cloud] {interfaces}");
+                    }
+
                     _runOnMainThread(() =>
                     {
-                        _view.AppendLog("Pull complete.");
+                        _view.AppendLog(result);
+                        _view.Actions.SetCloudStatus(result);
                         _view.Actions.SetPushPullDisabled(false);
                     });
                 });

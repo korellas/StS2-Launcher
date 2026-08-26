@@ -12,10 +12,12 @@ namespace STS2Mobile.Launcher.Sections;
 // is updated by the controller once SteamNewsClient.FetchAsync resolves.
 public class NewsSection : VBoxContainer
 {
-    private static readonly Color StatusColor = new(0.55f, 0.55f, 0.6f);
-    private static readonly Color TitleColor = new(0.85f, 0.85f, 0.9f);
-    private static readonly Color DateColor = new(0.5f, 0.5f, 0.55f);
-    private static readonly Color HoverColor = new(1.0f, 0.8f, 0.3f);
+    public event Action<SteamNewsItem> ArticleSelected;
+
+    private static readonly Color StatusColor = new(0.72f, 0.74f, 0.80f);
+    private static readonly Color TitleColor = LauncherTheme.Cream;
+    private static readonly Color DateColor = new(0.62f, 0.64f, 0.70f);
+    private static readonly Color HoverColor = LauncherTheme.Gold;
 
     private readonly float _scale;
     private readonly StyledLabel _statusLabel;
@@ -26,11 +28,11 @@ public class NewsSection : VBoxContainer
         _scale = scale;
         AddThemeConstantOverride("separation", (int)(4 * scale));
 
-        var header = new StyledLabel("Steam News", scale, fontSize: 14);
-        header.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.65f));
+        var header = new StyledLabel(Localization.Tr("NEWS_HEADER"), scale, fontSize: 19, align: HorizontalAlignment.Left);
+        header.AddThemeColorOverride("font_color", StatusColor);
         AddChild(header);
 
-        _statusLabel = new StyledLabel("Loading…", scale, fontSize: 11);
+        _statusLabel = new StyledLabel(Localization.Tr("NEWS_LOADING"), scale, fontSize: 17);
         _statusLabel.AddThemeColorOverride("font_color", StatusColor);
         AddChild(_statusLabel);
 
@@ -46,7 +48,7 @@ public class NewsSection : VBoxContainer
 
         if (items == null || items.Count == 0)
         {
-            _statusLabel.Text = "(no recent announcements)";
+            _statusLabel.Text = Localization.Tr("NEWS_EMPTY");
             _statusLabel.Visible = true;
             return;
         }
@@ -60,7 +62,7 @@ public class NewsSection : VBoxContainer
     public void SetFailed()
     {
         ClearItems();
-        _statusLabel.Text = "(news unavailable)";
+        _statusLabel.Text = Localization.Tr("NEWS_UNAVAILABLE");
         _statusLabel.Visible = true;
     }
 
@@ -89,7 +91,7 @@ public class NewsSection : VBoxContainer
 
         var transparent = StyledButton.MakeFilled(Colors.Transparent, 0);
         var hoverStyle = StyledButton.MakeFilled(
-            new Color(1f, 1f, 1f, 0.06f),
+            new Color(1f, 1f, 1f, 0.07f),
             (int)(3 * _scale)
         );
         btn.AddThemeStyleboxOverride("normal", transparent);
@@ -111,7 +113,7 @@ public class NewsSection : VBoxContainer
         inner.AddThemeConstantOverride("separation", (int)(2 * _scale));
         inner.MouseFilter = MouseFilterEnum.Ignore;
 
-        var title = new StyledLabel(item.Title, _scale, fontSize: 14);
+        var title = new StyledLabel(item.Title, _scale, fontSize: 24, align: HorizontalAlignment.Left);
         title.AddThemeColorOverride("font_color", TitleColor);
         title.AutowrapMode = TextServer.AutowrapMode.Off;
         title.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
@@ -119,14 +121,14 @@ public class NewsSection : VBoxContainer
         title.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(title);
 
-        var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 10);
+        var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 17, align: HorizontalAlignment.Left);
         date.AddThemeColorOverride("font_color", DateColor);
         date.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(date);
 
         btn.MouseEntered += () => title.AddThemeColorOverride("font_color", HoverColor);
         btn.MouseExited += () => title.AddThemeColorOverride("font_color", TitleColor);
-        btn.Pressed += () => OpenInAppWebView(item.Url);
+        btn.Pressed += () => ArticleSelected?.Invoke(item);
 
         return btn;
     }
@@ -134,7 +136,7 @@ public class NewsSection : VBoxContainer
     // Tries to open the article inside the launcher via the GodotApp
     // WebView overlay; falls back to the system browser if the JNI bridge
     // isn't available (e.g. running on desktop for dev).
-    private static void OpenInAppWebView(string url)
+    public static void OpenInBrowser(string url)
     {
         try
         {
@@ -160,7 +162,7 @@ public class NewsSection : VBoxContainer
     }
 
     // "3d ago", "2w ago", "Mar 5" — keeps the row to a single short line.
-    private static string FormatDate(DateTimeOffset date)
+    public static string FormatDate(DateTimeOffset date)
     {
         var delta = DateTimeOffset.UtcNow - date;
         if (delta.TotalHours < 1)

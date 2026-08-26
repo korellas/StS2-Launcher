@@ -7,7 +7,7 @@ public class StyledPanel : CenterContainer
 {
     public VBoxContainer Content { get; }
 
-    public StyledPanel(float scale, float widthRatio = 0.7f)
+    public StyledPanel(float scale, float widthRatio = 0.7f, bool transparent = false)
     {
         SetAnchorsPreset(LayoutPreset.FullRect);
 
@@ -15,9 +15,10 @@ public class StyledPanel : CenterContainer
         var panelContainer = new PanelContainer();
         panelContainer.CustomMinimumSize = new Vector2(vpSize.X * widthRatio, 0);
 
-        var style = new StyleBoxFlat();
-        style.BgColor = new Color(0.12f, 0.12f, 0.15f);
-        style.SetCornerRadiusAll(S(scale, 8));
+        // The game never shows a screen-filling box: its menus put content
+        // straight onto the artwork. A full-bleed panel here hid the background
+        // entirely and read as a dialog with no edges.
+        var style = transparent ? new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0) } : LauncherTheme.Panel(scale);
         style.ContentMarginLeft = S(scale, 28);
         style.ContentMarginRight = S(scale, 28);
         style.ContentMarginTop = S(scale, 24);

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Godot;
 using Godot.Bridge;
@@ -61,36 +62,48 @@ public static class ModEntry
         // Game patches require sts2.dll; if missing, fall through to standalone launcher.
         try
         {
-            ModelDbInitPatch.Apply(_harmony);
-            PlatformPatches.Apply(_harmony);
-            SettingsPatches.Apply(_harmony);
-            FontSubstitutionPatches.Apply(_harmony);
-            UiScalePatches.Apply(_harmony);
-            MobileLayoutPatches.Apply(_harmony);
-            EventLayoutPatches.Apply(_harmony);
-            MerchantLayoutPatches.Apply(_harmony);
-            AppLifecyclePatches.Apply(_harmony);
-            TouchInputPatches.Apply(_harmony);
-            CardRewardPatches.Apply(_harmony);
-            EarlyAccessDisclaimerPatches.Apply(_harmony);
-            CombatBackgroundPatches.Apply(_harmony);
-            LanMultiplayerPatcher.Apply(_harmony);
-            ModLoaderPatches.Apply(_harmony);
-            AssetPreloadPatches.Apply(_harmony);
-            LauncherPatches.Apply(_harmony);
-#if DEBUG
-            // Transpiler-based diagnostic logging: full IL rewrite of LoadProgress.
-            // Skipped in release to keep startup lean.
-            SaveDiagnosticPatches.Apply(_harmony);
-#endif
-
-            PatchHelper.Log("All game patches applied.");
+            ApplyGamePatches();
         }
         catch (Exception ex)
         {
             PatchHelper.Log($"Game patches skipped (files not present): {ex.Message}");
             ScheduleStandaloneLauncher();
         }
+    }
+
+    // Kept in a separate, non-inlined method on purpose. Several patch classes hold
+    // fields typed from sts2.dll, so resolving them throws TypeLoadException when the game
+    // files are not downloaded yet. Inlined into Apply(), that resolution happens while
+    // Apply() itself is being JIT-compiled — before execution reaches the try block — so the
+    // fallback never runs and the process dies. Behind a call boundary the failure surfaces
+    // inside the try and launcher-only mode works as designed.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ApplyGamePatches()
+    {
+        ModelDbInitPatch.Apply(_harmony);
+        PlatformPatches.Apply(_harmony);
+        SettingsPatches.Apply(_harmony);
+        FontSubstitutionPatches.Apply(_harmony);
+        UiScalePatches.Apply(_harmony);
+        MobileLayoutPatches.Apply(_harmony);
+        EventLayoutPatches.Apply(_harmony);
+        MerchantLayoutPatches.Apply(_harmony);
+        AppLifecyclePatches.Apply(_harmony);
+        TouchInputPatches.Apply(_harmony);
+        CardRewardPatches.Apply(_harmony);
+        EarlyAccessDisclaimerPatches.Apply(_harmony);
+        CombatBackgroundPatches.Apply(_harmony);
+        LanMultiplayerPatcher.Apply(_harmony);
+        ModLoaderPatches.Apply(_harmony);
+        AssetPreloadPatches.Apply(_harmony);
+        LauncherPatches.Apply(_harmony);
+#if DEBUG
+        // Transpiler-based diagnostic logging: full IL rewrite of LoadProgress.
+        // Skipped in release to keep startup lean.
+        SaveDiagnosticPatches.Apply(_harmony);
+#endif
+
+        PatchHelper.Log("All game patches applied.");
     }
 
     private static void ScheduleStandaloneLauncher()

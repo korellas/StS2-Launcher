@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using Godot;
 using HarmonyLib;
+using STS2Mobile.Audio;
 using STS2Mobile.Steam;
 
 namespace STS2Mobile.Patches;
@@ -75,6 +76,10 @@ public static class AppLifecyclePatches
 
             int masterBus = AudioServer.GetBusIndex("Master");
             AudioServer.SetBusMute(masterBus, true);
+
+            // FMOD drives its own AAudio stream and is unaffected by the bus mute
+            // above or by SetMasterVol, so stop its events explicitly.
+            FmodAudioControl.Suspend();
 
             var node = (Node)__instance;
             node.GetTree().Paused = true;
@@ -184,6 +189,7 @@ public static class AppLifecyclePatches
             // Restore FMOD and Godot audio to user's saved volume levels
             int masterBus = AudioServer.GetBusIndex("Master");
             AudioServer.SetBusMute(masterBus, false);
+            FmodAudioControl.Resume();
             try
             {
                 var nGameInstance = MegaCrit.Sts2.Core.Nodes.NGame.Instance;
@@ -236,8 +242,15 @@ public static class AppLifecyclePatches
         }
     }
 
-    // Replaces the default quit (force-kill) with a clean app restart via GodotApp.
-    // Saves are already written by the original Quit() callers before this runs.
+    // The game's own Quit force-kills the process, which Android can surface as a
+    // crash, so it is intercepted.
+    //
+    // It backgrounds the app rather than ending it, because Android routes the
+    // system back gesture here: terminating meant a stray back press discarded a
+    // run in progress with no warning. The app stays in recents exactly as the
+    // home button leaves it, and the launcher's own Quit entry is the deliberate
+    // way out. Saves are written by the original Quit() callers before this runs,
+    // and the cloud flush below covers the rest either way.
     public static bool QuitPrefix(object __instance)
     {
         try
@@ -248,11 +261,11 @@ public static class AppLifecyclePatches
             }
             catch { }
 
-            PatchHelper.Log("NGame.Quit intercepted, restarting app");
+            PatchHelper.Log("NGame.Quit intercepted, backgrounding instead of exiting");
             var jcw = Engine.GetSingleton("JavaClassWrapper");
             var wrapper = (GodotObject)jcw.Call("wrap", "com.game.sts2launcher.GodotApp");
             var godotApp = (GodotObject)wrapper.Call("getInstance");
-            godotApp.Call("restartApp");
+            godotApp.Call("moveToBackground");
             return false;
         }
         catch (Exception ex)

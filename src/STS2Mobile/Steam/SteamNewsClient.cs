@@ -20,7 +20,9 @@ public static class SteamNewsClient
     // and trim down to MaxItems on our side.
     private static readonly string NewsUrl =
         $"https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?appid={AppId}"
-        + "&count=10&maxlength=1&format=json";
+        // maxlength=0 asks for the full body: the launcher renders announcements
+        // itself rather than sending the reader to a browser.
+        + "&count=10&maxlength=0&format=json";
 
     public static async Task<IReadOnlyList<SteamNewsItem>> FetchAsync()
     {
@@ -50,12 +52,13 @@ public static class SteamNewsClient
 
             var title = item.TryGetProperty("title", out var t) ? t.GetString() : null;
             var url = item.TryGetProperty("url", out var u) ? u.GetString() : null;
+            var contents = item.TryGetProperty("contents", out var c) ? c.GetString() : null;
             var date = item.TryGetProperty("date", out var d) && d.TryGetInt64(out var ts) ? ts : 0;
 
             if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(url))
                 continue;
 
-            results.Add(new SteamNewsItem(title, url, date));
+            results.Add(new SteamNewsItem(title, url, date, contents ?? string.Empty));
             if (results.Count >= MaxItems)
                 break;
         }
@@ -64,7 +67,7 @@ public static class SteamNewsClient
     }
 }
 
-public sealed record SteamNewsItem(string Title, string Url, long UnixTimestamp)
+public sealed record SteamNewsItem(string Title, string Url, long UnixTimestamp, string Contents)
 {
     public DateTimeOffset Date => DateTimeOffset.FromUnixTimeSeconds(UnixTimestamp);
 }

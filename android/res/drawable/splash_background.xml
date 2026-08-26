@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Window background for the launcher activity. Android 12's splash API only
+     offers an icon over a solid colour, so the key art is shown here instead:
+     once the system splash yields, this covers the screen for the couple of
+     seconds Godot needs to boot.
+
+     Centred rather than stretched so the art keeps its aspect ratio; the fill
+     colour is sampled from the art's darkest edge so the letterbox is invisible. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item>
+        <bitmap
+            android:src="@drawable/splash_art"
+            android:gravity="center" />
+    </item>
+</layer-list>

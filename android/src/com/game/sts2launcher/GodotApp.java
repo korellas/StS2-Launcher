@@ -4,10 +4,35 @@ import org.godotengine.godot.Godot;
 import org.godotengine.godot.GodotActivity;
 
 import android.content.Intent;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Bundle;
+import android.os.CancellationSignal;
+import android.os.PowerManager;
+import android.icu.util.ULocale;
+import android.view.translation.TranslationCapability;
+import android.view.translation.TranslationContext;
+import android.view.translation.TranslationManager;
+import android.view.translation.TranslationRequest;
+import android.view.translation.TranslationRequestValue;
+import android.view.translation.TranslationResponse;
+import android.view.translation.TranslationResponseValue;
+import android.view.translation.TranslationSpec;
+import android.view.translation.Translator;
+
+import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import android.util.Log;
 
 import androidx.activity.EdgeToEdge;
+import androidx.browser.customtabs.CustomTabsIntent;
+
+import com.google.mlkit.common.model.DownloadConditions;
+import com.google.mlkit.nl.translate.TranslateLanguage;
+import com.google.mlkit.nl.translate.Translation;
+import com.google.mlkit.nl.translate.TranslatorOptions;
 import androidx.core.content.FileProvider;
 import androidx.core.splashscreen.SplashScreen;
 
@@ -94,14 +119,23 @@ public class GodotApp extends GodotActivity {
 		gameDir = new File(getFilesDir(), "game").getAbsolutePath();
 
 		SplashScreen splash = SplashScreen.installSplashScreen(this);
-		splash.setKeepOnScreenCondition(() -> !godotReady.get());
+		// Dismiss as soon as Android is ready: the activity's windowBackground is
+		// the key art, so releasing the icon splash early shows artwork during
+		// Godot's boot rather than a static icon.
+		splash.setKeepOnScreenCondition(() -> false);
 		EdgeToEdge.enable(this);
 
 		// Must be called before any native FMOD calls.
 		FMOD.init(this);
 
+		versionChanged = isNewVersion();
+		recordColdStart();
+
 		setupAssemblies();
 		extractAssetFile("FMOD_LOGOS/FMOD Logo White - Transparent Background.png", "fmod_logo.png");
+		extractAssetFile("launcher_bg.png", "launcher_bg.png");
+		extractAssetFile("launcher_font.ttf", "launcher_font.ttf");
+		extractAssetFile("launcher_logo.png", "launcher_logo.png");
 
 		super.onCreate(savedInstanceState);
 
@@ -115,6 +149,26 @@ public class GodotApp extends GodotActivity {
 		} catch (Exception e) {
 			Log.w(TAG, "Failed to acquire MulticastLock", e);
 		}
+	}
+
+	// Whether this launch is the first on a newly installed APK. Read once and
+	// cached: isNewVersion() records the new code, so a second call returns false.
+	private boolean versionChanged;
+
+	// Counts process starts. Android kills backgrounded apps under memory
+	// pressure, and from inside there is no way to tell that from a bug except by
+	// noticing the count moved.
+	private int coldStarts;
+
+	private void recordColdStart() {
+		SharedPreferences prefs = getSharedPreferences("sts2mobile", MODE_PRIVATE);
+		coldStarts = prefs.getInt("cold_starts", 0) + 1;
+		prefs.edit().putInt("cold_starts", coldStarts).apply();
+		Log.i(TAG, "Cold start #" + coldStarts);
+	}
+
+	public int getColdStarts() {
+		return coldStarts;
 	}
 
 	private boolean isNewVersion() {
@@ -136,8 +190,6 @@ public class GodotApp extends GodotActivity {
 	private void setupAssemblies() {
 		File srcDir = findAssembliesDir();
 		File destDir = new File(getFilesDir(), ".godot/mono/publish/arm64");
-
-		boolean versionChanged = isNewVersion();
 
 		File patcherMarker = new File(destDir, "STS2Mobile.dll");
 		File sts2Marker = new File(destDir, "sts2.dll");
@@ -238,7 +290,7 @@ public class GodotApp extends GodotActivity {
 	// Extracts a single file from APK assets to the files directory.
 	private void extractAssetFile(String assetPath, String destName) {
 		File dest = new File(getFilesDir(), destName);
-		if (dest.exists())
+		if (dest.exists() && !versionChanged)
 			return;
 		try (InputStream in = getAssets().open(assetPath);
 				OutputStream out = new FileOutputStream(dest)) {
@@ -327,6 +379,217 @@ public class GodotApp extends GodotActivity {
 
 	public String getVersionName() {
 		return BuildConfig.VERSION_NAME;
+	}
+
+	// Thermal throttling level reported by the platform, for the debug overlay.
+	// PowerManager.getCurrentThermalStatus() is available to normal apps from
+	// API 29; returns an empty string when unavailable so callers can hide the field.
+	public String getThermalStatus() {
+		try {
+			if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+				return "";
+			}
+			PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+			if (pm == null) {
+				return "";
+			}
+			switch (pm.getCurrentThermalStatus()) {
+				case PowerManager.THERMAL_STATUS_NONE:      return "NONE";
+				case PowerManager.THERMAL_STATUS_LIGHT:     return "LIGHT";
+				case PowerManager.THERMAL_STATUS_MODERATE:  return "MODERATE";
+				case PowerManager.THERMAL_STATUS_SEVERE:    return "SEVERE";
+				case PowerManager.THERMAL_STATUS_CRITICAL:  return "CRITICAL";
+				case PowerManager.THERMAL_STATUS_EMERGENCY: return "EMERGENCY";
+				case PowerManager.THERMAL_STATUS_SHUTDOWN:  return "SHUTDOWN";
+				default:                                    return "";
+			}
+		} catch (Exception e) {
+			Log.w(TAG, "getThermalStatus failed", e);
+			return "";
+		}
+	}
+
+	// Sends the app to the background, leaving it running exactly as the home
+	// button does. Used for the game's back navigation, where terminating would
+	// throw away a run in progress without warning.
+	// ---- On-device translation -------------------------------------------------
+	//
+	// Uses the platform's translation framework rather than bundling a model:
+	// whichever service the device ships answers the request, which on a Galaxy
+	// means Samsung's own translator instead of a generic offline model. It needs
+	// API 31 and a translation service to be present, so every entry point here
+	// reports failure rather than assuming, and the caller can fall back.
+
+	private final Executor translationExecutor = Executors.newSingleThreadExecutor();
+	private volatile String translationResult;
+	private volatile String translationState = "idle";
+
+	// Logged once so an unsupported device is diagnosable from the console rather
+	// than looking like a silent failure.
+	public String translationCapabilities() {
+		if (Build.VERSION.SDK_INT < 31) {
+			return "unsupported: needs API 31, device is " + Build.VERSION.SDK_INT;
+		}
+		try {
+			TranslationManager manager = getSystemService(TranslationManager.class);
+			if (manager == null) {
+				return "unavailable: no TranslationManager on this device";
+			}
+			Set<TranslationCapability> caps = manager.getOnDeviceTranslationCapabilities(
+					TranslationSpec.DATA_FORMAT_TEXT, TranslationSpec.DATA_FORMAT_TEXT);
+			if (caps == null || caps.isEmpty()) {
+				// The device may still translate: Samsung exposes its engine to its
+				// own keyboard rather than through this API, so ML Kit takes over.
+				return "on-device (ML Kit)";
+			}
+			StringBuilder sb = new StringBuilder("available:");
+			for (TranslationCapability c : caps) {
+				sb.append(' ')
+						.append(c.getSourceSpec().getLocale().toLanguageTag())
+						.append("->")
+						.append(c.getTargetSpec().getLocale().toLanguageTag())
+						.append('(').append(c.getState()).append(')');
+			}
+			return sb.toString();
+		} catch (Throwable t) {
+			return "error: " + t;
+		}
+	}
+
+	// Kicks off a translation; the result is collected with getTranslationState /
+	// getTranslationResult. A callback into Godot would need a JNI bridge in the
+	// other direction, and one in-flight request is all the reader needs.
+	public void startTranslation(String text, String sourceLanguage, String targetLanguage) {
+		translationResult = null;
+		translationState = "running";
+
+		if (text == null || text.isEmpty()) {
+			translationState = "failed";
+			return;
+		}
+
+		if (Build.VERSION.SDK_INT < 31) {
+			translateWithMlKit(text, sourceLanguage, targetLanguage);
+			return;
+		}
+
+		try {
+			TranslationManager manager = getSystemService(TranslationManager.class);
+			Set<TranslationCapability> caps = manager == null ? null
+					: manager.getOnDeviceTranslationCapabilities(
+							TranslationSpec.DATA_FORMAT_TEXT, TranslationSpec.DATA_FORMAT_TEXT);
+			if (manager == null || caps == null || caps.isEmpty()) {
+				translateWithMlKit(text, sourceLanguage, targetLanguage);
+				return;
+			}
+
+			TranslationContext context = new TranslationContext.Builder(
+					new TranslationSpec(ULocale.forLanguageTag(sourceLanguage),
+							TranslationSpec.DATA_FORMAT_TEXT),
+					new TranslationSpec(ULocale.forLanguageTag(targetLanguage),
+							TranslationSpec.DATA_FORMAT_TEXT))
+					.build();
+
+			manager.createOnDeviceTranslator(context, translationExecutor, translator -> {
+				if (translator == null) {
+					translateWithMlKit(text, sourceLanguage, targetLanguage);
+					return;
+				}
+				try {
+					TranslationRequest request = new TranslationRequest.Builder()
+							.setTranslationRequestValues(
+									java.util.List.of(TranslationRequestValue.forText(text)))
+							.build();
+					translator.translate(request, new CancellationSignal(), translationExecutor,
+							response -> {
+								try {
+									TranslationResponseValue value =
+											response.getTranslationResponseValues().get(0);
+									if (value.getStatusCode() == TranslationResponseValue.STATUS_SUCCESS) {
+										translationResult = String.valueOf(value.getText());
+										translationState = "done";
+									} else {
+										translationState = "failed";
+									}
+								} catch (Throwable t) {
+									Log.w(TAG, "translation response unusable", t);
+									translationState = "failed";
+								} finally {
+									translator.destroy();
+								}
+							});
+				} catch (Throwable t) {
+					Log.w(TAG, "translate call failed", t);
+					translationState = "failed";
+					translator.destroy();
+				}
+			});
+		} catch (Throwable t) {
+			Log.w(TAG, "platform translation failed, falling back to ML Kit", t);
+			translateWithMlKit(text, sourceLanguage, targetLanguage);
+		}
+	}
+
+	// ML Kit runs entirely on the device using the same models as Google
+	// Translate's offline mode. It needs a one-off model download per language
+	// pair, after which it works without a network.
+	private void translateWithMlKit(String text, String sourceLanguage, String targetLanguage) {
+		try {
+			TranslatorOptions options = new TranslatorOptions.Builder()
+					.setSourceLanguage(TranslateLanguage.fromLanguageTag(sourceLanguage))
+					.setTargetLanguage(TranslateLanguage.fromLanguageTag(targetLanguage))
+					.build();
+			com.google.mlkit.nl.translate.Translator translator = Translation.getClient(options);
+
+			translator.downloadModelIfNeeded(new DownloadConditions.Builder().build())
+					.addOnSuccessListener(ignored -> translator.translate(text)
+							.addOnSuccessListener(result -> {
+								translationResult = result;
+								translationState = "done";
+								translator.close();
+							})
+							.addOnFailureListener(e -> {
+								Log.w(TAG, "ML Kit translate failed", e);
+								translationState = "failed";
+								translator.close();
+							}))
+					.addOnFailureListener(e -> {
+						Log.w(TAG, "ML Kit model download failed", e);
+						translationState = "failed";
+						translator.close();
+					});
+		} catch (Throwable t) {
+			Log.w(TAG, "ML Kit unavailable", t);
+			translationState = "failed";
+		}
+	}
+
+	public String getTranslationState() {
+		return translationState;
+	}
+
+	public String getTranslationResult() {
+		return translationResult == null ? "" : translationResult;
+	}
+
+	public void moveToBackground() {
+		Log.i(TAG, "Back requested, moving task to background");
+		moveTaskToBack(true);
+	}
+
+	// Ends the app rather than bouncing back to the launcher. finishAndRemoveTask
+	// drops the task from recents so this reads as a deliberate exit, and the
+	// explicit exit follows because Godot's process does not reliably unwind on
+	// its own once the activity is gone.
+	public void quitApp() {
+		Log.i(TAG, "Quit requested, exiting app");
+		finishAndRemoveTask();
+
+		// finishAndRemoveTask posts the teardown to the main looper, so exiting on
+		// the next line would kill the process before onDestroy ran. Queueing the
+		// exit behind it lets the lifecycle finish first. The exit is still needed:
+		// Godot's process does not reliably unwind once the activity is gone.
+		new Handler(Looper.getMainLooper()).post(() -> Runtime.getRuntime().exit(0));
 	}
 
 	public void restartApp() {
@@ -503,6 +766,19 @@ public class GodotApp extends GodotActivity {
 		if (url == null || url.isEmpty()) {
 			return;
 		}
+
+		// Preferred path: a Custom Tab. It renders as part of the launcher rather
+		// than sending the user off to a browser app, and being a real browser it
+		// brings its own page translation — which is the only translation route
+		// still standing. Every URL-based translation proxy this used to rely on
+		// is gone: Microsoft retired translatetheweb.com, Google's URL translation
+		// is blocked in Korea along with the known workaround, and Papago has no
+		// deep link (its /website endpoint drops the parameters and redirects to
+		// the home page).
+		if (openInCustomTab(url)) {
+			return;
+		}
+
 		runOnUiThread(() -> {
 			closeWebViewInternal();
 
@@ -664,6 +940,23 @@ public class GodotApp extends GodotActivity {
 			activeWebView = webView;
 			Log.i(TAG, "showWebView: opened " + url);
 		});
+	}
+
+	// Returns false when no browser on the device supports Custom Tabs, in which
+	// case the caller falls back to the bundled WebView.
+	private boolean openInCustomTab(String url) {
+		try {
+			CustomTabsIntent intent = new CustomTabsIntent.Builder()
+					.setShowTitle(true)
+					.setUrlBarHidingEnabled(true)
+					.build();
+			intent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			intent.launchUrl(this, Uri.parse(url));
+			return true;
+		} catch (Exception e) {
+			Log.w(TAG, "Custom Tab unavailable, falling back to the in-app WebView", e);
+			return false;
+		}
 	}
 
 	public void closeWebView() {

@@ -11,6 +11,8 @@ public class ActionSection : VBoxContainer
     public event Action<bool> LocalBackupToggled;
     public event Action<bool> CloudSyncToggled;
     public event Action<bool> BetaChannelToggled;
+    public event Action<bool> FpsOverlayToggled;
+    public event Action<string, bool> OverlayRowToggled;
     public event Action CloudPushPressed;
     public event Action CloudPullPressed;
     public event Action CheckForUpdatesPressed;
@@ -18,122 +20,142 @@ public class ActionSection : VBoxContainer
 
     private readonly Button _launchButton;
     private readonly Button _retryButton;
-    private readonly StyledButton _localBackupToggle;
-    private readonly StyledButton _cloudSyncToggle;
-    private readonly StyledButton _betaChannelToggle;
+    private readonly Button _localBackupToggle;
+    private readonly Button _cloudSyncToggle;
+    private readonly Button _betaChannelToggle;
+    private readonly Button _fpsOverlayToggle;
     private readonly Button _pushButton;
     private readonly Button _pullButton;
     private readonly Button _updateButton;
-    private readonly StyledButton _appUpdateButton;
+    private readonly Button _appUpdateButton;
     private string _appUpdateBaseText = "UPDATE LAUNCHER";
-    private readonly StyleBoxFlat _offStyle;
-    private readonly StyleBoxFlat _onStyle;
+
+    // Toggles and cloud actions live in this group so LauncherView can reparent
+    // them into a Settings submenu, leaving only PLAY-level actions on the menu.
+    public VBoxContainer SettingsGroup { get; }
+
+    private readonly VBoxContainer _rows;
+    private readonly System.Collections.Generic.Dictionary<string, GameCheckbox> _overlayRowToggles = new();
+    private readonly StyledLabel _cloudStatus;
 
     public ActionSection(float scale)
     {
-        _retryButton = new StyledButton("RETRY", scale);
+        SettingsGroup = new VBoxContainer();
+        SettingsGroup.AddThemeConstantOverride("separation", (int)(14 * scale));
+        AddChild(SettingsGroup);
+
+        // Rows rather than a grid: the game's settings screen reads as a list of
+        // "name … control" lines, and a two-column grid of captioned boxes does not.
+        _rows = new VBoxContainer();
+        _rows.AddThemeConstantOverride("separation", 0);
+        SettingsGroup.AddChild(_rows);
+
+        _retryButton = new GameMenuButton(Localization.Tr("MENU_RETRY"), scale, fontSize: 34, primary: true);
         _retryButton.Visible = false;
         _retryButton.Pressed += () => RetryPressed?.Invoke();
         AddChild(_retryButton);
 
-        var r = (int)(4 * scale);
-        var bw = System.Math.Max(1, (int)(2 * scale));
-        _offStyle = StyledButton.MakeOutline(new Color(0.7f, 0.25f, 0.25f), r, bw);
-        _onStyle = StyledButton.MakeOutline(new Color(0.25f, 0.65f, 0.3f), r, bw);
 
-        _localBackupToggle = new StyledButton("Local Backup: OFF", scale, fontSize: 14, height: 44);
+        _localBackupToggle = new GameCheckbox(scale);
         _localBackupToggle.ToggleMode = true;
         _localBackupToggle.Visible = false;
-        ApplyToggleStyle(_localBackupToggle, false);
         _localBackupToggle.Toggled += pressed =>
         {
-            _localBackupToggle.Text = pressed ? "Local Backup: ON" : "Local Backup: OFF";
-            ApplyToggleStyle(_localBackupToggle, pressed);
             LocalBackupToggled?.Invoke(pressed);
         };
-        AddChild(_localBackupToggle);
+        AddSettingRow("SETTING_LOCAL_BACKUP", _localBackupToggle, scale);
 
-        _cloudSyncToggle = new StyledButton("Auto Sync: OFF", scale, fontSize: 14, height: 44);
+        _cloudSyncToggle = new GameCheckbox(scale);
         _cloudSyncToggle.ToggleMode = true;
         _cloudSyncToggle.Visible = false;
-        ApplyToggleStyle(_cloudSyncToggle, false);
         _cloudSyncToggle.Toggled += pressed =>
         {
-            _cloudSyncToggle.Text = pressed ? "Auto Sync: ON" : "Auto Sync: OFF";
-            ApplyToggleStyle(_cloudSyncToggle, pressed);
             CloudSyncToggled?.Invoke(pressed);
         };
-        AddChild(_cloudSyncToggle);
+        AddSettingRow("SETTING_AUTO_SYNC", _cloudSyncToggle, scale);
 
         // Channel toggle. Off (default) → follow Steam's `public` branch.
         // On → prefer any beta-named branch (e.g. STS2's `public-beta`).
         // The user MUST opt into the same beta channel inside the Steam
         // client first; otherwise GetManifestRequestCode fails with
         // "Ensure the account owns this app" on protected branches.
-        _betaChannelToggle = new StyledButton(
-            "Beta Channel: OFF",
-            scale,
-            fontSize: 14,
-            height: 44
-        );
+        _betaChannelToggle = new GameCheckbox(scale);
         _betaChannelToggle.ToggleMode = true;
         _betaChannelToggle.Visible = false;
-        ApplyToggleStyle(_betaChannelToggle, false);
         _betaChannelToggle.Toggled += pressed =>
         {
-            _betaChannelToggle.Text = pressed ? "Beta Channel: ON" : "Beta Channel: OFF";
-            ApplyToggleStyle(_betaChannelToggle, pressed);
             BetaChannelToggled?.Invoke(pressed);
         };
-        AddChild(_betaChannelToggle);
+        AddSettingRow("SETTING_BETA_CHANNEL", _betaChannelToggle, scale);
 
-        var pushPullRow = new HBoxContainer();
+        // Debug aid, so it stays available whether or not Steam is connected.
+        _fpsOverlayToggle = new GameCheckbox(scale);
+        _fpsOverlayToggle.ToggleMode = true;
+        _fpsOverlayToggle.Visible = false;
+        _fpsOverlayToggle.Toggled += pressed =>
+        {
+            FpsOverlayToggled?.Invoke(pressed);
+        };
+        AddSettingRow("SETTING_FPS_OVERLAY", _fpsOverlayToggle, scale);
+
+        // One switch per line of the overlay, so an unwanted reading can be
+        // dropped without losing the rest.
+        foreach (var (row, key) in new[]
+        {
+            ("cpu", "SETTING_OVERLAY_CPU"),
+            ("gpu", "SETTING_OVERLAY_GPU"),
+            ("temp", "SETTING_OVERLAY_TEMP"),
+        })
+        {
+            var box = new GameCheckbox(scale);
+            var rowName = row;
+            box.Toggled += pressed => OverlayRowToggled?.Invoke(rowName, pressed);
+            _overlayRowToggles[rowName] = box;
+            AddSettingRow(key, box, scale);
+        }
+
+
+        // Cloud transfers used to report only into the console; this line keeps
+        // the outcome next to the buttons that started it.
+        _cloudStatus = new StyledLabel("", scale, fontSize: 15, align: HorizontalAlignment.Left);
+        _cloudStatus.Modulate = new Color(1f, 1f, 1f, 0.75f);
+        _cloudStatus.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _cloudStatus.Visible = false;
+        SettingsGroup.AddChild(_cloudStatus);
+
+        var pushPullRow = new SettingsRow(Localization.Tr("SETTING_CLOUD_HEADER"), scale);
         pushPullRow.Visible = false;
-        pushPullRow.AddThemeConstantOverride("separation", (int)(6 * scale));
 
-        _pushButton = new StyledButton("Push to Cloud", scale, fontSize: 14, height: 44);
-        _pushButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _pushButton = new GameMenuButton(Localization.Tr("SETTING_UPLOAD_SAVES"), scale, fontSize: 21);
         _pushButton.Pressed += () => CloudPushPressed?.Invoke();
-        pushPullRow.AddChild(_pushButton);
+        pushPullRow.AddControl(_pushButton);
 
-        _pullButton = new StyledButton("Pull from Cloud", scale, fontSize: 14, height: 44);
-        _pullButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _pullButton = new GameMenuButton(Localization.Tr("SETTING_DOWNLOAD_SAVES"), scale, fontSize: 21);
         _pullButton.Pressed += () => CloudPullPressed?.Invoke();
-        pushPullRow.AddChild(_pullButton);
+        pushPullRow.AddControl(_pullButton);
 
-        AddChild(pushPullRow);
+        _rows.AddChild(pushPullRow);
+        _rows.AddChild(SettingsRow.Separator(scale));
 
-        _updateButton = new StyledButton("CHECK FOR UPDATES", scale, fontSize: 16, height: 48);
+        _updateButton = new GameMenuButton(Localization.Tr("SETTING_CHECK_UPDATES"), scale, fontSize: 22);
         _updateButton.Visible = false;
         _updateButton.Pressed += () => CheckForUpdatesPressed?.Invoke();
-        AddChild(_updateButton);
+        var updateRow = new SettingsRow(Localization.Tr("SETTING_UPDATE_ROW"), scale);
+        updateRow.AddControl(_updateButton);
+        _rows.AddChild(updateRow);
 
         // No banner above the orange UPDATE LAUNCHER button. Earlier versions
         // had a single-line yellow prompt here, but the user found it noisy
         // and asked us to remove it — the button itself already changes label
         // (e.g. "UPDATE LAUNCHER → v0.3.19", "Downloading… 42%",
         // "TAP TO INSTALL") so a separate prompt was redundant.
-        _appUpdateButton = new StyledButton("UPDATE LAUNCHER", scale, fontSize: 16, height: 48);
+        _appUpdateButton = new GameMenuButton(Localization.Tr("MENU_UPDATE_LAUNCHER"), scale, fontSize: 26);
         _appUpdateButton.Visible = false;
-        var appUpdateStyle = StyledButton.MakeFilled(
-            new Color(0.85f, 0.6f, 0.15f),
-            (int)(4 * scale)
-        );
-        var appUpdateHover = StyledButton.MakeFilled(
-            new Color(0.95f, 0.7f, 0.2f),
-            (int)(4 * scale)
-        );
-        var appUpdatePressed = StyledButton.MakeFilled(
-            new Color(0.7f, 0.5f, 0.1f),
-            (int)(4 * scale)
-        );
-        _appUpdateButton.AddThemeStyleboxOverride("normal", appUpdateStyle);
-        _appUpdateButton.AddThemeStyleboxOverride("hover", appUpdateHover);
-        _appUpdateButton.AddThemeStyleboxOverride("pressed", appUpdatePressed);
+        _appUpdateButton.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         _appUpdateButton.Pressed += () => AppUpdatePressed?.Invoke();
         AddChild(_appUpdateButton);
 
-        _launchButton = new StyledButton("LAUNCH", scale, fontSize: 16, height: 48);
+        _launchButton = new GameMenuButton(Localization.Tr("MENU_PLAY"), scale, fontSize: 40, primary: true);
         _launchButton.Visible = false;
         _launchButton.Pressed += () => LaunchPressed?.Invoke();
         AddChild(_launchButton);
@@ -142,34 +164,25 @@ public class ActionSection : VBoxContainer
     public void SetLocalBackupChecked(bool value)
     {
         _localBackupToggle.ButtonPressed = value;
-        _localBackupToggle.Text = value ? "Local Backup: ON" : "Local Backup: OFF";
-        ApplyToggleStyle(_localBackupToggle, value);
     }
 
     public void SetCloudSyncChecked(bool value)
     {
         _cloudSyncToggle.ButtonPressed = value;
-        _cloudSyncToggle.Text = value ? "Auto Sync: ON" : "Auto Sync: OFF";
-        ApplyToggleStyle(_cloudSyncToggle, value);
+    }
+
+    public void SetFpsOverlayChecked(bool value)
+    {
+        _fpsOverlayToggle.ButtonPressed = value;
     }
 
     public void SetBetaChannelChecked(bool value)
     {
         _betaChannelToggle.ButtonPressed = value;
-        _betaChannelToggle.Text = value ? "Beta Channel: ON" : "Beta Channel: OFF";
-        ApplyToggleStyle(_betaChannelToggle, value);
     }
 
-    private void ApplyToggleStyle(Button button, bool on)
-    {
-        var style = on ? _onStyle : _offStyle;
-        button.AddThemeStyleboxOverride("normal", style);
-        button.AddThemeStyleboxOverride("hover", style);
-        button.AddThemeStyleboxOverride("pressed", style);
-        button.AddThemeStyleboxOverride("disabled", style);
-    }
 
-    private HBoxContainer PushPullRow => (HBoxContainer)_pushButton.GetParent();
+    private Control PushPullRow => (Control)_pushButton.GetParent();
 
     public void ShowLaunch(string text, bool showCloudSync, bool showUpdate)
     {
@@ -178,10 +191,11 @@ public class ActionSection : VBoxContainer
         _localBackupToggle.Visible = showCloudSync;
         _cloudSyncToggle.Visible = showCloudSync;
         _betaChannelToggle.Visible = showCloudSync;
+        _fpsOverlayToggle.Visible = true;
         PushPullRow.Visible = showCloudSync;
         _updateButton.Visible = showUpdate;
         _updateButton.Disabled = false;
-        _updateButton.Text = "CHECK FOR UPDATES";
+        _updateButton.Text = Localization.Tr("SETTING_CHECK_UPDATES");
         _retryButton.Visible = false;
     }
 
@@ -192,6 +206,7 @@ public class ActionSection : VBoxContainer
         _localBackupToggle.Visible = false;
         _cloudSyncToggle.Visible = false;
         _betaChannelToggle.Visible = false;
+        _fpsOverlayToggle.Visible = false;
         PushPullRow.Visible = false;
         _updateButton.Visible = false;
     }
@@ -203,9 +218,30 @@ public class ActionSection : VBoxContainer
         _localBackupToggle.Visible = false;
         _cloudSyncToggle.Visible = false;
         _betaChannelToggle.Visible = false;
+        _fpsOverlayToggle.Visible = false;
         PushPullRow.Visible = false;
         _updateButton.Visible = false;
         _appUpdateButton.Visible = false;
+    }
+
+    private void AddSettingRow(string labelKey, Control control, float scale)
+    {
+        var row = new SettingsRow(Localization.Tr(labelKey), scale);
+        row.AddControl(control);
+        _rows.AddChild(row);
+        _rows.AddChild(SettingsRow.Separator(scale));
+    }
+
+    public void SetOverlayRowChecked(string row, bool value)
+    {
+        if (_overlayRowToggles.TryGetValue(row, out var box))
+            box.ButtonPressed = value;
+    }
+
+    public void SetCloudStatus(string text)
+    {
+        _cloudStatus.Text = text;
+        _cloudStatus.Visible = !string.IsNullOrEmpty(text);
     }
 
     public void SetPushPullDisabled(bool disabled)
@@ -243,13 +279,13 @@ public class ActionSection : VBoxContainer
     public void SetAppUpdateReadyToInstall()
     {
         _appUpdateButton.Disabled = false;
-        _appUpdateButton.Text = "TAP TO INSTALL";
+        _appUpdateButton.Text = Localization.Tr("UPDATE_TAP_TO_INSTALL");
     }
 
     public void SetAppUpdatePermissionNeeded()
     {
         _appUpdateButton.Disabled = false;
-        _appUpdateButton.Text = "ALLOW INSTALL IN SETTINGS";
+        _appUpdateButton.Text = Localization.Tr("UPDATE_ALLOW_INSTALL");
     }
 
     public void SetAppUpdateFailed()
