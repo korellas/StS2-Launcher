@@ -113,6 +113,7 @@ public class GodotApp extends GodotActivity {
 		extractAssetFile("FMOD_LOGOS/FMOD Logo White - Transparent Background.png", "fmod_logo.png");
 		extractAssetFile("launcher_bg.png", "launcher_bg.png");
 		extractAssetFile("launcher_font.ttf", "launcher_font.ttf");
+		extractAssetFile("launcher_logo.png", "launcher_logo.png");
 
 		super.onCreate(savedInstanceState);
 

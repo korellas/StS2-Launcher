@@ -45,15 +45,31 @@ public class LauncherView
         {
             AnchorLeft = 0.5f,
             AnchorRight = 0.5f,
-            AnchorTop = 0.55f,
-            AnchorBottom = 0.55f,
+            AnchorTop = 0.48f,
+            AnchorBottom = 0.48f,
             GrowHorizontal = Control.GrowDirection.Both,
             GrowVertical = Control.GrowDirection.Both,
         };
-        menu.CustomMinimumSize = new Vector2((int)(320 * scale), 0);
+        menu.CustomMinimumSize = new Vector2((int)(520 * scale), 0);
         menu.AddThemeConstantOverride("separation", (int)(2 * scale));
         parent.AddChild(menu);
         _menu = menu;
+
+        // Sits above the entries where the text title used to be.
+        var logo = LauncherTheme.LoadLogo();
+        if (logo != null)
+        {
+            var mark = new TextureRect
+            {
+                Texture = logo,
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                CustomMinimumSize = new Vector2(0, (int)(150 * scale)),
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+            };
+            menu.AddChild(mark);
+            menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(18 * scale)) });
+        }
 
         _statusLabel = new StyledLabel(Localization.Tr("STATUS_INITIALIZING"), scale, fontSize: 15);
         _statusLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;

@@ -70,14 +70,18 @@ public static class LauncherTheme
         }
     }
 
-    public static Texture2D LoadKeyArt()
+    public static Texture2D LoadLogo() => LoadPng("launcher_logo.png");
+
+    public static Texture2D LoadKeyArt() => LoadPng("launcher_bg.png");
+
+    private static Texture2D LoadPng(string fileName)
     {
         try
         {
-            var path = Path.Combine(OS.GetDataDir(), "launcher_bg.png");
+            var path = Path.Combine(OS.GetDataDir(), fileName);
             if (!File.Exists(path))
             {
-                PatchHelper.Log($"[Theme] background not found at {path}");
+                PatchHelper.Log($"[Theme] image not found at {path}");
                 return null;
             }
 
@@ -87,7 +91,7 @@ public static class LauncherTheme
         }
         catch (Exception ex)
         {
-            PatchHelper.Log($"[Theme] background load failed: {ex.Message}");
+            PatchHelper.Log($"[Theme] {fileName} load failed: {ex.Message}");
             return null;
         }
     }
