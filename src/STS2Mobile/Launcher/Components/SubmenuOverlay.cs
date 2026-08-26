@@ -9,6 +9,8 @@ namespace STS2Mobile.Launcher.Components;
 // these instead of being permanently on screen.
 public class SubmenuOverlay : Control
 {
+    public event Action Opened;
+
     public VBoxContainer Content { get; }
 
     private readonly ColorRect _scrim;
@@ -149,6 +151,7 @@ public class SubmenuOverlay : Control
         if (_frame != null)
             _frame.CustomMinimumSize = ViewportRelativeSize();
         Visible = true;
+        Opened?.Invoke();
     }
 
     public new void Hide() => Visible = false;

@@ -31,6 +31,10 @@ _custom_features="dotnet"
 config/name="sts2"
 config/features=PackedStringArray("4.5", "Forward Plus", "C#")
 run/main_scene=""
+; Godot quits on the system back gesture by default, which closed the
+; launcher outright. The game handles the notification itself; nothing
+; should be closed just because back was pressed.
+config/quit_on_go_back=false
 
 [display]
 

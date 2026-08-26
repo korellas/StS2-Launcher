@@ -99,6 +99,16 @@ public static class LauncherTheme
     // Prefers the game's own Kreon face once the game pack is mounted, so the
     // launcher and the game read as one product. Korean text falls back to the
     // game's Korean face, which Kreon has no glyphs for.
+    // Exposed for RichTextLabel, which reads normal_font rather than font and so
+    // cannot go through ApplyGameFont.
+    public static Font GameFont(bool bold = false)
+    {
+        var path = Localization.IsKorean
+            ? GameAssets.FontKorean
+            : (bold ? GameAssets.FontBold : GameAssets.FontRegular);
+        return GameAssets.Load<Font>(path);
+    }
+
     public static void ApplyGameFont(Control control, int fontSize, float scale, bool bold = false)
     {
         // Kreon carries no Hangul, so Korean has to use the face the game itself

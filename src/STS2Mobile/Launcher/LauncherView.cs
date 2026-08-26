@@ -124,6 +124,12 @@ public class LauncherView
         };
         article.OpenOriginalRequested += NewsSection.OpenInBrowser;
 
+        newsOverlay.Opened += () =>
+        {
+            article.Visible = false;
+            News.Visible = true;
+        };
+
         parent.AddChild(newsOverlay);
 
         var consoleOverlay = new SubmenuOverlay(Localization.Tr("MENU_CONSOLE"), scale, heightRatio: 0.78f);

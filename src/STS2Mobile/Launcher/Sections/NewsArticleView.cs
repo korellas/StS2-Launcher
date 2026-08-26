@@ -73,8 +73,18 @@ public class NewsArticleView : VBoxContainer
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
             CustomMinimumSize = new Vector2(0, (int)(240 * scale)),
+            // Pass, not Stop: the label still receives clicks for links,
+            // but a drag reaches the ScrollContainer instead of dying here.
+            MouseFilter = MouseFilterEnum.Pass,
         };
-        LauncherTheme.ApplyGameFont(_body, 26, scale);
+        var bodyFont = LauncherTheme.GameFont();
+        if (bodyFont != null)
+        {
+            _body.AddThemeFontOverride("normal_font", bodyFont);
+            _body.AddThemeFontOverride("bold_font", bodyFont);
+        }
+        _body.AddThemeFontSizeOverride("normal_font_size", (int)(26 * scale));
+        _body.AddThemeFontSizeOverride("bold_font_size", (int)(26 * scale));
         _body.AddThemeColorOverride("default_color", LauncherTheme.Cream);
         // Long prose needs air; the game font is drawn for short labels.
         _body.AddThemeConstantOverride("line_separation", (int)(8 * scale));
