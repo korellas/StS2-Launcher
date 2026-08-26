@@ -12,6 +12,7 @@ import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.activity.EdgeToEdge;
+import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.FileProvider;
 import androidx.core.splashscreen.SplashScreen;
 
@@ -560,6 +561,19 @@ public class GodotApp extends GodotActivity {
 		if (url == null || url.isEmpty()) {
 			return;
 		}
+
+		// Preferred path: a Custom Tab. It renders as part of the launcher rather
+		// than sending the user off to a browser app, and being a real browser it
+		// brings its own page translation — which is the only translation route
+		// still standing. Every URL-based translation proxy this used to rely on
+		// is gone: Microsoft retired translatetheweb.com, Google's URL translation
+		// is blocked in Korea along with the known workaround, and Papago has no
+		// deep link (its /website endpoint drops the parameters and redirects to
+		// the home page).
+		if (openInCustomTab(url)) {
+			return;
+		}
+
 		runOnUiThread(() -> {
 			closeWebViewInternal();
 
@@ -721,6 +735,23 @@ public class GodotApp extends GodotActivity {
 			activeWebView = webView;
 			Log.i(TAG, "showWebView: opened " + url);
 		});
+	}
+
+	// Returns false when no browser on the device supports Custom Tabs, in which
+	// case the caller falls back to the bundled WebView.
+	private boolean openInCustomTab(String url) {
+		try {
+			CustomTabsIntent intent = new CustomTabsIntent.Builder()
+					.setShowTitle(true)
+					.setUrlBarHidingEnabled(true)
+					.build();
+			intent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			intent.launchUrl(this, Uri.parse(url));
+			return true;
+		} catch (Exception e) {
+			Log.w(TAG, "Custom Tab unavailable, falling back to the in-app WebView", e);
+			return false;
+		}
 	}
 
 	public void closeWebView() {

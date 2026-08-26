@@ -36,6 +36,7 @@ configurations {
 dependencies {
     implementation "androidx.fragment:fragment:$versions.fragmentVersion"
     implementation "androidx.core:core-splashscreen:$versions.splashscreenVersion"
+    implementation "androidx.browser:browser:$versions.browserVersion"
 
     if (rootProject.findProject(":lib")) {
         implementation project(":lib")
