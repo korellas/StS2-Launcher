@@ -138,6 +138,8 @@ public class SubmenuOverlay : Control
     private Control _frame;
     private GameBackButton _back;
 
+    private const float BackClipRatio = 0.209f;
+
 
 
     private Vector2 ViewportRelativeSize()
@@ -171,8 +173,13 @@ public class SubmenuOverlay : Control
         // the panel put it in mid-air once the panel narrowed.
         _back.AnchorLeft = 0f;
         _back.AnchorRight = 0f;
-        _back.OffsetLeft = 0f;
-        _back.OffsetRight = button.X;
+        // Hung off the left edge, not flush against it. Thresholding both
+        // screenshots shows the game runs 20.9% of the flag's width past the
+        // screen: its flag measures 217px across where the sprite's proportions
+        // put the whole thing at 274. Sitting ours fully on screen is why it read
+        // as about twice the size when it is 1.37x.
+        _back.OffsetLeft = -button.X * BackClipRatio;
+        _back.OffsetRight = _back.OffsetLeft + button.X;
 
         _back.AnchorTop = 0.5f;
         _back.AnchorBottom = 0.5f;
