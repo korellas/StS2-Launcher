@@ -104,6 +104,25 @@ public class LauncherView
         News = new NewsSection(scale);
         News.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         newsOverlay.Content.AddChild(News);
+
+        // The announcement body arrives with the list, so reading happens here
+        // rather than in a browser. The list and the article share the panel,
+        // swapping places.
+        var article = new NewsArticleView(scale) { Visible = false };
+        newsOverlay.Content.AddChild(article);
+
+        News.ArticleSelected += item =>
+        {
+            News.Visible = false;
+            article.Show(item, NewsSection.FormatDate(item.Date));
+        };
+        article.BackRequested += () =>
+        {
+            article.Visible = false;
+            News.Visible = true;
+        };
+        article.OpenOriginalRequested += NewsSection.OpenInBrowser;
+
         parent.AddChild(newsOverlay);
 
         var consoleOverlay = new SubmenuOverlay(Localization.Tr("MENU_CONSOLE"), scale, heightRatio: 0.78f);

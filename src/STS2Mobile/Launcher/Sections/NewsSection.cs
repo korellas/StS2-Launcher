@@ -12,6 +12,8 @@ namespace STS2Mobile.Launcher.Sections;
 // is updated by the controller once SteamNewsClient.FetchAsync resolves.
 public class NewsSection : VBoxContainer
 {
+    public event Action<SteamNewsItem> ArticleSelected;
+
     private static readonly Color StatusColor = new(0.72f, 0.74f, 0.80f);
     private static readonly Color TitleColor = LauncherTheme.Cream;
     private static readonly Color DateColor = new(0.62f, 0.64f, 0.70f);
@@ -126,7 +128,7 @@ public class NewsSection : VBoxContainer
 
         btn.MouseEntered += () => title.AddThemeColorOverride("font_color", HoverColor);
         btn.MouseExited += () => title.AddThemeColorOverride("font_color", TitleColor);
-        btn.Pressed += () => OpenInAppWebView(item.Url);
+        btn.Pressed += () => ArticleSelected?.Invoke(item);
 
         return btn;
     }
@@ -134,7 +136,7 @@ public class NewsSection : VBoxContainer
     // Tries to open the article inside the launcher via the GodotApp
     // WebView overlay; falls back to the system browser if the JNI bridge
     // isn't available (e.g. running on desktop for dev).
-    private static void OpenInAppWebView(string url)
+    public static void OpenInBrowser(string url)
     {
         try
         {
@@ -160,7 +162,7 @@ public class NewsSection : VBoxContainer
     }
 
     // "3d ago", "2w ago", "Mar 5" — keeps the row to a single short line.
-    private static string FormatDate(DateTimeOffset date)
+    public static string FormatDate(DateTimeOffset date)
     {
         var delta = DateTimeOffset.UtcNow - date;
         if (delta.TotalHours < 1)
