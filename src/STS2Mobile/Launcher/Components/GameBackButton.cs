@@ -10,13 +10,40 @@ public class GameBackButton : Button
     {
         Flat = true;
 
-        var sprite = GameAssets.Load<Texture2D>(GameAssets.BackButton);
-        if (sprite != null)
+        var ribbon = GameAssets.Load<Texture2D>(GameAssets.BackButton);
+        if (ribbon != null)
         {
-            Icon = sprite;
-            ExpandIcon = false;
-            AddThemeConstantOverride("icon_max_width", (int)(64 * scale));
-            CustomMinimumSize = new Vector2((int)(72 * scale), (int)(52 * scale));
+            CustomMinimumSize = new Vector2((int)(96 * scale), (int)(58 * scale));
+
+            var flag = new TextureRect
+            {
+                Texture = ribbon,
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                MouseFilter = MouseFilterEnum.Ignore,
+            };
+            flag.SetAnchorsPreset(LayoutPreset.FullRect);
+            AddChild(flag);
+
+            // The ribbon sprite is the flag alone; the arrow is a separate sprite
+            // that the game lays over it.
+            var arrow = GameAssets.Load<Texture2D>(GameAssets.BackButtonArrow);
+            if (arrow != null)
+            {
+                var glyph = new TextureRect
+                {
+                    Texture = arrow,
+                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                    StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                    MouseFilter = MouseFilterEnum.Ignore,
+                };
+                glyph.SetAnchorsPreset(LayoutPreset.FullRect);
+                glyph.OffsetLeft = (int)(10 * scale);
+                glyph.OffsetRight = -(int)(22 * scale);
+                glyph.OffsetTop = (int)(12 * scale);
+                glyph.OffsetBottom = -(int)(12 * scale);
+                AddChild(glyph);
+            }
         }
         else
         {

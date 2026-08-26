@@ -31,6 +31,7 @@ public static class GameAssets
     public const string PopupCancelButton = "res://images/atlases/ui_atlas.sprites/popup_cancel_button.tres";
     public const string PopupConfirmButton = "res://images/atlases/ui_atlas.sprites/popup_confirm_button.tres";
     public const string BackButton = "res://images/atlases/ui_atlas.sprites/back_button.tres";
+    public const string BackButtonArrow = "res://images/atlases/compressed.sprites/back_button_arrow.tres";
 
     private static bool _mountAttempted;
     private static bool _mounted;

@@ -13,7 +13,7 @@ public class SubmenuOverlay : Control
 
     private readonly ColorRect _scrim;
 
-    public SubmenuOverlay(string title, float scale, float widthRatio = 0.68f, float heightRatio = 0.86f)
+    public SubmenuOverlay(string title, float scale, float widthRatio = 0.68f, float heightRatio = 0f)
     {
         SetAnchorsPreset(LayoutPreset.FullRect);
         Visible = false;
@@ -49,9 +49,18 @@ public class SubmenuOverlay : Control
         titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         header.AddChild(titleLabel);
 
-        var close = new GameBackButton(scale);
+        var close = new GameBackButton(scale)
+        {
+            AnchorLeft = 0f,
+            AnchorRight = 0f,
+            AnchorTop = 0.5f,
+            AnchorBottom = 0.5f,
+            GrowHorizontal = GrowDirection.End,
+            GrowVertical = GrowDirection.Both,
+            OffsetLeft = (int)(-46 * scale),
+        };
         close.Pressed += Hide;
-        header.AddChild(close);
+        AddChild(close);
     }
 
     // NinePatchRect over the game's panel art when available; the launcher's own
@@ -129,6 +138,8 @@ public class SubmenuOverlay : Control
     private Vector2 ViewportRelativeSize()
     {
         var vp = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
+        // A zero height ratio means "fit the content": the settings panel had a
+        // fixed 86% height and stood mostly empty.
         return new Vector2((int)(vp.X * _widthRatio), (int)(vp.Y * _heightRatio));
     }
 

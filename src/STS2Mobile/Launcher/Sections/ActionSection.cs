@@ -35,6 +35,7 @@ public class ActionSection : VBoxContainer
 
     private readonly GridContainer _toggleGrid;
     private readonly StyledLabel _cloudHeader;
+    private readonly StyledLabel _cloudStatus;
 
     public ActionSection(float scale)
     {
@@ -102,6 +103,14 @@ public class ActionSection : VBoxContainer
         _cloudHeader = new StyledLabel(Localization.Tr("SETTING_CLOUD_HEADER"), scale, fontSize: 18, align: HorizontalAlignment.Left);
         _cloudHeader.Visible = false;
         SettingsGroup.AddChild(_cloudHeader);
+
+        // Cloud transfers used to report only into the console; this line keeps
+        // the outcome next to the buttons that started it.
+        _cloudStatus = new StyledLabel("", scale, fontSize: 15, align: HorizontalAlignment.Left);
+        _cloudStatus.Modulate = new Color(1f, 1f, 1f, 0.75f);
+        _cloudStatus.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _cloudStatus.Visible = false;
+        SettingsGroup.AddChild(_cloudStatus);
 
         var pushPullRow = new HBoxContainer();
         pushPullRow.Visible = false;
@@ -205,6 +214,12 @@ public class ActionSection : VBoxContainer
         _cloudHeader.Visible = false;
         _updateButton.Visible = false;
         _appUpdateButton.Visible = false;
+    }
+
+    public void SetCloudStatus(string text)
+    {
+        _cloudStatus.Text = text;
+        _cloudStatus.Visible = !string.IsNullOrEmpty(text);
     }
 
     public void SetPushPullDisabled(bool disabled)

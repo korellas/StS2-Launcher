@@ -100,7 +100,7 @@ public class LauncherController
                 }
                 else
                 {
-                    _view.Actions.SetUpdateButtonText("UP TO DATE");
+                    _view.Actions.SetUpdateButtonText(Localization.Tr("UPDATE_UP_TO_DATE"));
                 }
             });
         _model.UpdateCheckFailed += msg =>
@@ -524,47 +524,59 @@ public class LauncherController
         }
     }
 
-    private void OnCloudPushPressed()
-    {
-        ShowConfirmation(
-            "Push local saves to cloud?\nThis will overwrite your cloud saves.",
+    private void OnCloudPushPressed() =>
+        RunCloudTransfer(
+            "CLOUD_PUSH_CONFIRM",
+            "CLOUD_PUSH_RUNNING",
             () =>
-            {
-                _view.Actions.SetPushPullDisabled(true);
-                _view.AppendLog("Pushing local saves to cloud...");
-                Task.Run(async () =>
-                {
-                    await CloudSyncCoordinator.ManualPushAllAsync(
-                        LauncherPatches.SavedAccountName,
-                        LauncherPatches.SavedRefreshToken
-                    );
-                    _runOnMainThread(() =>
-                    {
-                        _view.AppendLog("Push complete.");
-                        _view.Actions.SetPushPullDisabled(false);
-                    });
-                });
-            }
+                CloudSyncCoordinator.ManualPushAllAsync(
+                    LauncherPatches.SavedAccountName,
+                    LauncherPatches.SavedRefreshToken
+                )
         );
-    }
 
-    private void OnCloudPullPressed()
+    private void OnCloudPullPressed() =>
+        RunCloudTransfer(
+            "CLOUD_PULL_CONFIRM",
+            "CLOUD_PULL_RUNNING",
+            () =>
+                CloudSyncCoordinator.ManualPullAllAsync(
+                    LauncherPatches.SavedAccountName,
+                    LauncherPatches.SavedRefreshToken
+                )
+        );
+
+    // Both transfers previously reported only into the console, which now lives
+    // behind a submenu, and had no error handling: an exception skipped the
+    // re-enable and left the buttons dead until the launcher restarted. Status
+    // goes on screen and the buttons are restored in a finally.
+    private void RunCloudTransfer(string confirmKey, string runningKey, Func<Task> transfer)
     {
         ShowConfirmation(
-            "Pull cloud saves to local?\nThis will overwrite your local saves.",
+            Localization.Tr(confirmKey),
             () =>
             {
                 _view.Actions.SetPushPullDisabled(true);
-                _view.AppendLog("Pulling cloud saves to local...");
+                _view.Actions.SetCloudStatus(Localization.Tr(runningKey));
+                _view.AppendLog(Localization.Tr(runningKey));
+
                 Task.Run(async () =>
                 {
-                    await CloudSyncCoordinator.ManualPullAllAsync(
-                        LauncherPatches.SavedAccountName,
-                        LauncherPatches.SavedRefreshToken
-                    );
+                    string result;
+                    try
+                    {
+                        await transfer();
+                        result = Localization.Tr("CLOUD_DONE");
+                    }
+                    catch (Exception ex)
+                    {
+                        result = Localization.Tr("CLOUD_FAILED", ex.Message);
+                    }
+
                     _runOnMainThread(() =>
                     {
-                        _view.AppendLog("Pull complete.");
+                        _view.AppendLog(result);
+                        _view.Actions.SetCloudStatus(result);
                         _view.Actions.SetPushPullDisabled(false);
                     });
                 });
