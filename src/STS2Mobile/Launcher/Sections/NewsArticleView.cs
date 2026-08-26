@@ -23,6 +23,14 @@ public class NewsArticleView : VBoxContainer
     private readonly TranslationBridge _translation = new();
     private readonly Timer _poll = new();
 
+    // Paragraphs are translated one at a time and reassembled, rather than the
+    // article going over as a single blob: a translator handed the whole body
+    // returns one run-on block with every line break gone, and shorter segments
+    // usually come back better anyway.
+    private readonly System.Collections.Generic.List<string> _sourceLines = new();
+    private readonly System.Collections.Generic.List<string> _translatedLines = new();
+    private int _lineIndex;
+
     private string _url = "";
     private string _originalBody = "";
     private bool _showingTranslation;
@@ -93,8 +101,8 @@ public class NewsArticleView : VBoxContainer
             _body.AddThemeFontOverride("normal_font", bodyFont);
             _body.AddThemeFontOverride("bold_font", bodyFont);
         }
-        _body.AddThemeFontSizeOverride("normal_font_size", (int)(26 * scale));
-        _body.AddThemeFontSizeOverride("bold_font_size", (int)(26 * scale));
+        _body.AddThemeFontSizeOverride("normal_font_size", (int)(22 * scale));
+        _body.AddThemeFontSizeOverride("bold_font_size", (int)(22 * scale));
         _body.AddThemeColorOverride("default_color", LauncherTheme.Cream);
         // Long prose needs air; the game font is drawn for short labels.
         _body.AddThemeConstantOverride("line_separation", (int)(8 * scale));
@@ -136,18 +144,69 @@ public class NewsArticleView : VBoxContainer
             return;
         }
 
-        // Tags would be translated as words, so the request carries the plain
-        // text and the result is shown without markup.
+        // Tags would be translated as words, so the request carries plain text and
+        // the result is shown without markup.
         var plain = _body.GetParsedText();
-        if (string.IsNullOrWhiteSpace(plain) || !_translation.Start(plain))
+        if (string.IsNullOrWhiteSpace(plain))
         {
-            _translateButton.Text = Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE");
+            ReportUnavailable();
             return;
         }
 
+        _sourceLines.Clear();
+        _translatedLines.Clear();
+        _sourceLines.AddRange(plain.Replace("\r\n", "\n").Split('\n'));
+        _lineIndex = 0;
+
         _translateButton.Disabled = true;
         _translateButton.Text = Localization.Tr("NEWS_TRANSLATING");
-        _poll.Start();
+
+        if (!StartNextLine())
+            ReportUnavailable();
+    }
+
+    // Blank lines and separators carry structure but nothing to translate, so
+    // they are copied straight across.
+    private bool StartNextLine()
+    {
+        while (_lineIndex < _sourceLines.Count)
+        {
+            var line = _sourceLines[_lineIndex];
+            if (string.IsNullOrWhiteSpace(line) || !HasLetters(line))
+            {
+                _translatedLines.Add(line);
+                _lineIndex++;
+                continue;
+            }
+
+            if (!_translation.Start(line))
+                return false;
+
+            _poll.Start();
+            return true;
+        }
+
+        FinishTranslation();
+        return true;
+    }
+
+    private static bool HasLetters(string text)
+    {
+        foreach (var c in text)
+        {
+            if (char.IsLetter(c))
+                return true;
+        }
+        return false;
+    }
+
+    private void FinishTranslation()
+    {
+        _poll.Stop();
+        _showingTranslation = true;
+        _body.Text = string.Join("\n", _translatedLines);
+        _translateButton.Disabled = false;
+        _translateButton.Text = Localization.Tr("NEWS_SHOW_ORIGINAL");
     }
 
     private void ReportUnavailable()
@@ -170,17 +229,15 @@ public class NewsArticleView : VBoxContainer
 
             case TranslationBridge.State.Done:
                 _poll.Stop();
-                _showingTranslation = true;
-                _body.Text = _translation.Result();
-                _translateButton.Disabled = false;
-                _translateButton.Text = Localization.Tr("NEWS_SHOW_ORIGINAL");
+                _translatedLines.Add(_translation.Result());
+                _lineIndex++;
+                if (!StartNextLine())
+                    ReportUnavailable();
                 return;
 
             default:
                 _poll.Stop();
-                _translateButton.Disabled = false;
-                _translateButton.Text = Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE");
-                PatchHelper.Log($"[Translate] unavailable — {_translation.Capabilities()}");
+                ReportUnavailable();
                 return;
         }
     }
