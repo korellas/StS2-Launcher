@@ -11,12 +11,12 @@ public class GameBackButton : Button
     // 0.53, so the box is scaled by that ratio and pulled back to the middle of
     // the flag's solid body. The 0.76 canvas-fill figure the previous derivation
     // assumed was wrong — the arrow fills far more of its square than that.
-    private const float ArrowCanvasRatio = 0.45f;
+    private const float ArrowCanvasRatio = 0.60f;
     private const float ArrowCenterX = 0.38f;
 
     // Puts the flag at the height the game draws it once the sprite's aspect is
     // applied.
-    private const float FlagWidth = 175f;
+    private const float FlagWidth = 150f;
 
     public GameBackButton(float scale)
     {

@@ -1,4 +1,5 @@
 using System;
+using Godot;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -90,6 +91,19 @@ public static class SaveStoreDiagnostics
             return ReferenceEquals(runtime, compiled)
                 ? "same instance"
                 : $"DIFFERENT: runtime={Describe(runtime?.Assembly)} compiled={Describe(compiled.Assembly)}";
+        });
+
+        // The scale figure used when reasoning about the launcher's geometry has
+        // been an assumption — the screenshot's pixel size read as the viewport's.
+        // Report the viewport so it stops being guessed at.
+        Try(sb, "viewport", () =>
+        {
+            var vp = Godot.Engine.GetMainLoop() is Godot.SceneTree tree
+                ? tree.Root?.GetVisibleRect().Size
+                : null;
+            return vp is { } size
+                ? $"{size.X}x{size.Y} scale={Mathf.Max(size.X, size.Y) / 960f:F3}"
+                : "unavailable";
         });
 
         Try(sb, "sprites", () =>
