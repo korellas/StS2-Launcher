@@ -22,11 +22,11 @@ public class FpsOverlay : CanvasLayer
     private const int HistoryLength = 120; // 30 s at SampleHz
     private const int TopOffset = 100;
     private const int RightMargin = 24;
-    private const int GraphWidth = 150;
-    private const int RowHeight = 46;
+    private const int GraphWidth = 170;
+    private const int RowHeight = 42;
     private const int LabelWidth = 38;
     private const int ValueWidth = 76;
-    private const int DetailWidth = 148;
+    private const int DetailWidth = 132;
     private const int CaptionSize = 12;
     private const int ValueSize = 17;
     private const int DetailSize = 13;
@@ -193,10 +193,13 @@ public class FpsOverlay : CanvasLayer
 
         _framesSinceSample++;
 
-        _frameTimes[_frameTimeHead] = (float)delta;
-        _frameTimeHead = (_frameTimeHead + 1) % _frameTimes.Length;
-        if (_frameTimeCount < _frameTimes.Length)
-            _frameTimeCount++;
+        if (delta > 0)
+        {
+            _frameTimes[_frameTimeHead] = (float)delta;
+            _frameTimeHead = (_frameTimeHead + 1) % _frameTimes.Length;
+            if (_frameTimeCount < _frameTimes.Length)
+                _frameTimeCount++;
+        }
 
         _sampleTimer += delta;
         if (_sampleTimer < SampleInterval)
@@ -455,7 +458,7 @@ public class FpsOverlay : CanvasLayer
             }
 
             float span = Math.Max(0.001f, max - _min);
-            float stepX = size.X / (HistoryLength - 1);
+            float stepX = size.X / Math.Max(1, _count - 1);
             float top = GraphInset;
             float plotHeight = Math.Max(1f, size.Y - GraphInset * 2);
             int oldest = (_head - _count + HistoryLength) % HistoryLength;

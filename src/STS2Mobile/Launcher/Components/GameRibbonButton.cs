@@ -19,9 +19,13 @@ public class GameRibbonButton : Button
 
         if (sprite != null)
         {
-            // The flared ends must not stretch, so only the flat middle grows.
+            // Only the horizontal margins are set. SetTextureMarginAll would also
+            // fix the vertical ones, and a stylebox's texture margins act as a
+            // minimum size — which is what inflated these into squares instead of
+            // letting them stay the flat ribbons the game draws.
             var style = new StyleBoxTexture { Texture = sprite };
-            style.SetTextureMarginAll(sprite.GetWidth() / 3f);
+            style.TextureMarginLeft = sprite.GetWidth() / 3f;
+            style.TextureMarginRight = sprite.GetWidth() / 3f;
 
             // The confirm sprite is blue in the atlas; the game tints it green for
             // an affirmative answer, which is the colour pairing players read.
@@ -37,7 +41,7 @@ public class GameRibbonButton : Button
                 AddThemeStyleboxOverride(state, new StyleBoxEmpty());
         }
 
-        LauncherTheme.ApplyGameFont(this, 22, scale, bold: true);
+        LauncherTheme.ApplyGameFont(this, 19, scale, bold: true);
         AddThemeColorOverride("font_color", Colors.White);
         AddThemeColorOverride("font_hover_color", LauncherTheme.Cream);
         AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.7f));
