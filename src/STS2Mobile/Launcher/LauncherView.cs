@@ -181,10 +181,10 @@ public class LauncherView
             AnchorRight = 1f,
             AnchorTop = 1f,
             AnchorBottom = 1f,
-            OffsetLeft = (int)(18 * scale),
-            OffsetRight = -(int)(18 * scale),
-            OffsetTop = -(int)(46 * scale),
-            OffsetBottom = -(int)(8 * scale),
+            OffsetLeft = (int)(30 * scale),
+            OffsetRight = -(int)(30 * scale),
+            OffsetTop = -(int)(58 * scale),
+            OffsetBottom = -(int)(20 * scale),
             GrowVertical = Control.GrowDirection.Begin,
         };
         parent.AddChild(footer);

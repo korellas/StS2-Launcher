@@ -35,8 +35,16 @@ public static class SaveStoreDiagnostics
                     continue;
                 }
 
+                // Full signatures, not just name and arity. A parameter or return
+                // type can change without the count changing — GetFileSize going
+                // from int to long would break the VTable while looking identical
+                // in an arity listing, and that is the one assumption comparing
+                // against a decompile cannot rule out.
                 var members = type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                    .Select(m => $"{m.Name}({m.GetParameters().Length})")
+                    .Select(m =>
+                        $"{Short(m.ReturnType)} {m.Name}("
+                        + string.Join(",", m.GetParameters().Select(x => Short(x.ParameterType)))
+                        + ")")
                     .OrderBy(x => x, StringComparer.Ordinal);
 
                 sb.Append(type.Name)
@@ -114,5 +122,29 @@ public static class SaveStoreDiagnostics
             return "<null>";
         var name = assembly.GetName();
         return $"{name.Name} v{name.Version} mvid={assembly.ManifestModule.ModuleVersionId:N}";
+    }
+
+    // Long names would push the interesting part of the report off the panel.
+    private static string Short(Type type)
+    {
+        if (type == null)
+            return "?";
+        if (type.IsGenericType)
+        {
+            var name = type.Name;
+            var stem = name.Substring(0, name.IndexOf('`'));
+            return $"{stem}<{string.Join(",", type.GetGenericArguments().Select(Short))}>";
+        }
+        return type.Name switch
+        {
+            "String" => "str",
+            "Boolean" => "bool",
+            "Int32" => "int",
+            "Int64" => "long",
+            "Void" => "void",
+            "String[]" => "str[]",
+            "Byte[]" => "byte[]",
+            _ => type.Name,
+        };
     }
 }

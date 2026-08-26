@@ -23,11 +23,11 @@ public class FpsOverlay : CanvasLayer
     private const int TopOffset = 84;
     private const int RightMargin = 24;
     private const int GraphWidth = 104;
-    private const int RowHeight = 24;
-    private const int LabelWidth = 32;
-    private const int ValueWidth = 56;
-    private const int CaptionSize = 10;
-    private const int ValueSize = 13;
+    private const int RowHeight = 28;
+    private const int LabelWidth = 38;
+    private const int ValueWidth = 66;
+    private const int CaptionSize = 12;
+    private const int ValueSize = 16;
     private const int PanelPadding = 6;
     private const int ColumnGap = 6;
 

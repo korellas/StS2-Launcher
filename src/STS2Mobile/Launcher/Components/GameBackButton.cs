@@ -6,9 +6,11 @@ namespace STS2Mobile.Launcher.Components;
 // back to a text entry when the game pack isn't mounted.
 public class GameBackButton : Button
 {
-    private const float ArrowPadLeft = 0.12f;
-    private const float ArrowPadRight = 0.26f;
-    private const float ArrowPadVertical = 0.22f;
+    // From the game's settings screen: the arrow spans 59% of the flag's width,
+    // centred just left of middle because the flag tapers to a point on the right.
+    private const float ArrowWidthRatio = 0.59f;
+    private const float ArrowCenterX = 0.48f;
+    private const float FlagWidth = 140f;
 
     public GameBackButton(float scale)
     {
@@ -20,7 +22,7 @@ public class GameBackButton : Button
             // Height follows the flag's own aspect. Fixing both figures meant any
             // change to one squashed the artwork, and the arrow — inset by four
             // hardcoded pixel values — stopped matching it.
-            float width = 96 * scale;
+            float width = FlagWidth * scale;
             float height = width * ribbon.GetHeight() / ribbon.GetWidth();
             CustomMinimumSize = new Vector2((int)width, (int)height);
 
@@ -46,14 +48,16 @@ public class GameBackButton : Button
                     StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                     MouseFilter = MouseFilterEnum.Ignore,
                 };
-                glyph.SetAnchorsPreset(LayoutPreset.FullRect);
-                // The flag tapers to a point on the right, so the arrow sits in the
-                // solid part: padded more on that side. As fractions of the button
-                // these hold whatever size it ends up.
-                glyph.OffsetLeft = width * ArrowPadLeft;
-                glyph.OffsetRight = -width * ArrowPadRight;
-                glyph.OffsetTop = height * ArrowPadVertical;
-                glyph.OffsetBottom = -height * ArrowPadVertical;
+                // Sized from its width, not fitted into an inset box. Insetting and
+                // letting KeepAspectCentered fit meant the box's height bound first
+                // and shrank the arrow to well under the width the game gives it.
+                float arrowWidth = width * ArrowWidthRatio;
+                float arrowHeight = arrowWidth * arrow.GetHeight() / arrow.GetWidth();
+                glyph.SetAnchorsPreset(LayoutPreset.TopLeft);
+                glyph.OffsetLeft = width * ArrowCenterX - arrowWidth * 0.5f;
+                glyph.OffsetTop = (height - arrowHeight) * 0.5f;
+                glyph.OffsetRight = glyph.OffsetLeft + arrowWidth;
+                glyph.OffsetBottom = glyph.OffsetTop + arrowHeight;
                 AddChild(glyph);
             }
         }
@@ -62,7 +66,7 @@ public class GameBackButton : Button
             Text = Localization.Tr("ACTION_CLOSE");
             LauncherTheme.ApplyGameFont(this, 20, scale);
             AddThemeColorOverride("font_color", LauncherTheme.Cream);
-            CustomMinimumSize = new Vector2((int)(96 * scale), (int)(52 * scale));
+            CustomMinimumSize = new Vector2((int)(FlagWidth * scale), (int)(76 * scale));
         }
 
         foreach (var state in new[] { "normal", "hover", "pressed", "focus", "disabled" })
