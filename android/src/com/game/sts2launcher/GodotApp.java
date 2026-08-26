@@ -8,7 +8,22 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.PowerManager;
+import android.icu.util.ULocale;
+import android.view.translation.TranslationCapability;
+import android.view.translation.TranslationContext;
+import android.view.translation.TranslationManager;
+import android.view.translation.TranslationRequest;
+import android.view.translation.TranslationRequestValue;
+import android.view.translation.TranslationResponse;
+import android.view.translation.TranslationResponseValue;
+import android.view.translation.TranslationSpec;
+import android.view.translation.Translator;
+
+import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import android.util.Log;
 
 import androidx.activity.EdgeToEdge;
@@ -375,6 +390,122 @@ public class GodotApp extends GodotActivity {
 	// Sends the app to the background, leaving it running exactly as the home
 	// button does. Used for the game's back navigation, where terminating would
 	// throw away a run in progress without warning.
+	// ---- On-device translation -------------------------------------------------
+	//
+	// Uses the platform's translation framework rather than bundling a model:
+	// whichever service the device ships answers the request, which on a Galaxy
+	// means Samsung's own translator instead of a generic offline model. It needs
+	// API 31 and a translation service to be present, so every entry point here
+	// reports failure rather than assuming, and the caller can fall back.
+
+	private final Executor translationExecutor = Executors.newSingleThreadExecutor();
+	private volatile String translationResult;
+	private volatile String translationState = "idle";
+
+	// Logged once so an unsupported device is diagnosable from the console rather
+	// than looking like a silent failure.
+	public String translationCapabilities() {
+		if (Build.VERSION.SDK_INT < 31) {
+			return "unsupported: needs API 31, device is " + Build.VERSION.SDK_INT;
+		}
+		try {
+			TranslationManager manager = getSystemService(TranslationManager.class);
+			if (manager == null) {
+				return "unavailable: no TranslationManager on this device";
+			}
+			Set<TranslationCapability> caps = manager.getOnDeviceTranslationCapabilities(
+					TranslationSpec.DATA_FORMAT_TEXT, TranslationSpec.DATA_FORMAT_TEXT);
+			if (caps == null || caps.isEmpty()) {
+				return "unavailable: no on-device translation capabilities reported";
+			}
+			StringBuilder sb = new StringBuilder("available:");
+			for (TranslationCapability c : caps) {
+				sb.append(' ')
+						.append(c.getSourceSpec().getLocale().toLanguageTag())
+						.append("->")
+						.append(c.getTargetSpec().getLocale().toLanguageTag())
+						.append('(').append(c.getState()).append(')');
+			}
+			return sb.toString();
+		} catch (Throwable t) {
+			return "error: " + t;
+		}
+	}
+
+	// Kicks off a translation; the result is collected with getTranslationState /
+	// getTranslationResult. A callback into Godot would need a JNI bridge in the
+	// other direction, and one in-flight request is all the reader needs.
+	public void startTranslation(String text, String sourceLanguage, String targetLanguage) {
+		translationResult = null;
+		translationState = "running";
+
+		if (Build.VERSION.SDK_INT < 31 || text == null || text.isEmpty()) {
+			translationState = "failed";
+			return;
+		}
+
+		try {
+			TranslationManager manager = getSystemService(TranslationManager.class);
+			if (manager == null) {
+				translationState = "failed";
+				return;
+			}
+
+			TranslationContext context = new TranslationContext.Builder(
+					new TranslationSpec(ULocale.forLanguageTag(sourceLanguage),
+							TranslationSpec.DATA_FORMAT_TEXT),
+					new TranslationSpec(ULocale.forLanguageTag(targetLanguage),
+							TranslationSpec.DATA_FORMAT_TEXT))
+					.build();
+
+			manager.createOnDeviceTranslator(context, translationExecutor, translator -> {
+				if (translator == null) {
+					translationState = "failed";
+					return;
+				}
+				try {
+					TranslationRequest request = new TranslationRequest.Builder()
+							.setTranslationRequestValues(
+									java.util.List.of(TranslationRequestValue.forText(text)))
+							.build();
+					translator.translate(request, new CancellationSignal(), translationExecutor,
+							response -> {
+								try {
+									TranslationResponseValue value =
+											response.getTranslationResponseValues().get(0);
+									if (value.getStatusCode() == TranslationResponseValue.STATUS_SUCCESS) {
+										translationResult = String.valueOf(value.getText());
+										translationState = "done";
+									} else {
+										translationState = "failed";
+									}
+								} catch (Throwable t) {
+									Log.w(TAG, "translation response unusable", t);
+									translationState = "failed";
+								} finally {
+									translator.destroy();
+								}
+							});
+				} catch (Throwable t) {
+					Log.w(TAG, "translate call failed", t);
+					translationState = "failed";
+					translator.destroy();
+				}
+			});
+		} catch (Throwable t) {
+			Log.w(TAG, "startTranslation failed", t);
+			translationState = "failed";
+		}
+	}
+
+	public String getTranslationState() {
+		return translationState;
+	}
+
+	public String getTranslationResult() {
+		return translationResult == null ? "" : translationResult;
+	}
+
 	public void moveToBackground() {
 		Log.i(TAG, "Back requested, moving task to background");
 		moveTaskToBack(true);

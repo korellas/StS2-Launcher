@@ -30,6 +30,7 @@ public class LauncherView
 
         Localization.Install();
         GameAssets.LogAvailability();
+        PatchHelper.Log($"[Translate] {new TranslationBridge().Capabilities()}");
         GameAssets.DescribeTheme(GameAssets.MenuButtonTheme);
         GameAssets.DescribeTheme(GameAssets.SettingsRowTheme);
 

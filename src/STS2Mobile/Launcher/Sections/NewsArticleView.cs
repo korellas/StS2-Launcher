@@ -18,8 +18,13 @@ public class NewsArticleView : VBoxContainer
     private readonly StyledLabel _date;
     private readonly RichTextLabel _body;
     private readonly float _scale;
+    private readonly Button _translateButton;
+    private readonly TranslationBridge _translation = new();
+    private readonly Timer _poll = new();
 
     private string _url = "";
+    private string _originalBody = "";
+    private bool _showingTranslation;
 
     public NewsArticleView(float scale)
     {
@@ -37,6 +42,10 @@ public class NewsArticleView : VBoxContainer
         header.AddChild(back);
 
         header.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
+
+        _translateButton = new GameMenuButton(Localization.Tr("NEWS_TRANSLATE"), scale, fontSize: 17);
+        _translateButton.Pressed += Translate;
+        header.AddChild(_translateButton);
 
         var original = new GameMenuButton(Localization.Tr("NEWS_OPEN_ORIGINAL"), scale, fontSize: 17);
         original.Pressed += () => OpenOriginalRequested?.Invoke(_url);
@@ -63,6 +72,10 @@ public class NewsArticleView : VBoxContainer
         _body.AddThemeColorOverride("default_color", LauncherTheme.Cream);
         _body.MetaClicked += meta => OpenOriginalRequested?.Invoke(meta.AsString());
         AddChild(_body);
+
+        _poll.WaitTime = 0.25;
+        _poll.Timeout += OnPoll;
+        AddChild(_poll);
     }
 
     public void Show(SteamNewsItem item, string formattedDate)
@@ -71,8 +84,62 @@ public class NewsArticleView : VBoxContainer
         _title.Text = item.Title;
         _date.Text = formattedDate;
 
-        var body = NewsMarkup.ToGodotBbcode(item.Contents);
-        _body.Text = string.IsNullOrWhiteSpace(body) ? Localization.Tr("NEWS_NO_BODY") : body;
+        _originalBody = NewsMarkup.ToGodotBbcode(item.Contents);
+        _showingTranslation = false;
+        _body.Text = string.IsNullOrWhiteSpace(_originalBody)
+            ? Localization.Tr("NEWS_NO_BODY")
+            : _originalBody;
+        _translateButton.Text = Localization.Tr("NEWS_TRANSLATE");
+        _translateButton.Disabled = string.IsNullOrWhiteSpace(_originalBody);
         Visible = true;
+    }
+
+    private void Translate()
+    {
+        // Second press returns to the original rather than translating again.
+        if (_showingTranslation)
+        {
+            _showingTranslation = false;
+            _body.Text = _originalBody;
+            _translateButton.Text = Localization.Tr("NEWS_TRANSLATE");
+            return;
+        }
+
+        // Tags would be translated as words, so the request carries the plain
+        // text and the result is shown without markup.
+        var plain = _body.GetParsedText();
+        if (string.IsNullOrWhiteSpace(plain) || !_translation.Start(plain))
+        {
+            _translateButton.Text = Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE");
+            return;
+        }
+
+        _translateButton.Disabled = true;
+        _translateButton.Text = Localization.Tr("NEWS_TRANSLATING");
+        _poll.Start();
+    }
+
+    private void OnPoll()
+    {
+        switch (_translation.Poll())
+        {
+            case TranslationBridge.State.Running:
+                return;
+
+            case TranslationBridge.State.Done:
+                _poll.Stop();
+                _showingTranslation = true;
+                _body.Text = _translation.Result();
+                _translateButton.Disabled = false;
+                _translateButton.Text = Localization.Tr("NEWS_SHOW_ORIGINAL");
+                return;
+
+            default:
+                _poll.Stop();
+                _translateButton.Disabled = false;
+                _translateButton.Text = Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE");
+                PatchHelper.Log($"[Translate] unavailable — {_translation.Capabilities()}");
+                return;
+        }
     }
 }
