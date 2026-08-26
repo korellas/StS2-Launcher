@@ -11,12 +11,13 @@ public class GameBackButton : Button
     // 0.53, so the box is scaled by that ratio and pulled back to the middle of
     // the flag's solid body. The 0.76 canvas-fill figure the previous derivation
     // assumed was wrong — the arrow fills far more of its square than that.
-    private const float ArrowCanvasRatio = 0.60f;
-    private const float ArrowCenterX = 0.38f;
+    private const float ArrowCanvasRatio = 0.53f;
+    private const float ArrowCenterX = 0.531f;
+    private const float ArrowCenterY = 0.431f;
 
     // Puts the flag at the height the game draws it once the sprite's aspect is
     // applied.
-    private const float FlagWidth = 150f;
+    private const float FlagWidth = 128f;
 
     public GameBackButton(float scale)
     {
@@ -66,8 +67,12 @@ public class GameBackButton : Button
 
                 glyph.AnchorLeft = ArrowCenterX - fractionX * 0.5f;
                 glyph.AnchorRight = ArrowCenterX + fractionX * 0.5f;
-                glyph.AnchorTop = 0.5f - fractionY * 0.5f;
-                glyph.AnchorBottom = 0.5f + fractionY * 0.5f;
+                // Not centred on the button: the flag art does not sit centred in
+                // its own sprite, so a glyph centred on the control lands low on
+                // the flag. Measured at 0.577 of the flag's height against the
+                // game's 0.504.
+                glyph.AnchorTop = ArrowCenterY - fractionY * 0.5f;
+                glyph.AnchorBottom = ArrowCenterY + fractionY * 0.5f;
                 glyph.OffsetLeft = 0;
                 glyph.OffsetRight = 0;
                 glyph.OffsetTop = 0;
