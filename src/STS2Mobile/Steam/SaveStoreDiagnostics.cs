@@ -102,6 +102,17 @@ public static class SaveStoreDiagnostics
                 + $"arrow={arrow?.GetWidth()}x{arrow?.GetHeight()}";
         });
 
+        // The probe shares the real class's interface shape and loads, so what is
+        // left is what the probe does not have: its fields. Mono has to load every
+        // field's type to lay a class out, and a failure there surfaces as the
+        // vtable error rather than naming the field.
+        Try(sb, "fields", () => string.Join(" ", new[]
+        {
+            "SteamConnection",
+            "CloudFileCache",
+            "CloudWriteQueue",
+        }.Select(n => $"{n}={LoadProbe(ours, "STS2Mobile.Steam." + n)}")));
+
         // Which half the fault lives in. See SaveStoreProbes for how to read it.
         Try(sb, "probes", () =>
         {
