@@ -117,7 +117,9 @@ public class ActionSection : VBoxContainer
 
         // Cloud transfers used to report only into the console; this line keeps
         // the outcome next to the buttons that started it.
-        _cloudStatus = new StyledLabel("", scale, fontSize: 15, align: HorizontalAlignment.Left);
+        // Small: this line carries the cloud diagnostic, which ran to two
+        // screenshots at the size the rest of the settings text uses.
+        _cloudStatus = new StyledLabel("", scale, fontSize: 10, align: HorizontalAlignment.Left);
         _cloudStatus.Modulate = new Color(1f, 1f, 1f, 0.75f);
         _cloudStatus.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _cloudStatus.Visible = false;
