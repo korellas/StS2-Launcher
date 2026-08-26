@@ -614,7 +614,16 @@ public class LauncherController
                         var interfaces = SaveStoreDiagnostics.DescribeInterfaces();
                         result = Localization.Tr("CLOUD_FAILED", ex.Message) + "\n\n" + interfaces;
                         PatchHelper.Log($"[Cloud] {ex}");
-                        PatchHelper.Log($"[Cloud] {interfaces}");
+                        // Chunked: Android truncates a log line at 4KB and the
+                        // report is longer, which cut off the probe results that
+                        // are the point of it.
+                        for (int i = 0; i < interfaces.Length; i += 700)
+                        {
+                            PatchHelper.Log(
+                                $"[Cloud] ({i / 700}) "
+                                    + interfaces.Substring(i, Math.Min(700, interfaces.Length - i))
+                            );
+                        }
                     }
 
                     _runOnMainThread(() =>
