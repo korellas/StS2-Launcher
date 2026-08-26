@@ -138,7 +138,11 @@ public class SubmenuOverlay : Control
     private Control _frame;
     private GameBackButton _back;
 
-    private const float BackClipRatio = 0.209f;
+    private const float BackClipRatio = 0.203f;
+
+    // The game puts the flag's centre here, measured on its settings screen.
+    // Tying it to the panel's bottom edge instead left it 275px low.
+    private const float BackCenterY = 0.6155f;
 
 
 
@@ -181,10 +185,10 @@ public class SubmenuOverlay : Control
         _back.OffsetLeft = -button.X * BackClipRatio;
         _back.OffsetRight = _back.OffsetLeft + button.X;
 
-        _back.AnchorTop = 0.5f;
-        _back.AnchorBottom = 0.5f;
-        _back.OffsetBottom = panel.Y * 0.5f;
-        _back.OffsetTop = _back.OffsetBottom - button.Y;
+        _back.AnchorTop = BackCenterY;
+        _back.AnchorBottom = BackCenterY;
+        _back.OffsetTop = -button.Y * 0.5f;
+        _back.OffsetBottom = button.Y * 0.5f;
     }
 
     public new void Hide() => Visible = false;
