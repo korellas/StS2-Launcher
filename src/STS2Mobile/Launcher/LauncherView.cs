@@ -45,8 +45,8 @@ public class LauncherView
         {
             AnchorLeft = 0.5f,
             AnchorRight = 0.5f,
-            AnchorTop = 0.48f,
-            AnchorBottom = 0.48f,
+            AnchorTop = 0.52f,
+            AnchorBottom = 0.52f,
             GrowHorizontal = Control.GrowDirection.Both,
             GrowVertical = Control.GrowDirection.Both,
         };
@@ -64,11 +64,11 @@ public class LauncherView
                 Texture = logo,
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-                CustomMinimumSize = new Vector2(0, (int)(150 * scale)),
+                CustomMinimumSize = new Vector2(0, (int)(210 * scale)),
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             };
             menu.AddChild(mark);
-            menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(18 * scale)) });
+            menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(28 * scale)) });
         }
 
         _statusLabel = new StyledLabel(Localization.Tr("STATUS_INITIALIZING"), scale, fontSize: 15);

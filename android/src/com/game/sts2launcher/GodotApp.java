@@ -372,6 +372,14 @@ public class GodotApp extends GodotActivity {
 		}
 	}
 
+	// Sends the app to the background, leaving it running exactly as the home
+	// button does. Used for the game's back navigation, where terminating would
+	// throw away a run in progress without warning.
+	public void moveToBackground() {
+		Log.i(TAG, "Back requested, moving task to background");
+		moveTaskToBack(true);
+	}
+
 	// Ends the app rather than bouncing back to the launcher. finishAndRemoveTask
 	// drops the task from recents so this reads as a deliberate exit, and the
 	// explicit exit follows because Godot's process does not reliably unwind on

@@ -36,7 +36,15 @@ public class SubmenuOverlay : Control
         _widthRatio = widthRatio;
         _heightRatio = heightRatio;
 
-        var frame = BuildFrame(center, scale, widthRatio, heightRatio);
+        var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+        row.AddThemeConstantOverride("separation", (int)(-18 * scale));
+        center.AddChild(row);
+
+        var back = new GameBackButton(scale) { SizeFlagsVertical = SizeFlags.ShrinkCenter };
+        back.Pressed += Hide;
+        row.AddChild(back);
+
+        var frame = BuildFrame(row, scale, widthRatio, heightRatio);
 
         var header = new HBoxContainer();
         header.AddThemeConstantOverride("separation", (int)(12 * scale));
@@ -51,6 +59,7 @@ public class SubmenuOverlay : Control
             HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
         };
         frame.AddChild(scroll);
+        LauncherTheme.ApplyGameScrollbar(scroll, scale);
 
         Content = new VBoxContainer();
         Content.SizeFlagsHorizontal = SizeFlags.ExpandFill;
@@ -63,13 +72,6 @@ public class SubmenuOverlay : Control
         titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         header.AddChild(titleLabel);
 
-        // Kept in the header rather than floating at the screen edge: anchored to
-        // the overlay it had no width of its own, which left it both misplaced and
-        // impossible to hit.
-        var close = new GameBackButton(scale);
-        close.Pressed += Hide;
-        header.AddChild(close);
-        header.MoveChild(close, 0);
     }
 
     // NinePatchRect over the game's panel art when available; the launcher's own

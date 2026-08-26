@@ -243,10 +243,14 @@ public static class AppLifecyclePatches
     }
 
     // The game's own Quit force-kills the process, which Android can surface as a
-    // crash, so it is intercepted. This used to restart the app instead, because
-    // the launcher is only shown by the GameStartupWrapper patch and a restart was
-    // the only way back to it — but quitting should quit, so it now ends the app.
-    // Saves are already written by the original Quit() callers before this runs.
+    // crash, so it is intercepted.
+    //
+    // It backgrounds the app rather than ending it, because Android routes the
+    // system back gesture here: terminating meant a stray back press discarded a
+    // run in progress with no warning. The app stays in recents exactly as the
+    // home button leaves it, and the launcher's own Quit entry is the deliberate
+    // way out. Saves are written by the original Quit() callers before this runs,
+    // and the cloud flush below covers the rest either way.
     public static bool QuitPrefix(object __instance)
     {
         try
@@ -257,11 +261,11 @@ public static class AppLifecyclePatches
             }
             catch { }
 
-            PatchHelper.Log("NGame.Quit intercepted, exiting app");
+            PatchHelper.Log("NGame.Quit intercepted, backgrounding instead of exiting");
             var jcw = Engine.GetSingleton("JavaClassWrapper");
             var wrapper = (GodotObject)jcw.Call("wrap", "com.game.sts2launcher.GodotApp");
             var godotApp = (GodotObject)wrapper.Call("getInstance");
-            godotApp.Call("quitApp");
+            godotApp.Call("moveToBackground");
             return false;
         }
         catch (Exception ex)

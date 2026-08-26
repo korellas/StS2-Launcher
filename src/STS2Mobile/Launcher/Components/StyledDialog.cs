@@ -37,6 +37,7 @@ public class StyledDialog : ColorRect
         body.AddChild(text);
 
         var buttons = new HBoxContainer();
+        buttons.AddThemeConstantOverride("margin_bottom", 0);
         body.AddChild(buttons);
 
         // Decline sits left of accept, matching the game's own prompts.
@@ -75,6 +76,8 @@ public class StyledDialog : ColorRect
             float inset = Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f;
             style.SetTextureMarginAll(inset);
             style.SetContentMarginAll(36 * scale);
+            // The ribbons hang over the panel's bottom edge, as the game draws them.
+            style.ContentMarginBottom = 6 * scale;
             panel.AddThemeStyleboxOverride("panel", style);
         }
         else

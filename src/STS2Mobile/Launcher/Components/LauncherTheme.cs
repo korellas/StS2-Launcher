@@ -124,6 +124,38 @@ public static class LauncherTheme
         control.AddThemeFontSizeOverride("font_size", (int)(fontSize * scale));
     }
 
+    // Dresses a ScrollContainer's vertical bar in the game's own track and train
+    // sprites; Godot's default bar is a flat grey slab that reads as a different
+    // application.
+    public static void ApplyGameScrollbar(ScrollContainer container, float scale)
+    {
+        var bar = container.GetVScrollBar();
+        if (bar == null)
+            return;
+
+        bar.CustomMinimumSize = new Vector2((int)(14 * scale), 0);
+
+        var track = GameAssets.Load<Texture2D>(GameAssets.ScrollTrack);
+        var grabber = GameAssets.Load<Texture2D>(GameAssets.ScrollGrabber);
+        if (track == null || grabber == null)
+            return;
+
+        bar.AddThemeStyleboxOverride("scroll", Stretchable(track));
+        var thumb = Stretchable(grabber);
+        bar.AddThemeStyleboxOverride("grabber", thumb);
+        bar.AddThemeStyleboxOverride("grabber_highlight", thumb);
+        bar.AddThemeStyleboxOverride("grabber_pressed", thumb);
+    }
+
+    // Only the middle of these sprites may stretch, so the rounded caps survive.
+    private static StyleBoxTexture Stretchable(Texture2D texture)
+    {
+        var style = new StyleBoxTexture { Texture = texture };
+        float inset = Math.Max(1f, texture.GetHeight() / 3f);
+        style.SetTextureMarginAll(inset);
+        return style;
+    }
+
     public static StyleBoxFlat Panel(float scale)
     {
         var style = new StyleBoxFlat { BgColor = PanelFill, BorderColor = PanelBorder };
