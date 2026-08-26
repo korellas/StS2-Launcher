@@ -92,6 +92,16 @@ public static class SaveStoreDiagnostics
                 : $"DIFFERENT: runtime={Describe(runtime?.Assembly)} compiled={Describe(compiled.Assembly)}";
         });
 
+        Try(sb, "sprites", () =>
+        {
+            var flag = Launcher.Components.GameAssets.Load<Godot.Texture2D>(
+                Launcher.Components.GameAssets.BackButton);
+            var arrow = Launcher.Components.GameAssets.Load<Godot.Texture2D>(
+                Launcher.Components.GameAssets.BackButtonArrow);
+            return $"flag={flag?.GetWidth()}x{flag?.GetHeight()} "
+                + $"arrow={arrow?.GetWidth()}x{arrow?.GetHeight()}";
+        });
+
         // Which half the fault lives in. See SaveStoreProbes for how to read it.
         Try(sb, "probes", () =>
         {

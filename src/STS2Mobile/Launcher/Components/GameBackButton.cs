@@ -6,6 +6,13 @@ namespace STS2Mobile.Launcher.Components;
 // back to a text entry when the game pack isn't mounted.
 public class GameBackButton : Button
 {
+    // In the game's settings screen the arrow stands a little over half the flag's
+    // height. Heights are the one measurement that screenshot could give honestly:
+    // the flag runs off the left of the screen, so every width in it is clipped,
+    // and the two ratios taken from those widths both blew the arrow up.
+    private const float ArrowHeightRatio = 0.53f;
+    private const float ArrowCenterX = 0.44f;
+
     // The game's flag stands 150px tall on a 1510px-tall screen; this is the width
     // that puts ours at the same height once the sprite's aspect is applied.
     private const float FlagWidth = 175f;
@@ -46,21 +53,19 @@ public class GameBackButton : Button
                     StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                     MouseFilter = MouseFilterEnum.Ignore,
                 };
-                // Both sprites drawn at one scale factor and concentric — no ratio
-                // or padding constants at all. They are two layers of the same
-                // piece of UI art, so the artwork already encodes where the arrow
-                // sits; every figure hand-fitted here so far has been a guess, and
-                // the last one came from comparing the game's flag, which runs off
-                // the left of its screen, against ours, which does not.
-                float unit = width / ribbon.GetWidth();
-                float arrowWidth = arrow.GetWidth() * unit;
-                float arrowHeight = arrow.GetHeight() * unit;
+                // Fitted into a box rather than sized outright. KeepAspectCentered
+                // scales the sprite down to whatever box it is given and never up,
+                // so the arrow cannot escape the flag however wrong the box is —
+                // the property both of the last two attempts gave away by
+                // computing the arrow's size themselves.
+                float glyphHeight = height * ArrowHeightRatio;
+                float glyphWidth = width * 0.72f;
 
                 glyph.SetAnchorsPreset(LayoutPreset.TopLeft);
-                glyph.OffsetLeft = (width - arrowWidth) * 0.5f;
-                glyph.OffsetTop = (height - arrowHeight) * 0.5f;
-                glyph.OffsetRight = glyph.OffsetLeft + arrowWidth;
-                glyph.OffsetBottom = glyph.OffsetTop + arrowHeight;
+                glyph.OffsetLeft = width * ArrowCenterX - glyphWidth * 0.5f;
+                glyph.OffsetTop = (height - glyphHeight) * 0.5f;
+                glyph.OffsetRight = glyph.OffsetLeft + glyphWidth;
+                glyph.OffsetBottom = glyph.OffsetTop + glyphHeight;
 
                 AddChild(glyph);
             }
