@@ -138,7 +138,7 @@ public static class CloudSyncCoordinator
     {
         var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
         var cloudStore =
-            SteamKit2CloudSaveStore.Instance
+            CloudStoreHolder.Current
             ?? new SteamKit2CloudSaveStore(accountName, refreshToken);
 
         var paths = GetSaveFilePaths(localStore);
@@ -194,7 +194,7 @@ public static class CloudSyncCoordinator
     {
         var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
         var cloudStore =
-            SteamKit2CloudSaveStore.Instance
+            CloudStoreHolder.Current
             ?? new SteamKit2CloudSaveStore(accountName, refreshToken);
 
         var paths = GetSaveFilePaths(cloudStore);

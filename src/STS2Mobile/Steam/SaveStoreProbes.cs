@@ -69,6 +69,9 @@ internal sealed class CloudProbe : ICloudSaveStore, IDisposable
     // members declared here, plus IDisposable, because the previous CloudProbe
     // took ISaveStore's members from a base class and loaded fine while the real
     // class — which declares them all itself — did not.
+    // Same shape as the real class had: a static of the probe's own type.
+    internal static CloudProbe Instance { get; private set; }
+
     private readonly object _lock = new();
 
     public void Dispose() => GC.KeepAlive(_lock);
