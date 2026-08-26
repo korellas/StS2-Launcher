@@ -92,6 +92,14 @@ public static class SaveStoreDiagnostics
                 : $"DIFFERENT: runtime={Describe(runtime?.Assembly)} compiled={Describe(compiled.Assembly)}";
         });
 
+        // Which half the fault lives in. See SaveStoreProbes for how to read it.
+        Try(sb, "probes", () =>
+        {
+            var save = LoadProbe(ours, "STS2Mobile.Steam.SaveProbe");
+            var cloud = LoadProbe(ours, "STS2Mobile.Steam.CloudProbe");
+            return $"save={save} cloud={cloud}";
+        });
+
         // Last, and by name: this is the call that is expected to throw. Mono
         // names the member it could not resolve in the TypeLoadException, which
         // is the one piece of information the member listing above cannot give.
@@ -146,5 +154,18 @@ public static class SaveStoreDiagnostics
             "Byte[]" => "byte[]",
             _ => type.Name,
         };
+    }
+
+    private static string LoadProbe(Assembly assembly, string name)
+    {
+        try
+        {
+            assembly.GetType(name, throwOnError: true);
+            return "ok";
+        }
+        catch (Exception ex)
+        {
+            return ex.GetType().Name;
+        }
     }
 }

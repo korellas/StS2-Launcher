@@ -6,11 +6,9 @@ namespace STS2Mobile.Launcher.Components;
 // back to a text entry when the game pack isn't mounted.
 public class GameBackButton : Button
 {
-    // From the game's settings screen: the arrow spans 59% of the flag's width,
-    // centred just left of middle because the flag tapers to a point on the right.
-    private const float ArrowWidthRatio = 0.59f;
-    private const float ArrowCenterX = 0.48f;
-    private const float FlagWidth = 140f;
+    // The game's flag stands 150px tall on a 1510px-tall screen; this is the width
+    // that puts ours at the same height once the sprite's aspect is applied.
+    private const float FlagWidth = 175f;
 
     public GameBackButton(float scale)
     {
@@ -48,16 +46,22 @@ public class GameBackButton : Button
                     StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                     MouseFilter = MouseFilterEnum.Ignore,
                 };
-                // Sized from its width, not fitted into an inset box. Insetting and
-                // letting KeepAspectCentered fit meant the box's height bound first
-                // and shrank the arrow to well under the width the game gives it.
-                float arrowWidth = width * ArrowWidthRatio;
-                float arrowHeight = arrowWidth * arrow.GetHeight() / arrow.GetWidth();
+                // Both sprites drawn at one scale factor and concentric — no ratio
+                // or padding constants at all. They are two layers of the same
+                // piece of UI art, so the artwork already encodes where the arrow
+                // sits; every figure hand-fitted here so far has been a guess, and
+                // the last one came from comparing the game's flag, which runs off
+                // the left of its screen, against ours, which does not.
+                float unit = width / ribbon.GetWidth();
+                float arrowWidth = arrow.GetWidth() * unit;
+                float arrowHeight = arrow.GetHeight() * unit;
+
                 glyph.SetAnchorsPreset(LayoutPreset.TopLeft);
-                glyph.OffsetLeft = width * ArrowCenterX - arrowWidth * 0.5f;
+                glyph.OffsetLeft = (width - arrowWidth) * 0.5f;
                 glyph.OffsetTop = (height - arrowHeight) * 0.5f;
                 glyph.OffsetRight = glyph.OffsetLeft + arrowWidth;
                 glyph.OffsetBottom = glyph.OffsetTop + arrowHeight;
+
                 AddChild(glyph);
             }
         }
