@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using STS2Mobile.Launcher;
@@ -21,6 +22,8 @@ public class NewsArticleView : VBoxContainer
     private readonly RichTextLabel _body;
     private readonly float _scale;
     private readonly Button _translateButton;
+    private const string BulletMarker = "\u2022";
+
     private readonly TranslationBridge _translation = new();
     private readonly Timer _poll = new();
 
@@ -28,8 +31,8 @@ public class NewsArticleView : VBoxContainer
     // article going over as a single blob: a translator handed the whole body
     // returns one run-on block with every line break gone, and shorter segments
     // usually come back better anyway.
-    private readonly System.Collections.Generic.List<string> _sourceLines = new();
-    private readonly System.Collections.Generic.List<string> _translatedLines = new();
+    private readonly List<string> _sourceLines = new();
+    private readonly List<string> _translatedLines = new();
     private int _lineIndex;
 
     private string _url = "";
@@ -159,7 +162,7 @@ public class NewsArticleView : VBoxContainer
 
         _sourceLines.Clear();
         _translatedLines.Clear();
-        _sourceLines.AddRange(plain.Replace("\r\n", "\n").Split('\n'));
+        _sourceLines.AddRange(GroupIntoParagraphs(plain));
         _lineIndex = 0;
 
         _translateButton.Disabled = true;
@@ -167,6 +170,49 @@ public class NewsArticleView : VBoxContainer
 
         if (!StartNextLine())
             ReportUnavailable();
+    }
+
+    // A sentence hard-wrapped across three source lines used to be three separate
+    // requests, each translated with no idea what came before it — the single
+    // biggest cause of the mangled output. Rejoin those into one unit so the
+    // engine sees a whole sentence. Blank lines stay put because they carry the
+    // paragraph structure, and bullets stay separate because merging them would
+    // run a list together into one paragraph.
+    private static List<string> GroupIntoParagraphs(string plain)
+    {
+        var units = new List<string>();
+        var pending = new List<string>();
+
+        void Flush()
+        {
+            if (pending.Count == 0)
+                return;
+            units.Add(string.Join(" ", pending));
+            pending.Clear();
+        }
+
+        foreach (var raw in plain.Replace("\r\n", "\n").Split('\n'))
+        {
+            var line = raw.TrimEnd();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                Flush();
+                units.Add("");
+                continue;
+            }
+
+            if (line.TrimStart().StartsWith(BulletMarker, StringComparison.Ordinal))
+            {
+                Flush();
+                units.Add(line);
+                continue;
+            }
+
+            pending.Add(line.Trim());
+        }
+
+        Flush();
+        return units;
     }
 
     // Blank lines and separators carry structure but nothing to translate, so
