@@ -16,6 +16,7 @@ public class NewsArticleView : VBoxContainer
 
     private readonly StyledLabel _title;
     private readonly StyledLabel _date;
+    private readonly StyledLabel _translateStatus;
     private readonly RichTextLabel _body;
     private readonly float _scale;
     private readonly Button _translateButton;
@@ -54,6 +55,15 @@ public class NewsArticleView : VBoxContainer
         var original = new GameMenuButton(Localization.Tr("NEWS_OPEN_ORIGINAL"), scale, fontSize: 17);
         original.Pressed += () => OpenOriginalRequested?.Invoke(_url);
         header.AddChild(original);
+
+        // Its own line rather than a prefix on the body: the body is rewritten
+        // whenever the view toggles between original and translation, which is
+        // what kept swallowing the explanation.
+        _translateStatus = new StyledLabel("", scale, fontSize: 15, HorizontalAlignment.Left);
+        _translateStatus.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _translateStatus.AddThemeColorOverride("font_color", new Color(0.85f, 0.66f, 0.42f));
+        _translateStatus.Visible = false;
+        AddChild(_translateStatus);
 
         _title = new StyledLabel("", scale, fontSize: 30, HorizontalAlignment.Left);
         _title.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -102,6 +112,7 @@ public class NewsArticleView : VBoxContainer
         _title.Text = item.Title;
         _date.Text = formattedDate;
 
+        _translateStatus.Visible = false;
         _originalBody = NewsMarkup.ToGodotBbcode(item.Contents);
         _showingTranslation = false;
         _body.Text = string.IsNullOrWhiteSpace(_originalBody)
@@ -148,8 +159,8 @@ public class NewsArticleView : VBoxContainer
 
         var reason = _translation.Capabilities();
         PatchHelper.Log($"[Translate] unavailable — {reason}");
-        _body.Text = $"[color=#c8a06a]{Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE")}: {reason}[/color]\n\n"
-            + _originalBody;
+        _translateStatus.Text = $"{Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE")}: {reason}";
+        _translateStatus.Visible = true;
     }
 
     private void OnPoll()
