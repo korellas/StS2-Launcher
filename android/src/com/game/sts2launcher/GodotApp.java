@@ -28,6 +28,11 @@ import android.util.Log;
 
 import androidx.activity.EdgeToEdge;
 import androidx.browser.customtabs.CustomTabsIntent;
+
+import com.google.mlkit.common.model.DownloadConditions;
+import com.google.mlkit.nl.translate.TranslateLanguage;
+import com.google.mlkit.nl.translate.Translation;
+import com.google.mlkit.nl.translate.TranslatorOptions;
 import androidx.core.content.FileProvider;
 import androidx.core.splashscreen.SplashScreen;
 
@@ -433,7 +438,9 @@ public class GodotApp extends GodotActivity {
 			Set<TranslationCapability> caps = manager.getOnDeviceTranslationCapabilities(
 					TranslationSpec.DATA_FORMAT_TEXT, TranslationSpec.DATA_FORMAT_TEXT);
 			if (caps == null || caps.isEmpty()) {
-				return "unavailable: no on-device translation capabilities reported";
+				// The device may still translate: Samsung exposes its engine to its
+				// own keyboard rather than through this API, so ML Kit takes over.
+				return "on-device (ML Kit)";
 			}
 			StringBuilder sb = new StringBuilder("available:");
 			for (TranslationCapability c : caps) {
@@ -456,15 +463,23 @@ public class GodotApp extends GodotActivity {
 		translationResult = null;
 		translationState = "running";
 
-		if (Build.VERSION.SDK_INT < 31 || text == null || text.isEmpty()) {
+		if (text == null || text.isEmpty()) {
 			translationState = "failed";
+			return;
+		}
+
+		if (Build.VERSION.SDK_INT < 31) {
+			translateWithMlKit(text, sourceLanguage, targetLanguage);
 			return;
 		}
 
 		try {
 			TranslationManager manager = getSystemService(TranslationManager.class);
-			if (manager == null) {
-				translationState = "failed";
+			Set<TranslationCapability> caps = manager == null ? null
+					: manager.getOnDeviceTranslationCapabilities(
+							TranslationSpec.DATA_FORMAT_TEXT, TranslationSpec.DATA_FORMAT_TEXT);
+			if (manager == null || caps == null || caps.isEmpty()) {
+				translateWithMlKit(text, sourceLanguage, targetLanguage);
 				return;
 			}
 
@@ -477,7 +492,7 @@ public class GodotApp extends GodotActivity {
 
 			manager.createOnDeviceTranslator(context, translationExecutor, translator -> {
 				if (translator == null) {
-					translationState = "failed";
+					translateWithMlKit(text, sourceLanguage, targetLanguage);
 					return;
 				}
 				try {
@@ -510,7 +525,41 @@ public class GodotApp extends GodotActivity {
 				}
 			});
 		} catch (Throwable t) {
-			Log.w(TAG, "startTranslation failed", t);
+			Log.w(TAG, "platform translation failed, falling back to ML Kit", t);
+			translateWithMlKit(text, sourceLanguage, targetLanguage);
+		}
+	}
+
+	// ML Kit runs entirely on the device using the same models as Google
+	// Translate's offline mode. It needs a one-off model download per language
+	// pair, after which it works without a network.
+	private void translateWithMlKit(String text, String sourceLanguage, String targetLanguage) {
+		try {
+			TranslatorOptions options = new TranslatorOptions.Builder()
+					.setSourceLanguage(TranslateLanguage.fromLanguageTag(sourceLanguage))
+					.setTargetLanguage(TranslateLanguage.fromLanguageTag(targetLanguage))
+					.build();
+			com.google.mlkit.nl.translate.Translator translator = Translation.getClient(options);
+
+			translator.downloadModelIfNeeded(new DownloadConditions.Builder().build())
+					.addOnSuccessListener(ignored -> translator.translate(text)
+							.addOnSuccessListener(result -> {
+								translationResult = result;
+								translationState = "done";
+								translator.close();
+							})
+							.addOnFailureListener(e -> {
+								Log.w(TAG, "ML Kit translate failed", e);
+								translationState = "failed";
+								translator.close();
+							}))
+					.addOnFailureListener(e -> {
+						Log.w(TAG, "ML Kit model download failed", e);
+						translationState = "failed";
+						translator.close();
+					});
+		} catch (Throwable t) {
+			Log.w(TAG, "ML Kit unavailable", t);
 			translationState = "failed";
 		}
 	}

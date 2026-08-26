@@ -16,6 +16,7 @@ ext.versions = [
     ndkVersion         : '28.1.13356709',
     splashscreenVersion: '1.0.1',
     browserVersion     : '1.8.0',
+    mlkitTranslateVersion: '17.0.3',
     openxrVendorsVersion: '4.1.1-stable'
 
 ]

@@ -177,16 +177,6 @@ public static class LauncherPatches
             warmup.QueueFree();
         }
 
-        // Debug performance overlay, opt-in from the launcher. Held back until
-        // loading is done: a static menu's frame rate says nothing useful, and
-        // during loading the viewport differs from the in-game one, so the card
-        // appeared at the wrong size and then jumped.
-        if (FpsOverlayEnabled)
-        {
-            FpsOverlay.Show(tree);
-            PatchHelper.Log("[Overlay] FPS overlay enabled");
-        }
-
         SaveManager.Instance.InitSettingsData();
 
         var gameStartup = game.GetType()
@@ -210,5 +200,14 @@ public static class LauncherPatches
 
         if (GodotObject.IsInstanceValid(overlay))
             overlay.FadeOutAndFree(0.35f);
+
+        // Only once the game is up. During loading the viewport differs from the
+        // in-game one, so the card appeared at one size and jumped to another, and
+        // a loading screen's frame rate is not worth watching.
+        if (FpsOverlayEnabled)
+        {
+            FpsOverlay.Show(tree);
+            PatchHelper.Log("[Overlay] FPS overlay enabled");
+        }
     }
 }

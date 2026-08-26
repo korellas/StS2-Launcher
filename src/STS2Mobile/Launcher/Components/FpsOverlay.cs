@@ -24,14 +24,14 @@ public class FpsOverlay : CanvasLayer
     private const int RightMargin = 24;
     private const int GraphWidth = 170;
     private const int RowHeight = 42;
-    private const int LabelWidth = 38;
+    private const int LabelWidth = 42;
     private const int ValueWidth = 76;
     private const int DetailWidth = 132;
-    private const int CaptionSize = 12;
-    private const int ValueSize = 17;
-    private const int DetailSize = 13;
-    private const int PanelPadding = 10;
-    private const int ColumnGap = 8;
+    private const int CaptionSize = 13;
+    private const int ValueSize = 18;
+    private const int DetailSize = 14;
+    private const int PanelPadding = 8;
+    private const int ColumnGap = 10;
 
     // Keeps a 100% reading off the very top edge, so a full bar still reads as a
     // line rather than merging with the row above.
@@ -117,7 +117,7 @@ public class FpsOverlay : CanvasLayer
             OffsetBottom = TopOffset + RowHeight * RowCount() + (RowCount() - 1) + PanelPadding * 2,
         };
         var panelStyle = new StyleBoxFlat { BgColor = PanelColor, BorderColor = PanelBorder };
-        panelStyle.SetCornerRadiusAll(10);
+        panelStyle.SetCornerRadiusAll(8);
         panelStyle.SetBorderWidthAll(1);
         panel.AddThemeStyleboxOverride("panel", panelStyle);
         AddChild(panel);
@@ -358,7 +358,7 @@ public class FpsOverlay : CanvasLayer
                 AutowrapMode = TextServer.AutowrapMode.Off,
             };
             label.AddThemeColorOverride("font_color", TextColor);
-            label.AddThemeFontSizeOverride("font_size", size);
+            LauncherTheme.ApplyGameFont(label, size, 1f);
             return label;
         }
 
