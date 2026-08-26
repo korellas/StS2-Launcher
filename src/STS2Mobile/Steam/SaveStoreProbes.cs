@@ -21,7 +21,7 @@ namespace STS2Mobile.Steam;
 //                        which would point at the reference it compiled against
 //
 // Delete both once the cause is known.
-internal class SaveProbe : ISaveStore
+internal sealed class SaveProbe : ISaveStore
 {
     public string ReadFile(string path) => throw new NotImplementedException();
 
@@ -63,8 +63,55 @@ internal class SaveProbe : ISaveStore
     public string GetFullPath(string filename) => throw new NotImplementedException();
 }
 
-internal sealed class CloudProbe : SaveProbe, ICloudSaveStore
+internal sealed class CloudProbe : ICloudSaveStore, IDisposable
 {
+    // Mirrors the real class's shape rather than inheriting: all twenty-five
+    // members declared here, plus IDisposable, because the previous CloudProbe
+    // took ISaveStore's members from a base class and loaded fine while the real
+    // class — which declares them all itself — did not.
+    private readonly object _lock = new();
+
+    public void Dispose() => GC.KeepAlive(_lock);
+
+    public string ReadFile(string path) => throw new NotImplementedException();
+
+    public Task<string> ReadFileAsync(string path) => throw new NotImplementedException();
+
+    public void WriteFile(string path, string content) => throw new NotImplementedException();
+
+    public void WriteFile(string path, byte[] content) => throw new NotImplementedException();
+
+    public Task WriteFileAsync(string path, string content) => throw new NotImplementedException();
+
+    public Task WriteFileAsync(string path, byte[] content) => throw new NotImplementedException();
+
+    public bool FileExists(string path) => throw new NotImplementedException();
+
+    public bool DirectoryExists(string path) => throw new NotImplementedException();
+
+    public void DeleteFile(string path) => throw new NotImplementedException();
+
+    public void RenameFile(string source, string destination) => throw new NotImplementedException();
+
+    public string[] GetFilesInDirectory(string path) => throw new NotImplementedException();
+
+    public string[] GetDirectoriesInDirectory(string path) => throw new NotImplementedException();
+
+    public void CreateDirectory(string path) => throw new NotImplementedException();
+
+    public void DeleteDirectory(string path) => throw new NotImplementedException();
+
+    public void DeleteTemporaryFiles(string path) => throw new NotImplementedException();
+
+    public DateTimeOffset GetLastModifiedTime(string path) => throw new NotImplementedException();
+
+    public int GetFileSize(string path) => throw new NotImplementedException();
+
+    public void SetLastModifiedTime(string path, DateTimeOffset time) =>
+        throw new NotImplementedException();
+
+    public string GetFullPath(string filename) => throw new NotImplementedException();
+
     public bool HasCloudFiles() => throw new NotImplementedException();
 
     public void ForgetFile(string path) => throw new NotImplementedException();

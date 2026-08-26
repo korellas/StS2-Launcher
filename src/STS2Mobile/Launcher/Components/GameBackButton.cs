@@ -6,15 +6,21 @@ namespace STS2Mobile.Launcher.Components;
 // back to a text entry when the game pack isn't mounted.
 public class GameBackButton : Button
 {
-    // In the game's settings screen the arrow stands a little over half the flag's
-    // height. Heights are the one measurement that screenshot could give honestly:
-    // the flag runs off the left of the screen, so every width in it is clipped,
-    // and the two ratios taken from those widths both blew the arrow up.
-    private const float ArrowHeightRatio = 0.53f;
-    private const float ArrowCenterX = 0.44f;
+    // The device reports flag=300x202 and arrow=180x180. The arrow's canvas is
+    // square while the arrow drawn on it is wide and short, so roughly a quarter
+    // of that canvas is transparent above and below — which is why every attempt
+    // that treated the canvas as the arrow came out wrong.
+    //
+    // In the game the visible arrow stands 0.53 of the flag's height, and fills
+    // about 0.76 of its own canvas, so the canvas belongs on screen at 0.53/0.76
+    // of the flag's height. Being square, that is 0.70 * 202/300 = 0.47 of the
+    // flag's width — which is what the reference measures, arrived at without
+    // using any width from it.
+    private const float ArrowCanvasRatio = 0.70f;
+    private const float ArrowCenterX = 0.55f;
 
-    // The game's flag stands 150px tall on a 1510px-tall screen; this is the width
-    // that puts ours at the same height once the sprite's aspect is applied.
+    // Puts the flag at the height the game draws it once the sprite's aspect is
+    // applied.
     private const float FlagWidth = 175f;
 
     public GameBackButton(float scale)
@@ -53,19 +59,17 @@ public class GameBackButton : Button
                     StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                     MouseFilter = MouseFilterEnum.Ignore,
                 };
-                // Fitted into a box rather than sized outright. KeepAspectCentered
-                // scales the sprite down to whatever box it is given and never up,
-                // so the arrow cannot escape the flag however wrong the box is —
-                // the property both of the last two attempts gave away by
-                // computing the arrow's size themselves.
-                float glyphHeight = height * ArrowHeightRatio;
-                float glyphWidth = width * 0.72f;
+                // A square box, because the sprite is square: the arrow then lands
+                // wherever the artwork puts it inside that square, rather than
+                // wherever a guess at its padding puts it. Fitted, not sized, so
+                // it cannot escape the flag if the box is still wrong.
+                float box = height * ArrowCanvasRatio;
 
                 glyph.SetAnchorsPreset(LayoutPreset.TopLeft);
-                glyph.OffsetLeft = width * ArrowCenterX - glyphWidth * 0.5f;
-                glyph.OffsetTop = (height - glyphHeight) * 0.5f;
-                glyph.OffsetRight = glyph.OffsetLeft + glyphWidth;
-                glyph.OffsetBottom = glyph.OffsetTop + glyphHeight;
+                glyph.OffsetLeft = width * ArrowCenterX - box * 0.5f;
+                glyph.OffsetTop = (height - box) * 0.5f;
+                glyph.OffsetRight = glyph.OffsetLeft + box;
+                glyph.OffsetBottom = glyph.OffsetTop + box;
 
                 AddChild(glyph);
             }
