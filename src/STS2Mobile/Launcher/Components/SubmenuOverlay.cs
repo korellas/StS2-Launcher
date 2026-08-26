@@ -138,11 +138,11 @@ public class SubmenuOverlay : Control
     private Control _frame;
     private GameBackButton _back;
 
-    private const float BackClipRatio = 0.203f;
+    private const float BackClipRatio = 0.174f;
 
     // The game puts the flag's centre here, measured on its settings screen.
     // Tying it to the panel's bottom edge instead left it 275px low.
-    private const float BackCenterY = 0.6155f;
+    private const float BackCenterY = 0.6214f;
 
 
 
