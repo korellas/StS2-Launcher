@@ -33,34 +33,38 @@ public class SubmenuOverlay : Control
 
         var frame = BuildFrame(center, scale, widthRatio, heightRatio);
 
+        var header = new HBoxContainer();
+        header.AddThemeConstantOverride("separation", (int)(12 * scale));
+        frame.AddChild(header);
+
+        // Long lists (news, console) need to scroll; without this they simply ran
+        // past the panel.
+        var scroll = new ScrollContainer
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        frame.AddChild(scroll);
+
         Content = new VBoxContainer();
         Content.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         Content.SizeFlagsVertical = SizeFlags.ExpandFill;
         Content.AddThemeConstantOverride("separation", (int)(10 * scale));
-        frame.AddChild(Content);
-
-        var header = new HBoxContainer();
-        header.AddThemeConstantOverride("separation", (int)(8 * scale));
-        Content.AddChild(header);
-        Content.MoveChild(header, 0);
+        scroll.AddChild(Content);
 
         var titleLabel = new StyledLabel(title, scale, fontSize: 26, align: HorizontalAlignment.Left);
         titleLabel.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         header.AddChild(titleLabel);
 
-        var close = new GameBackButton(scale)
-        {
-            AnchorLeft = 0f,
-            AnchorRight = 0f,
-            AnchorTop = 0.5f,
-            AnchorBottom = 0.5f,
-            GrowHorizontal = GrowDirection.End,
-            GrowVertical = GrowDirection.Both,
-            OffsetLeft = (int)(28 * scale),
-        };
+        // Kept in the header rather than floating at the screen edge: anchored to
+        // the overlay it had no width of its own, which left it both misplaced and
+        // impossible to hit.
+        var close = new GameBackButton(scale);
         close.Pressed += Hide;
-        AddChild(close);
+        header.AddChild(close);
+        header.MoveChild(close, 0);
     }
 
     // NinePatchRect over the game's panel art when available; the launcher's own

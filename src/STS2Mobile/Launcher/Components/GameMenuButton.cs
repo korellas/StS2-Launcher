@@ -21,6 +21,14 @@ public class GameMenuButton : Button
             // outrank the theme itself, so adding our own font and colours on top
             // silently discarded everything we mounted the game pack for.
             Theme = theme;
+
+            // The theme is keyed on Label, so Button's own styleboxes are absent
+            // from it and Godot falls back to the engine default — a grey rounded
+            // rectangle that showed up as a frame around every entry. Clearing
+            // them leaves the text the theme actually styles.
+            foreach (var state in new[] { "normal", "hover", "pressed", "focus", "disabled" })
+                AddThemeStyleboxOverride(state, new StyleBoxEmpty());
+
             // The theme carries colours and styleboxes but no size, so without
             // this every entry renders at Godot's default and looks like fine
             // print next to the artwork.

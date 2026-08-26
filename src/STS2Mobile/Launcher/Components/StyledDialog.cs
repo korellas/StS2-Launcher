@@ -26,7 +26,7 @@ public class StyledDialog : ColorRect
 
         var body = BuildPanel(center, scale);
 
-        var heading = new StyledLabel(title ?? Localization.Tr("DIALOG_CONFIRM_TITLE"), scale, fontSize: 26);
+        var heading = new StyledLabel(title ?? Localization.Tr("DIALOG_CONFIRM_TITLE"), scale, fontSize: 28);
         heading.AddThemeColorOverride("font_color", TitleGold);
         body.AddChild(heading);
 
@@ -37,8 +37,6 @@ public class StyledDialog : ColorRect
         body.AddChild(text);
 
         var buttons = new HBoxContainer();
-        buttons.AddThemeConstantOverride("separation", (int)(40 * scale));
-        buttons.Alignment = BoxContainer.AlignmentMode.Center;
         body.AddChild(buttons);
 
         // Decline sits left of accept, matching the game's own prompts.
@@ -49,6 +47,10 @@ public class StyledDialog : ColorRect
             QueueFree();
         };
         buttons.AddChild(cancel);
+
+        // A spacer rather than a separation constant: the game pushes its two
+        // ribbons to opposite corners of the panel.
+        buttons.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
         var confirm = new GameRibbonButton(Localization.Tr("DIALOG_YES"), scale, confirm: true);
         confirm.Pressed += () =>
@@ -63,7 +65,7 @@ public class StyledDialog : ColorRect
     {
         var panel = new PanelContainer
         {
-            CustomMinimumSize = new Vector2((int)(560 * scale), (int)(340 * scale)),
+            CustomMinimumSize = new Vector2((int)(520 * scale), (int)(460 * scale)),
         };
 
         var texture = GameAssets.Load<Texture2D>(GameAssets.PopupPanel);
