@@ -552,7 +552,7 @@ public class LauncherController
     // behind a submenu, and had no error handling: an exception skipped the
     // re-enable and left the buttons dead until the launcher restarted. Status
     // goes on screen and the buttons are restored in a finally.
-    private void RunCloudTransfer(string confirmKey, string runningKey, Func<Task> transfer)
+    private void RunCloudTransfer(string confirmKey, string runningKey, Func<Task<string>> transfer)
     {
         ShowConfirmation(
             Localization.Tr(confirmKey),
@@ -567,8 +567,12 @@ public class LauncherController
                     string result;
                     try
                     {
-                        await transfer();
-                        result = Localization.Tr("CLOUD_DONE");
+                        // The counts come back rather than only landing in the log:
+                        // "done" and "there was nothing in the cloud" looked
+                        // identical on screen, which is exactly the question being
+                        // asked when sync appears not to work.
+                        var parts = (await transfer()).Split('/');
+                        result = Localization.Tr("CLOUD_DONE_COUNTS", parts[0], parts[1], parts[2]);
                     }
                     catch (Exception ex)
                     {

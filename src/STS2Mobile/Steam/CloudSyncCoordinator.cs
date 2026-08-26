@@ -134,7 +134,7 @@ public static class CloudSyncCoordinator
         }
     }
 
-    public static async Task ManualPushAllAsync(string accountName, string refreshToken)
+    public static async Task<string> ManualPushAllAsync(string accountName, string refreshToken)
     {
         var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
         var cloudStore =
@@ -187,9 +187,10 @@ public static class CloudSyncCoordinator
         cloudStore.EndSaveBatch();
 
         PatchHelper.Log($"[Cloud] Push complete: {count} files batched for upload");
+        return $"{paths.Count}/{count}/0";
     }
 
-    public static async Task ManualPullAllAsync(string accountName, string refreshToken)
+    public static async Task<string> ManualPullAllAsync(string accountName, string refreshToken)
     {
         var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
         var cloudStore =
@@ -244,6 +245,7 @@ public static class CloudSyncCoordinator
         }
 
         PatchHelper.Log($"[Cloud] Pull complete: {downloaded} downloaded, {skipped} not in cloud");
+        return $"{paths.Count}/{downloaded}/{skipped}";
     }
 
     public static List<string> GetSaveFilePaths(ISaveStore store)
