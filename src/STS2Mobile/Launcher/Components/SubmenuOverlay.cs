@@ -57,7 +57,7 @@ public class SubmenuOverlay : Control
             AnchorBottom = 0.5f,
             GrowHorizontal = GrowDirection.End,
             GrowVertical = GrowDirection.Both,
-            OffsetLeft = (int)(-46 * scale),
+            OffsetLeft = (int)(28 * scale),
         };
         close.Pressed += Hide;
         AddChild(close);
@@ -65,63 +65,42 @@ public class SubmenuOverlay : Control
 
     // NinePatchRect over the game's panel art when available; the launcher's own
     // rounded panel otherwise.
-    // Adds the frame to `parent` and returns the container callers should fill;
-    // the two are different nodes, so the frame cannot simply be returned.
+    // A PanelContainer with a StyleBoxTexture rather than a NinePatchRect: the
+    // rect is not a container, so content anchored inside it contributes nothing
+    // to its size and the panel stayed at its minimum while the rows spilled out
+    // the bottom. A PanelContainer grows to fit whatever it holds.
     private Container BuildFrame(Control parent, float scale, float widthRatio, float heightRatio)
     {
-        _widthRatio = widthRatio;
-        _heightRatio = heightRatio;
-
-        var size = ViewportRelativeSize();
-        int pad = (int)(28 * scale);
+        var panel = new PanelContainer
+        {
+            CustomMinimumSize = ViewportRelativeSize(),
+            MouseFilter = MouseFilterEnum.Stop,
+        };
 
         var texture = GameAssets.Load<Texture2D>(GameAssets.PopupPanel);
         if (texture != null)
         {
-            var patch = new NinePatchRect
-            {
-                Texture = texture,
-                CustomMinimumSize = size,
-                MouseFilter = MouseFilterEnum.Stop,
-            };
-            int inset = (int)(Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f);
-            patch.PatchMarginLeft = inset;
-            patch.PatchMarginRight = inset;
-            patch.PatchMarginTop = inset;
-            patch.PatchMarginBottom = inset;
-
-            var margin = new MarginContainer();
-            foreach (var side in new[] { "margin_left", "margin_right", "margin_top", "margin_bottom" })
-                margin.AddThemeConstantOverride(side, pad);
-            patch.AddChild(margin);
-            margin.SetAnchorsPreset(LayoutPreset.FullRect);
-            parent.AddChild(patch);
-            _frame = patch;
-            parent.AddChild(patch);
-
-            var holder = new VBoxContainer();
-            holder.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-            holder.SizeFlagsVertical = SizeFlags.ExpandFill;
-            margin.AddChild(holder);
-
-            return holder;
+            var style = new StyleBoxTexture { Texture = texture };
+            // Corners of the game's panel must not stretch; only the middle may.
+            float inset = Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f;
+            style.SetTextureMarginAll(inset);
+            style.SetContentMarginAll(34 * scale);
+            panel.AddThemeStyleboxOverride("panel", style);
+        }
+        else
+        {
+            var style = LauncherTheme.Panel(scale);
+            style.SetContentMarginAll((int)(28 * scale));
+            panel.AddThemeStyleboxOverride("panel", style);
         }
 
-        var panel = new PanelContainer { CustomMinimumSize = size, MouseFilter = MouseFilterEnum.Stop };
         parent.AddChild(panel);
         _frame = panel;
-        parent.AddChild(panel);
-        panel.AddThemeStyleboxOverride("panel", LauncherTheme.Panel(scale));
-        var fallbackMargin = new MarginContainer();
-        foreach (var side in new[] { "margin_left", "margin_right", "margin_top", "margin_bottom" })
-            fallbackMargin.AddThemeConstantOverride(side, pad);
-        panel.AddChild(fallbackMargin);
 
         var box = new VBoxContainer();
         box.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         box.SizeFlagsVertical = SizeFlags.ExpandFill;
-        fallbackMargin.AddChild(box);
-
+        panel.AddChild(box);
         return box;
     }
 

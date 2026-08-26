@@ -61,38 +61,34 @@ public class StyledDialog : ColorRect
 
     private static VBoxContainer BuildPanel(Control parent, float scale)
     {
-        var size = new Vector2((int)(560 * scale), (int)(360 * scale));
-        int pad = (int)(34 * scale);
+        var panel = new PanelContainer
+        {
+            CustomMinimumSize = new Vector2((int)(560 * scale), (int)(340 * scale)),
+        };
+
+        var texture = GameAssets.Load<Texture2D>(GameAssets.PopupPanel);
+        if (texture != null)
+        {
+            var style = new StyleBoxTexture { Texture = texture };
+            float inset = Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f;
+            style.SetTextureMarginAll(inset);
+            style.SetContentMarginAll(36 * scale);
+            panel.AddThemeStyleboxOverride("panel", style);
+        }
+        else
+        {
+            var style = LauncherTheme.Panel(scale);
+            style.SetContentMarginAll((int)(30 * scale));
+            panel.AddThemeStyleboxOverride("panel", style);
+        }
+
+        parent.AddChild(panel);
 
         var body = new VBoxContainer();
         body.AddThemeConstantOverride("separation", (int)(18 * scale));
         body.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         body.SizeFlagsVertical = SizeFlags.ExpandFill;
-
-        var margin = new MarginContainer();
-        foreach (var side in new[] { "margin_left", "margin_right", "margin_top", "margin_bottom" })
-            margin.AddThemeConstantOverride(side, pad);
-        margin.AddChild(body);
-
-        var texture = GameAssets.Load<Texture2D>(GameAssets.PopupPanel);
-        if (texture != null)
-        {
-            var panel = new NinePatchRect { Texture = texture, CustomMinimumSize = size };
-            int inset = (int)(Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f);
-            panel.PatchMarginLeft = inset;
-            panel.PatchMarginRight = inset;
-            panel.PatchMarginTop = inset;
-            panel.PatchMarginBottom = inset;
-            panel.AddChild(margin);
-            margin.SetAnchorsPreset(LayoutPreset.FullRect);
-            parent.AddChild(panel);
-            return body;
-        }
-
-        var fallback = new PanelContainer { CustomMinimumSize = size };
-        fallback.AddThemeStyleboxOverride("panel", LauncherTheme.Panel(scale));
-        fallback.AddChild(margin);
-        parent.AddChild(fallback);
+        panel.AddChild(body);
         return body;
     }
 }
