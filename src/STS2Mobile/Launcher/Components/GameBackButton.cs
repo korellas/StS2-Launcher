@@ -6,18 +6,13 @@ namespace STS2Mobile.Launcher.Components;
 // back to a text entry when the game pack isn't mounted.
 public class GameBackButton : Button
 {
-    // The device reports flag=300x202 and arrow=180x180. The arrow's canvas is
-    // square while the arrow drawn on it is wide and short, so roughly a quarter
-    // of that canvas is transparent above and below — which is why every attempt
-    // that treated the canvas as the arrow came out wrong.
-    //
-    // In the game the visible arrow stands 0.53 of the flag's height, and fills
-    // about 0.76 of its own canvas, so the canvas belongs on screen at 0.53/0.76
-    // of the flag's height. Being square, that is 0.70 * 202/300 = 0.47 of the
-    // flag's width — which is what the reference measures, arrived at without
-    // using any width from it.
-    private const float ArrowCanvasRatio = 0.70f;
-    private const float ArrowCenterX = 0.55f;
+    // Sized against what the build actually renders rather than derived: the
+    // arrow came out at 0.81 of the flag's height where the game draws it at
+    // 0.53, so the box is scaled by that ratio and pulled back to the middle of
+    // the flag's solid body. The 0.76 canvas-fill figure the previous derivation
+    // assumed was wrong — the arrow fills far more of its square than that.
+    private const float ArrowCanvasRatio = 0.45f;
+    private const float ArrowCenterX = 0.47f;
 
     // Puts the flag at the height the game draws it once the sprite's aspect is
     // applied.
