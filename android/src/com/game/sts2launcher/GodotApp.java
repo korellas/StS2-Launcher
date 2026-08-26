@@ -124,6 +124,7 @@ public class GodotApp extends GodotActivity {
 		FMOD.init(this);
 
 		versionChanged = isNewVersion();
+		recordColdStart();
 
 		setupAssemblies();
 		extractAssetFile("FMOD_LOGOS/FMOD Logo White - Transparent Background.png", "fmod_logo.png");
@@ -148,6 +149,22 @@ public class GodotApp extends GodotActivity {
 	// Whether this launch is the first on a newly installed APK. Read once and
 	// cached: isNewVersion() records the new code, so a second call returns false.
 	private boolean versionChanged;
+
+	// Counts process starts. Android kills backgrounded apps under memory
+	// pressure, and from inside there is no way to tell that from a bug except by
+	// noticing the count moved.
+	private int coldStarts;
+
+	private void recordColdStart() {
+		SharedPreferences prefs = getSharedPreferences("sts2mobile", MODE_PRIVATE);
+		coldStarts = prefs.getInt("cold_starts", 0) + 1;
+		prefs.edit().putInt("cold_starts", coldStarts).apply();
+		Log.i(TAG, "Cold start #" + coldStarts);
+	}
+
+	public int getColdStarts() {
+		return coldStarts;
+	}
 
 	private boolean isNewVersion() {
 		SharedPreferences prefs = getSharedPreferences("sts2mobile", MODE_PRIVATE);

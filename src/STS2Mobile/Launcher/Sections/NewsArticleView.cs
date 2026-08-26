@@ -55,11 +55,11 @@ public class NewsArticleView : VBoxContainer
         original.Pressed += () => OpenOriginalRequested?.Invoke(_url);
         header.AddChild(original);
 
-        _title = new StyledLabel("", scale, fontSize: 24, HorizontalAlignment.Left);
+        _title = new StyledLabel("", scale, fontSize: 30, HorizontalAlignment.Left);
         _title.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         AddChild(_title);
 
-        _date = new StyledLabel("", scale, fontSize: 14, HorizontalAlignment.Left);
+        _date = new StyledLabel("", scale, fontSize: 17, HorizontalAlignment.Left);
         _date.Modulate = new Color(1f, 1f, 1f, 0.6f);
         AddChild(_date);
 
@@ -74,8 +74,10 @@ public class NewsArticleView : VBoxContainer
             SizeFlagsVertical = SizeFlags.ExpandFill,
             CustomMinimumSize = new Vector2(0, (int)(240 * scale)),
         };
-        LauncherTheme.ApplyGameFont(_body, 18, scale);
+        LauncherTheme.ApplyGameFont(_body, 26, scale);
         _body.AddThemeColorOverride("default_color", LauncherTheme.Cream);
+        // Long prose needs air; the game font is drawn for short labels.
+        _body.AddThemeConstantOverride("line_separation", (int)(8 * scale));
         _body.MetaClicked += meta => OpenOriginalRequested?.Invoke(meta.AsString());
         AddChild(_body);
 

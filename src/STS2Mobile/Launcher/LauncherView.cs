@@ -220,7 +220,10 @@ public class LauncherView
 
     public void SetStatus(string text) => _statusLabel.Text = text;
 
-    public void SetVersionStatus(string text) => _versionLabel.Text = text;
+    // The start count rides along with the version so it needs no screen of its
+    // own: if it changes after backgrounding, the process was reclaimed.
+    public void SetVersionStatus(string text) =>
+        _versionLabel.Text = $"{text}  ·  run {LauncherModel.GetColdStarts()}";
 
     public void AppendLog(string msg) => Log.AppendLog(msg);
 

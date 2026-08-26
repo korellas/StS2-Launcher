@@ -113,7 +113,7 @@ public class NewsSection : VBoxContainer
         inner.AddThemeConstantOverride("separation", (int)(2 * _scale));
         inner.MouseFilter = MouseFilterEnum.Ignore;
 
-        var title = new StyledLabel(item.Title, _scale, fontSize: 21, align: HorizontalAlignment.Left);
+        var title = new StyledLabel(item.Title, _scale, fontSize: 24, align: HorizontalAlignment.Left);
         title.AddThemeColorOverride("font_color", TitleColor);
         title.AutowrapMode = TextServer.AutowrapMode.Off;
         title.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
@@ -121,7 +121,7 @@ public class NewsSection : VBoxContainer
         title.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(title);
 
-        var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 15, align: HorizontalAlignment.Left);
+        var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 17, align: HorizontalAlignment.Left);
         date.AddThemeColorOverride("font_color", DateColor);
         date.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(date);

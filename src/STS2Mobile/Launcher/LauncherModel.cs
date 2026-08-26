@@ -465,6 +465,20 @@ public class LauncherModel : IDisposable
         catch { }
     }
 
+    // Process starts since install. If this moves after backgrounding the app,
+    // Android reclaimed the process rather than the launcher losing its state.
+    public static int GetColdStarts()
+    {
+        try
+        {
+            return (int)(GetGodotApp()?.Call("getColdStarts") ?? 0);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     public static GodotObject GetGodotApp()
     {
         try
