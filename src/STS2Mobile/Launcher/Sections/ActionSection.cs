@@ -12,6 +12,7 @@ public class ActionSection : VBoxContainer
     public event Action<bool> CloudSyncToggled;
     public event Action<bool> BetaChannelToggled;
     public event Action<bool> FpsOverlayToggled;
+    public event Action<string, bool> OverlayRowToggled;
     public event Action CloudPushPressed;
     public event Action CloudPullPressed;
     public event Action CheckForUpdatesPressed;
@@ -34,6 +35,7 @@ public class ActionSection : VBoxContainer
     public VBoxContainer SettingsGroup { get; }
 
     private readonly VBoxContainer _rows;
+    private readonly System.Collections.Generic.Dictionary<string, GameCheckbox> _overlayRowToggles = new();
     private readonly StyledLabel _cloudStatus;
 
     public ActionSection(float scale)
@@ -95,6 +97,22 @@ public class ActionSection : VBoxContainer
             FpsOverlayToggled?.Invoke(pressed);
         };
         AddSettingRow("SETTING_FPS_OVERLAY", _fpsOverlayToggle, scale);
+
+        // One switch per line of the overlay, so an unwanted reading can be
+        // dropped without losing the rest.
+        foreach (var (row, key) in new[]
+        {
+            ("cpu", "SETTING_OVERLAY_CPU"),
+            ("gpu", "SETTING_OVERLAY_GPU"),
+            ("temp", "SETTING_OVERLAY_TEMP"),
+        })
+        {
+            var box = new GameCheckbox(scale);
+            var rowName = row;
+            box.Toggled += pressed => OverlayRowToggled?.Invoke(rowName, pressed);
+            _overlayRowToggles[rowName] = box;
+            AddSettingRow(key, box, scale);
+        }
 
 
         // Cloud transfers used to report only into the console; this line keeps
@@ -212,6 +230,12 @@ public class ActionSection : VBoxContainer
         row.AddControl(control);
         _rows.AddChild(row);
         _rows.AddChild(SettingsRow.Separator(scale));
+    }
+
+    public void SetOverlayRowChecked(string row, bool value)
+    {
+        if (_overlayRowToggles.TryGetValue(row, out var box))
+            box.ButtonPressed = value;
     }
 
     public void SetCloudStatus(string text)

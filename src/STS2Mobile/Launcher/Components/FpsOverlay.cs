@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using STS2Mobile.Diagnostics;
+using STS2Mobile.Patches;
 
 namespace STS2Mobile.Launcher.Components;
 
@@ -95,6 +96,12 @@ public class FpsOverlay : CanvasLayer
         return overlay;
     }
 
+    private static int RowCount() =>
+        1
+        + (LauncherPatches.OverlayShowCpu ? 1 : 0)
+        + (LauncherPatches.OverlayShowGpu ? 1 : 0)
+        + (LauncherPatches.OverlayShowTemp ? 1 : 0);
+
     private void Build()
     {
         int panelWidth = LabelWidth + ValueWidth + GraphWidth + DetailWidth + PanelPadding * 2;
@@ -107,7 +114,7 @@ public class FpsOverlay : CanvasLayer
             OffsetLeft = -(panelWidth + RightMargin),
             OffsetRight = -RightMargin,
             OffsetTop = TopOffset,
-            OffsetBottom = TopOffset + RowHeight * 4 + 3 + PanelPadding * 2,
+            OffsetBottom = TopOffset + RowHeight * RowCount() + (RowCount() - 1) + PanelPadding * 2,
         };
         var panelStyle = new StyleBoxFlat { BgColor = PanelColor, BorderColor = PanelBorder };
         panelStyle.SetCornerRadiusAll(10);
@@ -128,13 +135,27 @@ public class FpsOverlay : CanvasLayer
         rows.AddThemeConstantOverride("separation", 0);
         panel.AddChild(rows);
 
+        // fps is the reason the overlay exists, so it is always present; the rest
+        // are switched individually from the launcher.
         _fpsRow = StatRow.Add(rows, "fps", "FPS", FpsMin, FpsBaseMax, FpsAccent, alertAbove: null);
-        AddSeparator(rows);
-        _cpuRow = StatRow.Add(rows, "cpu", "CPU", LoadMin, LoadMax, CpuAccent, LoadAlertThreshold);
-        AddSeparator(rows);
-        _gpuRow = StatRow.Add(rows, "gpu", "GPU", LoadMin, LoadMax, GpuAccent, LoadAlertThreshold);
-        AddSeparator(rows);
-        _tempRow = StatRow.Add(rows, "temp", "TEMP", TempMin, TempMax, TempAccent, TempAlertThreshold);
+
+        if (LauncherPatches.OverlayShowCpu)
+        {
+            AddSeparator(rows);
+            _cpuRow = StatRow.Add(rows, "cpu", "CPU", LoadMin, LoadMax, CpuAccent, LoadAlertThreshold);
+        }
+
+        if (LauncherPatches.OverlayShowGpu)
+        {
+            AddSeparator(rows);
+            _gpuRow = StatRow.Add(rows, "gpu", "GPU", LoadMin, LoadMax, GpuAccent, LoadAlertThreshold);
+        }
+
+        if (LauncherPatches.OverlayShowTemp)
+        {
+            AddSeparator(rows);
+            _tempRow = StatRow.Add(rows, "temp", "TEMP", TempMin, TempMax, TempAccent, TempAlertThreshold);
+        }
     }
 
     private static void AddSeparator(Control parent)
@@ -195,16 +216,25 @@ public class FpsOverlay : CanvasLayer
         float average = _fpsSum / _fpsSamples;
         _fpsRow.Push(fps, $"{fps:F0}", $"avg {average:F0}   low {WorstFps():F0}");
 
-        float? cpu = _stats.ReadCpuPercent(elapsed);
-        float? ram = _stats.ReadRamMegabytes();
-        _cpuRow.Push(cpu, cpu is float c ? $"{c:F0} %" : null, ram is float r ? $"RAM {r:F0} MB" : "");
+        if (_cpuRow != null)
+        {
+            float? cpu = _stats.ReadCpuPercent(elapsed);
+            float? ram = _stats.ReadRamMegabytes();
+            _cpuRow.Push(cpu, cpu is float c ? $"{c:F0} %" : null, ram is float r ? $"RAM {r:F0} MB" : "");
+        }
 
-        float? gpu = _stats.ReadGpuPercent();
-        float vram = SystemStatsReader.VideoMemoryMegabytes();
-        _gpuRow.Push(gpu, gpu is float g ? $"{g:F0} %" : null, $"VRAM {vram:F0} MB");
+        if (_gpuRow != null)
+        {
+            float? gpu = _stats.ReadGpuPercent();
+            float vram = SystemStatsReader.VideoMemoryMegabytes();
+            _gpuRow.Push(gpu, gpu is float g ? $"{g:F0} %" : null, $"VRAM {vram:F0} MB");
+        }
 
-        float? temp = _stats.ReadTemperatureCelsius();
-        _tempRow.Push(temp, temp is float t ? $"{t:F1} °C" : null, ThermalStatus());
+        if (_tempRow != null)
+        {
+            float? temp = _stats.ReadTemperatureCelsius();
+            _tempRow.Push(temp, temp is float t ? $"{t:F1} °C" : null, ThermalStatus());
+        }
     }
 
     // Longest frame in the recent window, as fps. This is where stutter shows up

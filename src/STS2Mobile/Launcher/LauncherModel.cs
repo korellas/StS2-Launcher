@@ -465,6 +465,32 @@ public class LauncherModel : IDisposable
         catch { }
     }
 
+    private static string OverlayRowPrefPath(string row) =>
+        Path.Combine(OS.GetDataDir(), $"overlay_row_{row}");
+
+    // Individual overlay rows default to on: someone who switched the overlay on
+    // wants to see it, and can then turn off whichever line they do not care about.
+    public static bool LoadOverlayRowPref(string row)
+    {
+        try
+        {
+            var path = OverlayRowPrefPath(row);
+            if (File.Exists(path))
+                return File.ReadAllText(path).Trim() == "true";
+        }
+        catch { }
+        return true;
+    }
+
+    public static void SaveOverlayRowPref(string row, bool enabled)
+    {
+        try
+        {
+            File.WriteAllText(OverlayRowPrefPath(row), enabled ? "true" : "false");
+        }
+        catch { }
+    }
+
     // Process starts since install. If this moves after backgrounding the app,
     // Android reclaimed the process rather than the launcher losing its state.
     public static int GetColdStarts()

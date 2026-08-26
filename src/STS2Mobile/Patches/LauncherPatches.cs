@@ -19,6 +19,9 @@ public static class LauncherPatches
 {
     internal static bool CloudSyncEnabled = true;
     internal static bool FpsOverlayEnabled;
+    internal static bool OverlayShowCpu = true;
+    internal static bool OverlayShowGpu = true;
+    internal static bool OverlayShowTemp = true;
     internal static string SavedAccountName;
     internal static string SavedRefreshToken;
 

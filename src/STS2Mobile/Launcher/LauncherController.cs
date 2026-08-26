@@ -121,6 +121,7 @@ public class LauncherController
         _view.Actions.CloudSyncToggled += OnCloudSyncToggled;
         _view.Actions.BetaChannelToggled += OnBetaChannelToggled;
         _view.Actions.FpsOverlayToggled += OnFpsOverlayToggled;
+        _view.Actions.OverlayRowToggled += OnOverlayRowToggled;
         _view.Actions.CloudPushPressed += OnCloudPushPressed;
         _view.Actions.CloudPullPressed += OnCloudPullPressed;
         _view.Actions.CheckForUpdatesPressed += OnCheckForUpdatesPressed;
@@ -144,6 +145,13 @@ public class LauncherController
         var fpsOverlayPref = LauncherModel.LoadFpsOverlayPref();
         _view.Actions.SetFpsOverlayChecked(fpsOverlayPref);
         LauncherPatches.FpsOverlayEnabled = fpsOverlayPref;
+
+        foreach (var row in new[] { "cpu", "gpu", "temp" })
+        {
+            var enabled = LauncherModel.LoadOverlayRowPref(row);
+            _view.Actions.SetOverlayRowChecked(row, enabled);
+            ApplyOverlayRow(row, enabled);
+        }
 
         var result = _model.StartSession();
         HandleFastPath(result);
@@ -501,6 +509,28 @@ public class LauncherController
     {
         LauncherModel.SaveCloudSyncPref(pressed);
         LauncherPatches.CloudSyncEnabled = pressed;
+    }
+
+    private void OnOverlayRowToggled(string row, bool pressed)
+    {
+        LauncherModel.SaveOverlayRowPref(row, pressed);
+        ApplyOverlayRow(row, pressed);
+    }
+
+    private static void ApplyOverlayRow(string row, bool enabled)
+    {
+        switch (row)
+        {
+            case "cpu":
+                LauncherPatches.OverlayShowCpu = enabled;
+                break;
+            case "gpu":
+                LauncherPatches.OverlayShowGpu = enabled;
+                break;
+            case "temp":
+                LauncherPatches.OverlayShowTemp = enabled;
+                break;
+        }
     }
 
     private void OnFpsOverlayToggled(bool pressed)
