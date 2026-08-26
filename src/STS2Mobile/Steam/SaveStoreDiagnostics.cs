@@ -121,6 +121,29 @@ public static class SaveStoreDiagnostics
             return $"save={save} cloud={cloud}";
         });
 
+        // Everything checkable from outside is exhausted: the interfaces, the
+        // probe sharing the class's shape, and every field type all load. Loading
+        // the whole assembly is the one call that reports *why* rather than just
+        // which type — GetTypes collects per-type loader errors instead of
+        // stopping at the first, and those name the missing member or type.
+        Try(sb, "loader", () =>
+        {
+            try
+            {
+                ours.GetTypes();
+                return "no errors";
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                var reasons = ex.LoaderExceptions
+                    .Where(e => e != null)
+                    .Select(e => e.Message)
+                    .Distinct()
+                    .Take(4);
+                return string.Join(" ;; ", reasons);
+            }
+        });
+
         // Last, and by name: this is the call that is expected to throw. Mono
         // names the member it could not resolve in the TypeLoadException, which
         // is the one piece of information the member listing above cannot give.
