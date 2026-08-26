@@ -576,7 +576,15 @@ public class LauncherController
                     }
                     catch (Exception ex)
                     {
-                        result = Localization.Tr("CLOUD_FAILED", ex.Message);
+                        // A type-load failure here names our class but not the
+                        // reason, and the reason is almost always that the game
+                        // added a member to one of the save-store interfaces. The
+                        // requirement list goes on screen as well as into the log,
+                        // because the console is hidden once the game is installed.
+                        var interfaces = SaveStoreDiagnostics.DescribeInterfaces();
+                        result = Localization.Tr("CLOUD_FAILED", ex.Message) + "\n\n" + interfaces;
+                        PatchHelper.Log($"[Cloud] {ex}");
+                        PatchHelper.Log($"[Cloud] {interfaces}");
                     }
 
                     _runOnMainThread(() =>

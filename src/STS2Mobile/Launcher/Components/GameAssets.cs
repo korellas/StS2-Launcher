@@ -32,8 +32,8 @@ public static class GameAssets
     public const string PopupConfirmButton = "res://images/atlases/ui_atlas.sprites/popup_confirm_button.tres";
     public const string BackButton = "res://images/atlases/ui_atlas.sprites/back_button.tres";
     public const string BackButtonArrow = "res://images/atlases/compressed.sprites/back_button_arrow.tres";
-    public const string ScrollTrack = "res://images/atlases/ui_atlas.sprites/small_scrollbar_track_center.tres";
-    public const string ScrollGrabber = "res://images/atlases/ui_atlas.sprites/small_scrollbar_train.tres";
+    public const string ScrollTrack = "res://images/packed/common_ui/small_scrollbar_track_center.png";
+    public const string ScrollGrabber = "res://images/packed/common_ui/small_scrollbar_train.png";
 
     private static bool _mountAttempted;
     private static bool _mounted;

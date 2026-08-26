@@ -19,23 +19,23 @@ public class GameRibbonButton : Button
 
         if (sprite != null)
         {
-            var ribbon = new NinePatchRect
-            {
-                Texture = sprite,
-                MouseFilter = MouseFilterEnum.Ignore,
-                ShowBehindParent = true,
-            };
-            // The ribbon's flared ends must not stretch, so only the flat middle
-            // is allowed to grow.
-            int inset = (int)(sprite.GetWidth() / 3f);
-            ribbon.PatchMarginLeft = inset;
-            ribbon.PatchMarginRight = inset;
-            ribbon.SetAnchorsPreset(LayoutPreset.FullRect);
-            AddChild(ribbon);
-        }
+            // The flared ends must not stretch, so only the flat middle grows.
+            var style = new StyleBoxTexture { Texture = sprite };
+            style.SetTextureMarginAll(sprite.GetWidth() / 3f);
 
-        foreach (var state in new[] { "normal", "hover", "pressed", "focus", "disabled" })
-            AddThemeStyleboxOverride(state, new StyleBoxEmpty());
+            // The confirm sprite is blue in the atlas; the game tints it green for
+            // an affirmative answer, which is the colour pairing players read.
+            if (confirm)
+                style.ModulateColor = new Color(0.55f, 1.15f, 0.5f);
+
+            foreach (var state in new[] { "normal", "hover", "pressed", "focus", "disabled" })
+                AddThemeStyleboxOverride(state, style);
+        }
+        else
+        {
+            foreach (var state in new[] { "normal", "hover", "pressed", "focus", "disabled" })
+                AddThemeStyleboxOverride(state, new StyleBoxEmpty());
+        }
 
         LauncherTheme.ApplyGameFont(this, 22, scale, bold: true);
         AddThemeColorOverride("font_color", Colors.White);
