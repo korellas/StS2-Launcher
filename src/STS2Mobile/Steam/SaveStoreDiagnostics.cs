@@ -96,68 +96,6 @@ public static class SaveStoreDiagnostics
         // The scale figure used when reasoning about the launcher's geometry has
         // been an assumption — the screenshot's pixel size read as the viewport's.
         // Report the viewport so it stops being guessed at.
-        Try(sb, "viewport", () =>
-        {
-            var vp = Godot.Engine.GetMainLoop() is Godot.SceneTree tree
-                ? tree.Root?.GetVisibleRect().Size
-                : null;
-            return vp is { } size
-                ? $"{size.X}x{size.Y} scale={Mathf.Max(size.X, size.Y) / 960f:F3}"
-                : "unavailable";
-        });
-
-        Try(sb, "sprites", () =>
-        {
-            var flag = Launcher.Components.GameAssets.Load<Godot.Texture2D>(
-                Launcher.Components.GameAssets.BackButton);
-            var arrow = Launcher.Components.GameAssets.Load<Godot.Texture2D>(
-                Launcher.Components.GameAssets.BackButtonArrow);
-            return $"flag={flag?.GetWidth()}x{flag?.GetHeight()} "
-                + $"arrow={arrow?.GetWidth()}x{arrow?.GetHeight()}";
-        });
-
-        // The probe shares the real class's interface shape and loads, so what is
-        // left is what the probe does not have: its fields. Mono has to load every
-        // field's type to lay a class out, and a failure there surfaces as the
-        // vtable error rather than naming the field.
-        Try(sb, "fields", () => string.Join(" ", new[]
-        {
-            "SteamConnection",
-            "CloudFileCache",
-            "CloudWriteQueue",
-        }.Select(n => $"{n}={LoadProbe(ours, "STS2Mobile.Steam." + n)}")));
-
-        // Which half the fault lives in. See SaveStoreProbes for how to read it.
-        Try(sb, "probes", () =>
-        {
-            var save = LoadProbe(ours, "STS2Mobile.Steam.SaveProbe");
-            var cloud = LoadProbe(ours, "STS2Mobile.Steam.CloudProbe");
-            return $"save={save} cloud={cloud}";
-        });
-
-        // Everything checkable from outside is exhausted: the interfaces, the
-        // probe sharing the class's shape, and every field type all load. Loading
-        // the whole assembly is the one call that reports *why* rather than just
-        // which type — GetTypes collects per-type loader errors instead of
-        // stopping at the first, and those name the missing member or type.
-        Try(sb, "loader", () =>
-        {
-            try
-            {
-                ours.GetTypes();
-                return "no errors";
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                var reasons = ex.LoaderExceptions
-                    .Where(e => e != null)
-                    .Select(e => e.Message)
-                    .Distinct()
-                    .Take(4);
-                return string.Join(" ;; ", reasons);
-            }
-        });
-
         // Last, and by name: this is the call that is expected to throw. Mono
         // names the member it could not resolve in the TypeLoadException, which
         // is the one piece of information the member listing above cannot give.
@@ -214,16 +152,4 @@ public static class SaveStoreDiagnostics
         };
     }
 
-    private static string LoadProbe(Assembly assembly, string name)
-    {
-        try
-        {
-            assembly.GetType(name, throwOnError: true);
-            return "ok";
-        }
-        catch (Exception ex)
-        {
-            return ex.GetType().Name;
-        }
-    }
 }

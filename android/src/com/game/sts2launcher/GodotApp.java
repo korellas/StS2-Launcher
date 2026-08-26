@@ -42,6 +42,8 @@ import android.content.SharedPreferences;
 
 import java.net.URLEncoder;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -204,6 +206,8 @@ public class GodotApp extends GodotActivity {
 
 		destDir.mkdirs();
 
+		Set<String> bclNames = new HashSet<>();
+
 		try {
 			String[] bclFiles = getAssets().list("dotnet_bcl");
 			if (bclFiles != null) {
@@ -220,14 +224,19 @@ public class GodotApp extends GodotActivity {
 					}
 				}
 				Log.i(TAG, "Copied " + count + " BCL assemblies from assets");
+				bclNames.addAll(Arrays.asList(bclFiles));
 			}
 		} catch (IOException e) {
 			Log.e(TAG, "Failed to copy BCL assemblies", e);
 		}
 
-		// Only copy game assemblies that don't already exist in BCL. The depot has
-		// desktop
-		// CoreCLR versions that are incompatible with Android's Mono runtime.
+		// The depot ships desktop CoreCLR builds of the BCL alongside the game's own
+		// assemblies, and those would break Android's Mono runtime, so anything the
+		// APK already provided is left alone. That guard used to be "skip whatever
+		// exists", which also pinned sts2.dll to whatever was copied the very first
+		// time: a game update left the device running new game data against old game
+		// code, and left this project compiling against an interface the device no
+		// longer had.
 		if (!srcDir.exists() || !srcDir.isDirectory()) {
 			Log.w(TAG, "Game assemblies source dir not found: " + srcDir.getAbsolutePath());
 			return;
@@ -245,8 +254,12 @@ public class GodotApp extends GodotActivity {
 				if (name.endsWith(".so")) {
 					continue;
 				}
+				if (bclNames.contains(name)) {
+					continue;
+				}
 				File dest = new File(destDir, name);
-				if (dest.exists()) {
+				if (dest.exists() && dest.length() == src.length()
+						&& dest.lastModified() >= src.lastModified()) {
 					continue;
 				}
 				try {
@@ -258,6 +271,39 @@ public class GodotApp extends GodotActivity {
 			}
 		}
 		Log.i(TAG, "Copied " + count + " game assembly files");
+
+		exportGameAssemblies(destDir);
+	}
+
+	// Copies the assemblies the runtime actually loads somewhere adb can reach.
+	// The mod is compiled against a checked-in sts2.dll, and when the game updates
+	// past it the compiler stops seeing new interface members as implemented — a
+	// mismatch that costs a whole debugging session to find from the outside,
+	// because the resulting failure names neither the assembly nor the member.
+	// App-private storage is unreadable without a debuggable build, so mirror them
+	// out to the external files dir instead.
+	private void exportGameAssemblies(File srcDir) {
+		try {
+			File outDir = getExternalFilesDir(null);
+			if (outDir == null)
+				return;
+			File out = new File(outDir, "runtime-assemblies");
+			if (!out.exists() && !out.mkdirs())
+				return;
+
+			for (String name : new String[] { "sts2.dll", "SteamKit2.dll" }) {
+				File src = new File(srcDir, name);
+				if (!src.isFile())
+					continue;
+				File dest = new File(out, name);
+				if (dest.exists() && dest.length() == src.length())
+					continue;
+				copyFile(src, dest);
+				Log.i(TAG, "Exported " + name + " to " + dest.getAbsolutePath());
+			}
+		} catch (Exception e) {
+			Log.w(TAG, "Could not export runtime assemblies", e);
+		}
 	}
 
 	private File findAssembliesDir() {

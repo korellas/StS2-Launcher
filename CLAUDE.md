@@ -54,6 +54,26 @@ If `release.sh` fails mid-run:
 - After commit but before tag push: manually `git push origin HEAD v<version>`; then `gh release create ...` (mirror the script's final section).
 - After release create: you're done, just verify with `gh release view v<version>`.
 
+## Keeping the sts2.dll build reference current
+
+`src/STS2Mobile/STS2Mobile.csproj` references `upstream/godot-export/.godot/mono/publish/arm64/sts2.dll`. That file is gitignored, so **it does not travel with the repo and goes stale as the game updates**.
+
+This is not cosmetic. C# only emits a method as `virtual final newslot` — the form the CLR requires for an interface slot — when the compiler can see that it implements an interface member. Build against an sts2.dll that predates a member and the method compiles as an ordinary one, the type's vtable setup fails at runtime, and the error names neither the assembly nor the member: it surfaces as `Invalid type STS2Mobile.Steam.SteamKit2CloudSaveStore for instance field …`. Every check available from outside the process passes, because the member exists, the signature matches, and only the metadata flag differs.
+
+To refresh it from the device (the launcher mirrors the assemblies it loads to a spot adb can read):
+
+```bash
+export PATH="$PATH:$HOME/Library/Android/sdk/platform-tools"
+adb pull /sdcard/Android/data/com.game.sts2launcher/files/runtime-assemblies/sts2.dll \
+  upstream/godot-export/.godot/mono/publish/arm64/sts2.dll
+```
+
+Then rebuild. `GodotApp.exportGameAssemblies` writes that mirror on every launch.
+
+To check whether the reference is current, compare its MVID against `assemblies=game=…` in the cloud diagnostic (설정 → 내려받기). Different MVIDs mean the reference is stale.
+
+Note that `GodotApp.copyAssemblies` skips any game assembly already present in `publish/arm64`, so a game update does **not** refresh the copy on the device either — delete the app's data if the device needs to pick up a newer `sts2.dll`.
+
 ## Installing a built APK to a device
 
 Wireless `adb` stays paired across sessions as `adb-<SERIAL>._adb-tls-connect._tcp`:
