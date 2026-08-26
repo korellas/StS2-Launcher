@@ -109,6 +109,7 @@ public class SubmenuOverlay : Control
             float inset = Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f;
             style.SetTextureMarginAll(inset);
             style.SetContentMarginAll(34 * scale);
+            style.ModulateColor = LauncherTheme.PanelSlate;
             panel.AddThemeStyleboxOverride("panel", style);
         }
         else

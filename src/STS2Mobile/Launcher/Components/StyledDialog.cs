@@ -14,6 +14,7 @@ public class StyledDialog : ColorRect
 
     private static readonly Color TitleGold = new(0.96f, 0.76f, 0.31f);
 
+
     public StyledDialog(string message, float scale, string title = null)
     {
         SetAnchorsPreset(LayoutPreset.FullRect);
@@ -27,7 +28,8 @@ public class StyledDialog : ColorRect
         // The panel and the ribbons are siblings inside a fixed-size frame, so the
         // ribbons can hang over the panel's bottom edge the way the game draws
         // them. Kept inside the panel they sat in a tidy row well above it.
-        var size = new Vector2((int)(560 * scale), (int)(380 * scale));
+        var vp = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
+        var size = new Vector2((int)(vp.X * 0.30f), (int)(vp.Y * 0.46f));
         var frame = new Control { CustomMinimumSize = size, MouseFilter = MouseFilterEnum.Ignore };
         center.AddChild(frame);
 
@@ -64,23 +66,24 @@ public class StyledDialog : ColorRect
             AnchorBottom = 1f,
             GrowVertical = GrowDirection.Both,
             // Straddles the panel's lower edge rather than sitting inside it.
-            OffsetTop = (int)(-84 * scale),
-            OffsetBottom = (int)(-26 * scale),
+            OffsetTop = (int)(-96 * scale),
+            OffsetBottom = (int)(-38 * scale),
         };
 
+        // Anchored to fractions of the panel so the pair stays inside it at any
+        // size, rather than to fixed pixel insets.
         if (confirm)
         {
-            button.AnchorLeft = 1f;
-            button.AnchorRight = 1f;
-            button.GrowHorizontal = GrowDirection.Begin;
-            button.OffsetRight = (int)(-24 * scale);
-            button.OffsetLeft = (int)(-214 * scale);
+            button.AnchorLeft = 0.52f;
+            button.AnchorRight = 0.99f;
         }
         else
         {
-            button.OffsetLeft = (int)(24 * scale);
-            button.OffsetRight = (int)(214 * scale);
+            button.AnchorLeft = 0.01f;
+            button.AnchorRight = 0.48f;
         }
+        button.OffsetLeft = 0;
+        button.OffsetRight = 0;
 
         button.Pressed += onPressed;
         frame.AddChild(button);
@@ -97,8 +100,9 @@ public class StyledDialog : ColorRect
             var style = new StyleBoxTexture { Texture = texture };
             float inset = Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f;
             style.SetTextureMarginAll(inset);
-            style.SetContentMarginAll(36 * scale);
-            style.ContentMarginBottom = 96 * scale;
+            style.SetContentMarginAll(34 * scale);
+            style.ContentMarginBottom = 104 * scale;
+            style.ModulateColor = LauncherTheme.PanelSlate;
             panel.AddThemeStyleboxOverride("panel", style);
         }
         else

@@ -21,6 +21,10 @@ public static class LauncherTheme
     // Text drawn on the game's parchment submenu panel, where cream disappears.
     public static readonly Color Ink = new(0.22f, 0.15f, 0.09f);
 
+    // The game's popup sprite is warm stone; its own prompts render it in
+    // this blue-grey, and the launcher matches so the surfaces read as one set.
+    public static readonly Color PanelSlate = new(0.62f, 0.72f, 0.84f);
+
     public static readonly Color PanelFill = new(0.05f, 0.08f, 0.15f, 0.80f);
     public static readonly Color PanelBorder = new(0.48f, 0.58f, 0.76f, 0.30f);
 
