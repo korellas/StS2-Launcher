@@ -33,8 +33,7 @@ public class ActionSection : VBoxContainer
     // them into a Settings submenu, leaving only PLAY-level actions on the menu.
     public VBoxContainer SettingsGroup { get; }
 
-    private readonly GridContainer _toggleGrid;
-    private readonly StyledLabel _cloudHeader;
+    private readonly VBoxContainer _rows;
     private readonly StyledLabel _cloudStatus;
 
     public ActionSection(float scale)
@@ -43,12 +42,11 @@ public class ActionSection : VBoxContainer
         SettingsGroup.AddThemeConstantOverride("separation", (int)(14 * scale));
         AddChild(SettingsGroup);
 
-        // Two columns: four stacked checkboxes left half the panel empty and made
-        // the submenu feel cramped for no reason.
-        _toggleGrid = new GridContainer { Columns = 2 };
-        _toggleGrid.AddThemeConstantOverride("h_separation", (int)(40 * scale));
-        _toggleGrid.AddThemeConstantOverride("v_separation", (int)(10 * scale));
-        SettingsGroup.AddChild(_toggleGrid);
+        // Rows rather than a grid: the game's settings screen reads as a list of
+        // "name … control" lines, and a two-column grid of captioned boxes does not.
+        _rows = new VBoxContainer();
+        _rows.AddThemeConstantOverride("separation", 0);
+        SettingsGroup.AddChild(_rows);
 
         _retryButton = new GameMenuButton(Localization.Tr("MENU_RETRY"), scale, fontSize: 34, primary: true);
         _retryButton.Visible = false;
@@ -56,53 +54,48 @@ public class ActionSection : VBoxContainer
         AddChild(_retryButton);
 
 
-        _localBackupToggle = new GameCheckRow(Localization.Tr("SETTING_LOCAL_BACKUP"), scale);
+        _localBackupToggle = new GameCheckbox(scale);
         _localBackupToggle.ToggleMode = true;
         _localBackupToggle.Visible = false;
         _localBackupToggle.Toggled += pressed =>
         {
             LocalBackupToggled?.Invoke(pressed);
         };
-        _toggleGrid.AddChild(_localBackupToggle);
+        AddSettingRow("SETTING_LOCAL_BACKUP", _localBackupToggle, scale);
 
-        _cloudSyncToggle = new GameCheckRow(Localization.Tr("SETTING_AUTO_SYNC"), scale);
+        _cloudSyncToggle = new GameCheckbox(scale);
         _cloudSyncToggle.ToggleMode = true;
         _cloudSyncToggle.Visible = false;
         _cloudSyncToggle.Toggled += pressed =>
         {
             CloudSyncToggled?.Invoke(pressed);
         };
-        _toggleGrid.AddChild(_cloudSyncToggle);
+        AddSettingRow("SETTING_AUTO_SYNC", _cloudSyncToggle, scale);
 
         // Channel toggle. Off (default) → follow Steam's `public` branch.
         // On → prefer any beta-named branch (e.g. STS2's `public-beta`).
         // The user MUST opt into the same beta channel inside the Steam
         // client first; otherwise GetManifestRequestCode fails with
         // "Ensure the account owns this app" on protected branches.
-        _betaChannelToggle = new GameCheckRow(Localization.Tr("SETTING_BETA_CHANNEL"), scale);
+        _betaChannelToggle = new GameCheckbox(scale);
         _betaChannelToggle.ToggleMode = true;
         _betaChannelToggle.Visible = false;
         _betaChannelToggle.Toggled += pressed =>
         {
             BetaChannelToggled?.Invoke(pressed);
         };
-        _toggleGrid.AddChild(_betaChannelToggle);
+        AddSettingRow("SETTING_BETA_CHANNEL", _betaChannelToggle, scale);
 
         // Debug aid, so it stays available whether or not Steam is connected.
-        _fpsOverlayToggle = new GameCheckRow(Localization.Tr("SETTING_FPS_OVERLAY"), scale);
+        _fpsOverlayToggle = new GameCheckbox(scale);
         _fpsOverlayToggle.ToggleMode = true;
         _fpsOverlayToggle.Visible = false;
         _fpsOverlayToggle.Toggled += pressed =>
         {
             FpsOverlayToggled?.Invoke(pressed);
         };
-        _toggleGrid.AddChild(_fpsOverlayToggle);
+        AddSettingRow("SETTING_FPS_OVERLAY", _fpsOverlayToggle, scale);
 
-        // Given a heading of their own, these read as "what do I do with my saves"
-        // rather than two unexplained actions under the checkboxes.
-        _cloudHeader = new StyledLabel(Localization.Tr("SETTING_CLOUD_HEADER"), scale, fontSize: 18, align: HorizontalAlignment.Left);
-        _cloudHeader.Visible = false;
-        SettingsGroup.AddChild(_cloudHeader);
 
         // Cloud transfers used to report only into the console; this line keeps
         // the outcome next to the buttons that started it.
@@ -112,26 +105,26 @@ public class ActionSection : VBoxContainer
         _cloudStatus.Visible = false;
         SettingsGroup.AddChild(_cloudStatus);
 
-        var pushPullRow = new HBoxContainer();
+        var pushPullRow = new SettingsRow(Localization.Tr("SETTING_CLOUD_HEADER"), scale);
         pushPullRow.Visible = false;
-        pushPullRow.AddThemeConstantOverride("separation", (int)(6 * scale));
 
         _pushButton = new GameMenuButton(Localization.Tr("SETTING_UPLOAD_SAVES"), scale, fontSize: 21);
-        _pushButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _pushButton.Pressed += () => CloudPushPressed?.Invoke();
-        pushPullRow.AddChild(_pushButton);
+        pushPullRow.AddControl(_pushButton);
 
         _pullButton = new GameMenuButton(Localization.Tr("SETTING_DOWNLOAD_SAVES"), scale, fontSize: 21);
-        _pullButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _pullButton.Pressed += () => CloudPullPressed?.Invoke();
-        pushPullRow.AddChild(_pullButton);
+        pushPullRow.AddControl(_pullButton);
 
-        SettingsGroup.AddChild(pushPullRow);
+        _rows.AddChild(pushPullRow);
+        _rows.AddChild(SettingsRow.Separator(scale));
 
         _updateButton = new GameMenuButton(Localization.Tr("SETTING_CHECK_UPDATES"), scale, fontSize: 22);
         _updateButton.Visible = false;
         _updateButton.Pressed += () => CheckForUpdatesPressed?.Invoke();
-        SettingsGroup.AddChild(_updateButton);
+        var updateRow = new SettingsRow(Localization.Tr("SETTING_UPDATE_ROW"), scale);
+        updateRow.AddControl(_updateButton);
+        _rows.AddChild(updateRow);
 
         // No banner above the orange UPDATE LAUNCHER button. Earlier versions
         // had a single-line yellow prompt here, but the user found it noisy
@@ -171,7 +164,7 @@ public class ActionSection : VBoxContainer
     }
 
 
-    private HBoxContainer PushPullRow => (HBoxContainer)_pushButton.GetParent();
+    private Control PushPullRow => (Control)_pushButton.GetParent();
 
     public void ShowLaunch(string text, bool showCloudSync, bool showUpdate)
     {
@@ -182,7 +175,6 @@ public class ActionSection : VBoxContainer
         _betaChannelToggle.Visible = showCloudSync;
         _fpsOverlayToggle.Visible = true;
         PushPullRow.Visible = showCloudSync;
-        _cloudHeader.Visible = showCloudSync;
         _updateButton.Visible = showUpdate;
         _updateButton.Disabled = false;
         _updateButton.Text = Localization.Tr("SETTING_CHECK_UPDATES");
@@ -198,7 +190,6 @@ public class ActionSection : VBoxContainer
         _betaChannelToggle.Visible = false;
         _fpsOverlayToggle.Visible = false;
         PushPullRow.Visible = false;
-        _cloudHeader.Visible = false;
         _updateButton.Visible = false;
     }
 
@@ -211,9 +202,16 @@ public class ActionSection : VBoxContainer
         _betaChannelToggle.Visible = false;
         _fpsOverlayToggle.Visible = false;
         PushPullRow.Visible = false;
-        _cloudHeader.Visible = false;
         _updateButton.Visible = false;
         _appUpdateButton.Visible = false;
+    }
+
+    private void AddSettingRow(string labelKey, Control control, float scale)
+    {
+        var row = new SettingsRow(Localization.Tr(labelKey), scale);
+        row.AddControl(control);
+        _rows.AddChild(row);
+        _rows.AddChild(SettingsRow.Separator(scale));
     }
 
     public void SetCloudStatus(string text)
