@@ -5,7 +5,7 @@ using STS2Mobile.Patches;
 
 namespace STS2Mobile.Launcher.Components;
 
-// Debug performance overlay: four rows of "value · sparkline · detail", anchored
+// Debug performance overlay: four rows of "label · value · sparkline", anchored
 // below the status bar in the top-right corner where the game keeps no HUD.
 //
 // This assembly references GodotSharp directly instead of building through
@@ -20,22 +20,20 @@ public class FpsOverlay : CanvasLayer
     private const int SampleHz = 4;
     private const float SampleInterval = 1f / SampleHz;
     private const int HistoryLength = 120; // 30 s at SampleHz
-    private const int TopOffset = 100;
+    private const int TopOffset = 84;
     private const int RightMargin = 24;
-    private const int GraphWidth = 170;
-    private const int RowHeight = 42;
-    private const int LabelWidth = 42;
-    private const int ValueWidth = 76;
-    private const int DetailWidth = 132;
-    private const int CaptionSize = 13;
-    private const int ValueSize = 18;
-    private const int DetailSize = 14;
-    private const int PanelPadding = 8;
-    private const int ColumnGap = 10;
+    private const int GraphWidth = 104;
+    private const int RowHeight = 24;
+    private const int LabelWidth = 32;
+    private const int ValueWidth = 56;
+    private const int CaptionSize = 10;
+    private const int ValueSize = 13;
+    private const int PanelPadding = 6;
+    private const int ColumnGap = 6;
 
     // Keeps a 100% reading off the very top edge, so a full bar still reads as a
     // line rather than merging with the row above.
-    private const int GraphInset = 7;
+    private const int GraphInset = 4;
 
     // Fixed axes: an auto-scaled graph makes 5% GPU look identical to 95%.
     private const float LoadMin = 0f;
@@ -62,7 +60,6 @@ public class FpsOverlay : CanvasLayer
     private static readonly Color TempAccent = new(0.98f, 0.58f, 0.35f, 0.95f);
 
     private static readonly Color CaptionColor = new(0.68f, 0.70f, 0.76f, 0.85f);
-    private static readonly Color DetailColor = new(0.78f, 0.80f, 0.85f, 0.80f);
     private static readonly Color MidlineColor = new(1f, 1f, 1f, 0.10f);
     private static readonly Color SeparatorColor = new(1f, 1f, 1f, 0.07f);
 
@@ -104,7 +101,7 @@ public class FpsOverlay : CanvasLayer
 
     private void Build()
     {
-        int panelWidth = LabelWidth + ValueWidth + GraphWidth + DetailWidth + PanelPadding * 2;
+        int panelWidth = LabelWidth + ValueWidth + GraphWidth + PanelPadding * 2;
 
         var panel = new PanelContainer
         {
@@ -117,7 +114,7 @@ public class FpsOverlay : CanvasLayer
             OffsetBottom = TopOffset + RowHeight * RowCount() + (RowCount() - 1) + PanelPadding * 2,
         };
         var panelStyle = new StyleBoxFlat { BgColor = PanelColor, BorderColor = PanelBorder };
-        panelStyle.SetCornerRadiusAll(8);
+        panelStyle.SetCornerRadiusAll(2);
         panelStyle.SetBorderWidthAll(1);
         panel.AddThemeStyleboxOverride("panel", panelStyle);
         AddChild(panel);
@@ -217,26 +214,26 @@ public class FpsOverlay : CanvasLayer
         _fpsSamples++;
 
         float average = _fpsSum / _fpsSamples;
-        _fpsRow.Push(fps, $"{fps:F0}", $"avg {average:F0}   low {WorstFps():F0}");
+        _fpsRow.Push(fps, $"{fps:F0}");
 
         if (_cpuRow != null)
         {
             float? cpu = _stats.ReadCpuPercent(elapsed);
             float? ram = _stats.ReadRamMegabytes();
-            _cpuRow.Push(cpu, cpu is float c ? $"{c:F0} %" : null, ram is float r ? $"RAM {r:F0} MB" : "");
+            _cpuRow.Push(cpu, cpu is float c ? $"{c:F0} %" : null);
         }
 
         if (_gpuRow != null)
         {
             float? gpu = _stats.ReadGpuPercent();
             float vram = SystemStatsReader.VideoMemoryMegabytes();
-            _gpuRow.Push(gpu, gpu is float g ? $"{g:F0} %" : null, $"VRAM {vram:F0} MB");
+            _gpuRow.Push(gpu, gpu is float g ? $"{g:F0} %" : null);
         }
 
         if (_tempRow != null)
         {
             float? temp = _stats.ReadTemperatureCelsius();
-            _tempRow.Push(temp, temp is float t ? $"{t:F1} °C" : null, ThermalStatus());
+            _tempRow.Push(temp, temp is float t ? $"{t:F1} °C" : null);
         }
     }
 
@@ -283,23 +280,21 @@ public class FpsOverlay : CanvasLayer
         return _thermalStatus;
     }
 
-    // One "value · sparkline · detail" line, with its own fixed axis.
+    // One "label · value · sparkline" line, with its own fixed axis.
     private sealed class StatRow
     {
         private readonly HBoxContainer _container;
         private readonly Label _value;
-        private readonly Label _detail;
         private readonly Sparkline _graph;
         private readonly float? _alertAbove;
         private bool _everReadable;
 
-        private StatRow(HBoxContainer container, Label value, Sparkline graph, Label detail, float? alertAbove)
+        private StatRow(HBoxContainer container, Label value, Sparkline graph, float? alertAbove)
         {
             _alertAbove = alertAbove;
             _container = container;
             _value = value;
             _graph = graph;
-            _detail = detail;
         }
 
         public static StatRow Add(
@@ -338,11 +333,7 @@ public class FpsOverlay : CanvasLayer
             };
             row.AddChild(graph);
 
-            var detail = MakeLabel(DetailWidth, HorizontalAlignment.Right, DetailSize);
-            detail.AddThemeColorOverride("font_color", DetailColor);
-            row.AddChild(detail);
-
-            return new StatRow(row, value, graph, detail, alertAbove);
+            return new StatRow(row, value, graph, alertAbove);
         }
 
         private static Label MakeLabel(int width, HorizontalAlignment align, int size)
@@ -358,14 +349,23 @@ public class FpsOverlay : CanvasLayer
                 AutowrapMode = TextServer.AutowrapMode.Off,
             };
             label.AddThemeColorOverride("font_color", TextColor);
-            LauncherTheme.ApplyGameFont(label, size, 1f);
+            var mono = GameAssets.Load<Font>(GameAssets.FontMono);
+            if (mono != null)
+            {
+                label.AddThemeFontOverride("font", mono);
+                label.AddThemeFontSizeOverride("font_size", size);
+            }
+            else
+            {
+                LauncherTheme.ApplyGameFont(label, size, 1f);
+            }
             return label;
         }
 
         // A null sample means the counter was unreadable. Hide the row only while
         // it has never produced a value: once it works, a transient failure keeps
         // the last reading instead of making the row blink in and out.
-        public void Push(float? sample, string valueText, string detailText)
+        public void Push(float? sample, string valueText)
         {
             if (sample is not float v)
             {
@@ -379,7 +379,6 @@ public class FpsOverlay : CanvasLayer
             _value.Text = valueText;
             if (_alertAbove is float threshold)
                 _value.AddThemeColorOverride("font_color", v >= threshold ? AlertLine : TextColor);
-            _detail.Text = detailText ?? "";
             _graph.Push(v);
         }
     }

@@ -38,6 +38,10 @@ public static class NewsMarkup
         text = Regex.Replace(text, @"\[/?(?!b\]|/b\]|i\]|/i\]|u\]|/u\]|url|/url\]|font_size|/font_size\])[^\]]*\]",
             "", RegexOptions.IgnoreCase);
 
+        // Steam's HTML leaves lines holding nothing but spaces, and a "blank"
+        // line like that is not blank to the run collapse below — which is why
+        // paragraph gaps came out at arbitrary heights. Empty them first.
+        text = Regex.Replace(text, @"[^\S\n]+(?=\n)", "");
         text = Regex.Replace(text, @"\n{3,}", "\n\n");
         return text.Trim();
     }

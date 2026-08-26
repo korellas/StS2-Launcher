@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 using STS2Mobile.Launcher;
 using STS2Mobile.Launcher.Components;
@@ -98,14 +99,17 @@ public class NewsArticleView : VBoxContainer
         var bodyFont = LauncherTheme.GameFont();
         if (bodyFont != null)
         {
-            _body.AddThemeFontOverride("normal_font", bodyFont);
-            _body.AddThemeFontOverride("bold_font", bodyFont);
+            // The game font is drawn tight for short menu labels. At article
+            // length that reads as a wall, so open the glyph spacing up a little.
+            var spaced = new FontVariation { BaseFont = bodyFont, SpacingGlyph = 1 };
+            _body.AddThemeFontOverride("normal_font", spaced);
+            _body.AddThemeFontOverride("bold_font", spaced);
         }
         _body.AddThemeFontSizeOverride("normal_font_size", (int)(22 * scale));
         _body.AddThemeFontSizeOverride("bold_font_size", (int)(22 * scale));
         _body.AddThemeColorOverride("default_color", LauncherTheme.Cream);
         // Long prose needs air; the game font is drawn for short labels.
-        _body.AddThemeConstantOverride("line_separation", (int)(8 * scale));
+        _body.AddThemeConstantOverride("line_separation", (int)(11 * scale));
         _body.MetaClicked += meta => OpenOriginalRequested?.Invoke(meta.AsString());
         AddChild(_body);
 
@@ -204,7 +208,7 @@ public class NewsArticleView : VBoxContainer
     {
         _poll.Stop();
         _showingTranslation = true;
-        _body.Text = string.Join("\n", _translatedLines);
+        _body.Text = string.Join("\n", _translatedLines.Select(line => line.TrimEnd()));
         _translateButton.Disabled = false;
         _translateButton.Text = Localization.Tr("NEWS_SHOW_ORIGINAL");
     }
