@@ -20,8 +20,11 @@ public class StyledDialog : ColorRect
     private const float PanelHeightRatio = 0.527f;
     private const float RibbonTop = 0.843f;
     private const float RibbonBottom = 0.960f;
-    private const float RibbonInnerEdgeLeft = 0.335f;
-    private const float RibbonInnerEdgeRight = 0.695f;
+    // One width for both ribbons. They used to carry an inner edge each — 0.335
+    // on the left and 0.695 on the right — which are not mirror images, so the
+    // decline ribbon came out 10% wider than the accept one. Deriving both from
+    // a single figure makes that class of drift impossible.
+    private const float RibbonWidthRatio = 0.320f;
 
 
     public StyledDialog(string message, float scale, string title = null)
@@ -58,33 +61,49 @@ public class StyledDialog : ColorRect
         body.AddChild(text);
 
         // Decline sits left of accept, matching the game's own prompts.
-        AddRibbon(frame, scale, confirm: false, Localization.Tr("DIALOG_NO"), () =>
+        AddRibbon(frame, size, scale, confirm: false, Localization.Tr("DIALOG_NO"), () =>
         {
             Cancelled?.Invoke();
             QueueFree();
         });
-        AddRibbon(frame, scale, confirm: true, Localization.Tr("DIALOG_YES"), () =>
+        AddRibbon(frame, size, scale, confirm: true, Localization.Tr("DIALOG_YES"), () =>
         {
             Confirmed?.Invoke();
             QueueFree();
         });
     }
 
-    private static void AddRibbon(Control frame, float scale, bool confirm, string label, Action onPressed)
+    private static void AddRibbon(
+        Control frame,
+        Vector2 panelSize,
+        float scale,
+        bool confirm,
+        string label,
+        Action onPressed
+    )
     {
-        // Anchored on both axes: the ribbons sit inside the panel's lower area,
-        // each a third of its width, not straddling its border as they were.
-        var button = new GameRibbonButton(label, scale, confirm)
-        {
-            AnchorTop = RibbonTop,
-            AnchorBottom = RibbonBottom,
-            AnchorLeft = confirm ? RibbonInnerEdgeRight : 0f,
-            AnchorRight = confirm ? 1f : RibbonInnerEdgeLeft,
-            OffsetLeft = 0,
-            OffsetRight = 0,
-            OffsetTop = 0,
-            OffsetBottom = 0,
-        };
+        var button = new GameRibbonButton(label, scale, confirm);
+
+        // Height follows the artwork's own aspect rather than the anchor band.
+        // Stretching a ribbon into a box of unrelated proportions is what made
+        // these read as subtly wrong even once the widths agreed.
+        float width = panelSize.X * RibbonWidthRatio;
+        float height = button.SpriteSize.X > 0
+            ? width * button.SpriteSize.Y / button.SpriteSize.X
+            : panelSize.Y * (RibbonBottom - RibbonTop);
+
+        // Pinned to opposite panel edges at a shared centre line, so the pair is
+        // symmetric by construction at any viewport size.
+        float centerY = (RibbonTop + RibbonBottom) * 0.5f;
+        button.AnchorTop = centerY;
+        button.AnchorBottom = centerY;
+        button.OffsetTop = -height * 0.5f;
+        button.OffsetBottom = height * 0.5f;
+
+        button.AnchorLeft = confirm ? 1f : 0f;
+        button.AnchorRight = confirm ? 1f : 0f;
+        button.OffsetLeft = confirm ? -width : 0f;
+        button.OffsetRight = confirm ? 0f : width;
 
         button.Pressed += onPressed;
         frame.AddChild(button);

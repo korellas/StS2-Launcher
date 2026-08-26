@@ -7,6 +7,10 @@ namespace STS2Mobile.Launcher.Components;
 // prompt is indistinguishable from one the game raises itself.
 public class GameRibbonButton : Button
 {
+    // Natural sprite dimensions, so callers size the ribbon from the artwork's
+    // own aspect instead of stretching it into whatever box a ratio produces.
+    public Vector2 SpriteSize { get; } = Vector2.Zero;
+
     public GameRibbonButton(string text, float scale, bool confirm)
     {
         Text = text;
@@ -19,6 +23,8 @@ public class GameRibbonButton : Button
 
         if (sprite != null)
         {
+            SpriteSize = new Vector2(sprite.GetWidth(), sprite.GetHeight());
+
             // Only the horizontal margins are set. SetTextureMarginAll would also
             // fix the vertical ones, and a stylebox's texture margins act as a
             // minimum size — which is what inflated these into squares instead of

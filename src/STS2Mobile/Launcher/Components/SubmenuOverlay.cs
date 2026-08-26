@@ -40,16 +40,14 @@ public class SubmenuOverlay : Control
 
         var frame = BuildFrame(center, scale, widthRatio, heightRatio);
 
-        var back = new GameBackButton(scale)
-        {
-            AnchorTop = 0.66f,
-            AnchorBottom = 0.66f,
-            GrowVertical = GrowDirection.Both,
-            OffsetLeft = (int)(34 * scale),
-            OffsetRight = (int)(150 * scale),
-        };
-        back.Pressed += Hide;
-        AddChild(back);
+        // Anchored to the panel, not the screen. It used to sit 34px from the
+        // viewport's left edge at 66% of its height — figures with no relationship
+        // to the panel, so the button drifted away from it as the panel resized
+        // and ended up stranded in empty background.
+        _back = new GameBackButton(scale);
+        _back.Pressed += Hide;
+        AddChild(_back);
+        PositionBack();
 
         var header = new HBoxContainer();
         header.AddThemeConstantOverride("separation", (int)(12 * scale));
@@ -138,6 +136,11 @@ public class SubmenuOverlay : Control
     private float _widthRatio;
     private float _heightRatio;
     private Control _frame;
+    private GameBackButton _back;
+
+    // Overlap into the panel, as a fraction of the button's width, so the flag
+    // reads as attached to the panel rather than floating beside it.
+    private const float BackOverlapRatio = 0.30f;
 
     private Vector2 ViewportRelativeSize()
     {
@@ -151,8 +154,30 @@ public class SubmenuOverlay : Control
     {
         if (_frame != null)
             _frame.CustomMinimumSize = ViewportRelativeSize();
+        PositionBack();
         Visible = true;
         Opened?.Invoke();
+    }
+
+    // The panel is centred, so its edges follow from its size. Re-run on open
+    // because folding the device changes the viewport under a live overlay.
+    private void PositionBack()
+    {
+        if (_back == null)
+            return;
+
+        var panel = ViewportRelativeSize();
+        var button = _back.CustomMinimumSize;
+
+        _back.AnchorLeft = 0.5f;
+        _back.AnchorRight = 0.5f;
+        _back.OffsetLeft = -panel.X * 0.5f - button.X * (1f - BackOverlapRatio);
+        _back.OffsetRight = _back.OffsetLeft + button.X;
+
+        _back.AnchorTop = 0.5f;
+        _back.AnchorBottom = 0.5f;
+        _back.OffsetBottom = panel.Y * 0.5f;
+        _back.OffsetTop = _back.OffsetBottom - button.Y;
     }
 
     public new void Hide() => Visible = false;
