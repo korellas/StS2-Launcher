@@ -95,7 +95,7 @@ public class LauncherView
         // Settings controls are built by ActionSection but belong in a submenu,
         // so they are reparented rather than duplicated: every signal the
         // controller already connected keeps working untouched.
-        var settingsOverlay = new SubmenuOverlay(Localization.Tr("MENU_SETTINGS"), scale, widthRatio: 0.58f);
+        var settingsOverlay = new SubmenuOverlay(Localization.Tr("MENU_SETTINGS"), scale, widthRatio: 0.58f, heightRatio: 0.66f);
         Actions.RemoveChild(Actions.SettingsGroup);
         settingsOverlay.Content.AddChild(Actions.SettingsGroup);
         parent.AddChild(settingsOverlay);

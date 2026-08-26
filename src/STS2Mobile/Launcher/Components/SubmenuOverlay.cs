@@ -13,7 +13,7 @@ public class SubmenuOverlay : Control
 
     private readonly ColorRect _scrim;
 
-    public SubmenuOverlay(string title, float scale, float widthRatio = 0.68f, float heightRatio = 0f)
+    public SubmenuOverlay(string title, float scale, float widthRatio = 0.68f, float heightRatio = 0.72f)
     {
         SetAnchorsPreset(LayoutPreset.FullRect);
         Visible = false;
@@ -30,6 +30,11 @@ public class SubmenuOverlay : Control
         center.SetAnchorsPreset(LayoutPreset.FullRect);
         center.MouseFilter = MouseFilterEnum.Ignore;
         AddChild(center);
+
+        // Assigned before the frame is built: ViewportRelativeSize reads them, and
+        // leaving them at zero collapsed every panel down to its header.
+        _widthRatio = widthRatio;
+        _heightRatio = heightRatio;
 
         var frame = BuildFrame(center, scale, widthRatio, heightRatio);
 
@@ -121,8 +126,6 @@ public class SubmenuOverlay : Control
     private Vector2 ViewportRelativeSize()
     {
         var vp = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
-        // A zero height ratio means "fit the content": the settings panel had a
-        // fixed 86% height and stood mostly empty.
         return new Vector2((int)(vp.X * _widthRatio), (int)(vp.Y * _heightRatio));
     }
 
