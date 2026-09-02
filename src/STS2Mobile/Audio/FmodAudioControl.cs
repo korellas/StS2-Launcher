@@ -62,7 +62,9 @@ public static class FmodAudioControl
                 applied++;
             }
 
-            PatchHelper.Log($"[Audio] set_mute({muted}) applied to {applied}/{buses.Count} FMOD buses");
+            PatchHelper.Log(
+                $"[Audio] set_mute({muted}) applied to {applied}/{buses.Count} FMOD buses"
+            );
         }
         catch (Exception ex)
         {

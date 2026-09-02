@@ -11,7 +11,10 @@ public class StyledProgressBar : ProgressBar
         float heightPx = 12 * scale;
         CustomMinimumSize = new Vector2(0, (int)heightPx);
 
-        AddThemeStyleboxOverride("background", LauncherTheme.Pill(LauncherTheme.TrackFill, heightPx));
+        AddThemeStyleboxOverride(
+            "background",
+            LauncherTheme.Pill(LauncherTheme.TrackFill, heightPx)
+        );
         AddThemeStyleboxOverride("fill", LauncherTheme.Pill(LauncherTheme.Gold, heightPx));
 
         LauncherTheme.ApplyGameFont(this, 12, scale);

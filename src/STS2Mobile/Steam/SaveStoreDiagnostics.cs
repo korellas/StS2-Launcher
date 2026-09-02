@@ -1,8 +1,8 @@
 using System;
-using Godot;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Godot;
 
 namespace STS2Mobile.Steam;
 
@@ -23,11 +23,13 @@ public static class SaveStoreDiagnostics
             var assembly = typeof(MegaCrit.Sts2.Core.Nodes.NGame).Assembly;
             var sb = new StringBuilder();
 
-            foreach (var name in new[]
-            {
-                "MegaCrit.Sts2.Core.Saves.ICloudSaveStore",
-                "MegaCrit.Sts2.Core.Saves.ISaveStore",
-            })
+            foreach (
+                var name in new[]
+                {
+                    "MegaCrit.Sts2.Core.Saves.ICloudSaveStore",
+                    "MegaCrit.Sts2.Core.Saves.ISaveStore",
+                }
+            )
             {
                 var type = assembly.GetType(name);
                 if (type == null)
@@ -45,13 +47,11 @@ public static class SaveStoreDiagnostics
                     .Select(m =>
                         $"{Short(m.ReturnType)} {m.Name}("
                         + string.Join(",", m.GetParameters().Select(x => Short(x.ParameterType)))
-                        + ")")
+                        + ")"
+                    )
                     .OrderBy(x => x, StringComparer.Ordinal);
 
-                sb.Append(type.Name)
-                    .Append(" [")
-                    .Append(string.Join(", ", members))
-                    .Append("] ");
+                sb.Append(type.Name).Append(" [").Append(string.Join(", ", members)).Append("] ");
             }
 
             AppendIdentity(sb, assembly);
@@ -72,26 +72,36 @@ public static class SaveStoreDiagnostics
     {
         var ours = typeof(SaveStoreDiagnostics).Assembly;
 
-        Try(sb, "assemblies", () =>
-            $"game={Describe(gameAssembly)} mod={Describe(ours)}");
+        Try(sb, "assemblies", () => $"game={Describe(gameAssembly)} mod={Describe(ours)}");
 
-        Try(sb, "duplicates", () =>
-        {
-            var loaded = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => a.GetName().Name is "STS2Mobile" or "sts2")
-                .Select(Describe)
-                .ToArray();
-            return loaded.Length > 2 ? string.Join(" ; ", loaded) : $"none ({loaded.Length} loaded)";
-        });
+        Try(
+            sb,
+            "duplicates",
+            () =>
+            {
+                var loaded = AppDomain
+                    .CurrentDomain.GetAssemblies()
+                    .Where(a => a.GetName().Name is "STS2Mobile" or "sts2")
+                    .Select(Describe)
+                    .ToArray();
+                return loaded.Length > 2
+                    ? string.Join(" ; ", loaded)
+                    : $"none ({loaded.Length} loaded)";
+            }
+        );
 
-        Try(sb, "iface", () =>
-        {
-            var runtime = gameAssembly.GetType("MegaCrit.Sts2.Core.Saves.ICloudSaveStore");
-            var compiled = typeof(MegaCrit.Sts2.Core.Saves.ICloudSaveStore);
-            return ReferenceEquals(runtime, compiled)
-                ? "same instance"
-                : $"DIFFERENT: runtime={Describe(runtime?.Assembly)} compiled={Describe(compiled.Assembly)}";
-        });
+        Try(
+            sb,
+            "iface",
+            () =>
+            {
+                var runtime = gameAssembly.GetType("MegaCrit.Sts2.Core.Saves.ICloudSaveStore");
+                var compiled = typeof(MegaCrit.Sts2.Core.Saves.ICloudSaveStore);
+                return ReferenceEquals(runtime, compiled)
+                    ? "same instance"
+                    : $"DIFFERENT: runtime={Describe(runtime?.Assembly)} compiled={Describe(compiled.Assembly)}";
+            }
+        );
 
         // The scale figure used when reasoning about the launcher's geometry has
         // been an assumption — the screenshot's pixel size read as the viewport's.
@@ -99,11 +109,15 @@ public static class SaveStoreDiagnostics
         // Last, and by name: this is the call that is expected to throw. Mono
         // names the member it could not resolve in the TypeLoadException, which
         // is the one piece of information the member listing above cannot give.
-        Try(sb, "load", () =>
-        {
-            ours.GetType("STS2Mobile.Steam.SteamKit2CloudSaveStore", throwOnError: true);
-            return "ok";
-        });
+        Try(
+            sb,
+            "load",
+            () =>
+            {
+                ours.GetType("STS2Mobile.Steam.SteamKit2CloudSaveStore", throwOnError: true);
+                return "ok";
+            }
+        );
     }
 
     private static void Try(StringBuilder sb, string label, Func<string> probe)
@@ -151,5 +165,4 @@ public static class SaveStoreDiagnostics
             _ => type.Name,
         };
     }
-
 }

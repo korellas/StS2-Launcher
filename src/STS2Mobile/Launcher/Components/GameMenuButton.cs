@@ -8,7 +8,13 @@ namespace STS2Mobile.Launcher.Components;
 // the same control the game's own menu uses rather than an imitation of it.
 public class GameMenuButton : Button
 {
-    public GameMenuButton(string text, float scale, int fontSize = 22, bool primary = false, bool onParchment = false)
+    public GameMenuButton(
+        string text,
+        float scale,
+        int fontSize = 22,
+        bool primary = false,
+        bool onParchment = false
+    )
     {
         Text = text;
         Flat = true;

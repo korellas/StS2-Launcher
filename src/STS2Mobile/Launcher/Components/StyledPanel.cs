@@ -18,7 +18,9 @@ public class StyledPanel : CenterContainer
         // The game never shows a screen-filling box: its menus put content
         // straight onto the artwork. A full-bleed panel here hid the background
         // entirely and read as a dialog with no edges.
-        var style = transparent ? new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0) } : LauncherTheme.Panel(scale);
+        var style = transparent
+            ? new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0) }
+            : LauncherTheme.Panel(scale);
         style.ContentMarginLeft = S(scale, 28);
         style.ContentMarginRight = S(scale, 28);
         style.ContentMarginTop = S(scale, 24);

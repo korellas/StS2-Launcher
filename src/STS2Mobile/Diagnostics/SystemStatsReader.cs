@@ -86,10 +86,22 @@ public sealed class SystemStatsReader
                 .Trim()
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-            if (parts.Length >= 2
-                && double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double busy)
-                && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double total)
-                && total > 0)
+            if (
+                parts.Length >= 2
+                && double.TryParse(
+                    parts[0],
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out double busy
+                )
+                && double.TryParse(
+                    parts[1],
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out double total
+                )
+                && total > 0
+            )
             {
                 return (float)Math.Clamp(busy / total * 100.0, 0.0, 100.0);
             }
@@ -117,8 +129,15 @@ public sealed class SystemStatsReader
                 .Trim()
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-            if (raw.Length > 0
-                && float.TryParse(raw[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float percent))
+            if (
+                raw.Length > 0
+                && float.TryParse(
+                    raw[0],
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out float percent
+                )
+            )
             {
                 return Math.Clamp(percent, 0f, 100f);
             }
@@ -171,7 +190,9 @@ public sealed class SystemStatsReader
     {
         try
         {
-            ulong bytes = RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed);
+            ulong bytes = RenderingServer.GetRenderingInfo(
+                RenderingServer.RenderingInfo.VideoMemUsed
+            );
             return bytes / 1024f / 1024f;
         }
         catch

@@ -35,7 +35,10 @@ public class ActionSection : VBoxContainer
     public VBoxContainer SettingsGroup { get; }
 
     private readonly VBoxContainer _rows;
-    private readonly System.Collections.Generic.Dictionary<string, GameCheckbox> _overlayRowToggles = new();
+    private readonly System.Collections.Generic.Dictionary<
+        string,
+        GameCheckbox
+    > _overlayRowToggles = new();
     private readonly StyledLabel _cloudStatus;
 
     public ActionSection(float scale)
@@ -50,11 +53,15 @@ public class ActionSection : VBoxContainer
         _rows.AddThemeConstantOverride("separation", 0);
         SettingsGroup.AddChild(_rows);
 
-        _retryButton = new GameMenuButton(Localization.Tr("MENU_RETRY"), scale, fontSize: 34, primary: true);
+        _retryButton = new GameMenuButton(
+            Localization.Tr("MENU_RETRY"),
+            scale,
+            fontSize: 34,
+            primary: true
+        );
         _retryButton.Visible = false;
         _retryButton.Pressed += () => RetryPressed?.Invoke();
         AddChild(_retryButton);
-
 
         _localBackupToggle = new GameCheckbox(scale);
         _localBackupToggle.ToggleMode = true;
@@ -100,12 +107,14 @@ public class ActionSection : VBoxContainer
 
         // One switch per line of the overlay, so an unwanted reading can be
         // dropped without losing the rest.
-        foreach (var (row, key) in new[]
-        {
-            ("cpu", "SETTING_OVERLAY_CPU"),
-            ("gpu", "SETTING_OVERLAY_GPU"),
-            ("temp", "SETTING_OVERLAY_TEMP"),
-        })
+        foreach (
+            var (row, key) in new[]
+            {
+                ("cpu", "SETTING_OVERLAY_CPU"),
+                ("gpu", "SETTING_OVERLAY_GPU"),
+                ("temp", "SETTING_OVERLAY_TEMP"),
+            }
+        )
         {
             var box = new GameCheckbox(scale);
             var rowName = row;
@@ -113,7 +122,6 @@ public class ActionSection : VBoxContainer
             _overlayRowToggles[rowName] = box;
             AddSettingRow(key, box, scale);
         }
-
 
         // Cloud transfers used to report only into the console; this line keeps
         // the outcome next to the buttons that started it.
@@ -128,18 +136,30 @@ public class ActionSection : VBoxContainer
         var pushPullRow = new SettingsRow(Localization.Tr("SETTING_CLOUD_HEADER"), scale);
         pushPullRow.Visible = false;
 
-        _pushButton = new GameMenuButton(Localization.Tr("SETTING_UPLOAD_SAVES"), scale, fontSize: 21);
+        _pushButton = new GameMenuButton(
+            Localization.Tr("SETTING_UPLOAD_SAVES"),
+            scale,
+            fontSize: 21
+        );
         _pushButton.Pressed += () => CloudPushPressed?.Invoke();
         pushPullRow.AddControl(_pushButton);
 
-        _pullButton = new GameMenuButton(Localization.Tr("SETTING_DOWNLOAD_SAVES"), scale, fontSize: 21);
+        _pullButton = new GameMenuButton(
+            Localization.Tr("SETTING_DOWNLOAD_SAVES"),
+            scale,
+            fontSize: 21
+        );
         _pullButton.Pressed += () => CloudPullPressed?.Invoke();
         pushPullRow.AddControl(_pullButton);
 
         _rows.AddChild(pushPullRow);
         _rows.AddChild(SettingsRow.Separator(scale));
 
-        _updateButton = new GameMenuButton(Localization.Tr("SETTING_CHECK_UPDATES"), scale, fontSize: 22);
+        _updateButton = new GameMenuButton(
+            Localization.Tr("SETTING_CHECK_UPDATES"),
+            scale,
+            fontSize: 22
+        );
         _updateButton.Visible = false;
         _updateButton.Pressed += () => CheckForUpdatesPressed?.Invoke();
         var updateRow = new SettingsRow(Localization.Tr("SETTING_UPDATE_ROW"), scale);
@@ -151,13 +171,22 @@ public class ActionSection : VBoxContainer
         // and asked us to remove it — the button itself already changes label
         // (e.g. "UPDATE LAUNCHER → v0.3.19", "Downloading… 42%",
         // "TAP TO INSTALL") so a separate prompt was redundant.
-        _appUpdateButton = new GameMenuButton(Localization.Tr("MENU_UPDATE_LAUNCHER"), scale, fontSize: 26);
+        _appUpdateButton = new GameMenuButton(
+            Localization.Tr("MENU_UPDATE_LAUNCHER"),
+            scale,
+            fontSize: 26
+        );
         _appUpdateButton.Visible = false;
         _appUpdateButton.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         _appUpdateButton.Pressed += () => AppUpdatePressed?.Invoke();
         AddChild(_appUpdateButton);
 
-        _launchButton = new GameMenuButton(Localization.Tr("MENU_PLAY"), scale, fontSize: 40, primary: true);
+        _launchButton = new GameMenuButton(
+            Localization.Tr("MENU_PLAY"),
+            scale,
+            fontSize: 40,
+            primary: true
+        );
         _launchButton.Visible = false;
         _launchButton.Pressed += () => LaunchPressed?.Invoke();
         AddChild(_launchButton);
@@ -182,7 +211,6 @@ public class ActionSection : VBoxContainer
     {
         _betaChannelToggle.ButtonPressed = value;
     }
-
 
     private Control PushPullRow => (Control)_pushButton.GetParent();
 

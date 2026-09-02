@@ -22,20 +22,28 @@ public static class GameAssets
     public const string SettingsTabTheme = "res://themes/settings_screen_tab.tres";
     public const string FontRegular = "res://themes/kreon_regular_shared.tres";
     public const string FontBold = "res://themes/kreon_bold_shared.tres";
-    public const string FontKorean = "res://themes/fonts/kor/gyeonggi_cheonnyeon_batang_bold_shared.tres";
+    public const string FontKorean =
+        "res://themes/fonts/kor/gyeonggi_cheonnyeon_batang_bold_shared.tres";
+
     // Used only by the debug overlay: fixed-width digits stop the readout
     // twitching as values change. Falls back to the menu font if the game moves it.
     public const string FontMono = "res://themes/source_code_pro_medium_shared.tres";
     public const string SubmenuPanel = "res://images/packed/common_ui/submenu_panel.png";
     public const string SubmenuPanelShort = "res://images/packed/common_ui/submenu_panel_short.png";
-    public const string CheckboxTicked = "res://images/atlases/ui_atlas.sprites/checkbox_ticked.tres";
-    public const string CheckboxUnticked = "res://images/atlases/ui_atlas.sprites/checkbox_unticked.tres";
+    public const string CheckboxTicked =
+        "res://images/atlases/ui_atlas.sprites/checkbox_ticked.tres";
+    public const string CheckboxUnticked =
+        "res://images/atlases/ui_atlas.sprites/checkbox_unticked.tres";
     public const string PopupPanel = "res://images/atlases/ui_atlas.sprites/popup_vertical.tres";
-    public const string PopupCancelButton = "res://images/atlases/ui_atlas.sprites/popup_cancel_button.tres";
-    public const string PopupConfirmButton = "res://images/atlases/ui_atlas.sprites/popup_confirm_button.tres";
+    public const string PopupCancelButton =
+        "res://images/atlases/ui_atlas.sprites/popup_cancel_button.tres";
+    public const string PopupConfirmButton =
+        "res://images/atlases/ui_atlas.sprites/popup_confirm_button.tres";
     public const string BackButton = "res://images/atlases/ui_atlas.sprites/back_button.tres";
-    public const string BackButtonArrow = "res://images/atlases/compressed.sprites/back_button_arrow.tres";
-    public const string ScrollTrack = "res://images/packed/common_ui/small_scrollbar_track_center.png";
+    public const string BackButtonArrow =
+        "res://images/atlases/compressed.sprites/back_button_arrow.tres";
+    public const string ScrollTrack =
+        "res://images/packed/common_ui/small_scrollbar_track_center.png";
     public const string ScrollGrabber = "res://images/packed/common_ui/small_scrollbar_train.png";
 
     private static bool _mountAttempted;
@@ -61,7 +69,9 @@ public static class GameAssets
             var pck = Path.Combine(OS.GetDataDir(), "game", "SlayTheSpire2.pck");
             if (!File.Exists(pck))
             {
-                PatchHelper.Log("[GameAssets] game pack not downloaded yet, using launcher styling");
+                PatchHelper.Log(
+                    "[GameAssets] game pack not downloaded yet, using launcher styling"
+                );
                 return;
             }
 
@@ -87,13 +97,23 @@ public static class GameAssets
         if (!Available)
             return;
 
-        foreach (var path in new[]
+        foreach (
+            var path in new[]
+            {
+                MenuButtonTheme,
+                SettingsRowTheme,
+                SettingsTabTheme,
+                FontRegular,
+                FontBold,
+                FontKorean,
+                SubmenuPanel,
+                SubmenuPanelShort,
+            }
+        )
         {
-            MenuButtonTheme, SettingsRowTheme, SettingsTabTheme,
-            FontRegular, FontBold, FontKorean, SubmenuPanel, SubmenuPanelShort,
-        })
-        {
-            PatchHelper.Log($"[GameAssets] {(ResourceLoader.Exists(path) ? "ok  " : "MISS")} {path}");
+            PatchHelper.Log(
+                $"[GameAssets] {(ResourceLoader.Exists(path) ? "ok  " : "MISS")} {path}"
+            );
         }
     }
 

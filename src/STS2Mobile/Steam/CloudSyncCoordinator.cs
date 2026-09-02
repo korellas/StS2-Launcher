@@ -142,8 +142,7 @@ public static class CloudSyncCoordinator
     {
         var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
         var cloudStore =
-            CloudStoreHolder.Current
-            ?? new SteamKit2CloudSaveStore(accountName, refreshToken);
+            CloudStoreHolder.Current ?? new SteamKit2CloudSaveStore(accountName, refreshToken);
 
         var paths = GetSaveFilePaths(localStore);
         PatchHelper.Log($"[Cloud] Push: starting ({paths.Count} files)");
@@ -203,8 +202,7 @@ public static class CloudSyncCoordinator
     {
         var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
         var cloudStore =
-            CloudStoreHolder.Current
-            ?? new SteamKit2CloudSaveStore(accountName, refreshToken);
+            CloudStoreHolder.Current ?? new SteamKit2CloudSaveStore(accountName, refreshToken);
 
         var paths = GetSaveFilePaths(cloudStore);
         PatchHelper.Log($"[Cloud] Pull: starting ({paths.Count} files)");

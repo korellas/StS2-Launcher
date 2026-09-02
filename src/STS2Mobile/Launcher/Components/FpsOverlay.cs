@@ -46,7 +46,6 @@ public class FpsOverlay : CanvasLayer
     private const float LoadAlertThreshold = 90f;
     private const float TempAlertThreshold = 50f;
 
-
     private static readonly Color PanelColor = new(0.02f, 0.02f, 0.04f, 0.72f);
     private static readonly Color PanelBorder = new(0.55f, 0.55f, 0.62f, 0.28f);
     private static readonly Color TextColor = new(1f, 1f, 1f, 0.92f);
@@ -139,19 +138,43 @@ public class FpsOverlay : CanvasLayer
         if (LauncherPatches.OverlayShowCpu)
         {
             AddSeparator(rows);
-            _cpuRow = StatRow.Add(rows, "cpu", "CPU", LoadMin, LoadMax, CpuAccent, LoadAlertThreshold);
+            _cpuRow = StatRow.Add(
+                rows,
+                "cpu",
+                "CPU",
+                LoadMin,
+                LoadMax,
+                CpuAccent,
+                LoadAlertThreshold
+            );
         }
 
         if (LauncherPatches.OverlayShowGpu)
         {
             AddSeparator(rows);
-            _gpuRow = StatRow.Add(rows, "gpu", "GPU", LoadMin, LoadMax, GpuAccent, LoadAlertThreshold);
+            _gpuRow = StatRow.Add(
+                rows,
+                "gpu",
+                "GPU",
+                LoadMin,
+                LoadMax,
+                GpuAccent,
+                LoadAlertThreshold
+            );
         }
 
         if (LauncherPatches.OverlayShowTemp)
         {
             AddSeparator(rows);
-            _tempRow = StatRow.Add(rows, "temp", "TEMP", TempMin, TempMax, TempAccent, TempAlertThreshold);
+            _tempRow = StatRow.Add(
+                rows,
+                "temp",
+                "TEMP",
+                TempMin,
+                TempMax,
+                TempAccent,
+                TempAlertThreshold
+            );
         }
     }
 

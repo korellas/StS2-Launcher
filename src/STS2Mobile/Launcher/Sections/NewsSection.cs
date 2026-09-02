@@ -28,7 +28,12 @@ public class NewsSection : VBoxContainer
         _scale = scale;
         AddThemeConstantOverride("separation", (int)(4 * scale));
 
-        var header = new StyledLabel(Localization.Tr("NEWS_HEADER"), scale, fontSize: 19, align: HorizontalAlignment.Left);
+        var header = new StyledLabel(
+            Localization.Tr("NEWS_HEADER"),
+            scale,
+            fontSize: 19,
+            align: HorizontalAlignment.Left
+        );
         header.AddThemeColorOverride("font_color", StatusColor);
         AddChild(header);
 
@@ -90,10 +95,7 @@ public class NewsSection : VBoxContainer
         btn.Text = "";
 
         var transparent = StyledButton.MakeFilled(Colors.Transparent, 0);
-        var hoverStyle = StyledButton.MakeFilled(
-            new Color(1f, 1f, 1f, 0.07f),
-            (int)(3 * _scale)
-        );
+        var hoverStyle = StyledButton.MakeFilled(new Color(1f, 1f, 1f, 0.07f), (int)(3 * _scale));
         btn.AddThemeStyleboxOverride("normal", transparent);
         btn.AddThemeStyleboxOverride("hover", hoverStyle);
         btn.AddThemeStyleboxOverride("pressed", hoverStyle);
@@ -113,7 +115,12 @@ public class NewsSection : VBoxContainer
         inner.AddThemeConstantOverride("separation", (int)(2 * _scale));
         inner.MouseFilter = MouseFilterEnum.Ignore;
 
-        var title = new StyledLabel(item.Title, _scale, fontSize: 24, align: HorizontalAlignment.Left);
+        var title = new StyledLabel(
+            item.Title,
+            _scale,
+            fontSize: 24,
+            align: HorizontalAlignment.Left
+        );
         title.AddThemeColorOverride("font_color", TitleColor);
         title.AutowrapMode = TextServer.AutowrapMode.Off;
         title.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
@@ -121,7 +128,12 @@ public class NewsSection : VBoxContainer
         title.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(title);
 
-        var date = new StyledLabel(FormatDate(item.Date), _scale, fontSize: 17, align: HorizontalAlignment.Left);
+        var date = new StyledLabel(
+            FormatDate(item.Date),
+            _scale,
+            fontSize: 17,
+            align: HorizontalAlignment.Left
+        );
         date.AddThemeColorOverride("font_color", DateColor);
         date.MouseFilter = MouseFilterEnum.Ignore;
         inner.AddChild(date);

@@ -408,9 +408,7 @@ public class LauncherController
 
         if (!AppUpdateInstaller.CanInstallPackages())
         {
-            _view.AppendLog(
-                "This app isn't allowed to install packages. Opening settings..."
-            );
+            _view.AppendLog("This app isn't allowed to install packages. Opening settings...");
             _view.Actions.SetAppUpdatePermissionNeeded();
             AppUpdateInstaller.RequestInstallPermission();
             return;

@@ -45,7 +45,10 @@ public static class ModelDbInitPatch
             new[] { typeof(Type) },
             null
         );
-        _contentByIdField = modelDbType.GetField("_contentById", BindingFlags.NonPublic | BindingFlags.Static);
+        _contentByIdField = modelDbType.GetField(
+            "_contentById",
+            BindingFlags.NonPublic | BindingFlags.Static
+        );
 
         if (_getIdMethod != null)
             _getIdInvoker = HarmonyLib.MethodInvoker.GetHandler(_getIdMethod);

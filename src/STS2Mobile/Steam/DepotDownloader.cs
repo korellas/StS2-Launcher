@@ -300,9 +300,7 @@ public class DepotDownloader : IDisposable
             if (selectedBranch == null)
                 continue;
 
-            Log(
-                $"Found depot {depotId} manifest {manifestId} (branch={selectedBranch})"
-            );
+            Log($"Found depot {depotId} manifest {manifestId} (branch={selectedBranch})");
             result.Add((depotId, manifestId, selectedBranch));
         }
 

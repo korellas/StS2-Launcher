@@ -15,7 +15,12 @@ public class SubmenuOverlay : Control
 
     private readonly ColorRect _scrim;
 
-    public SubmenuOverlay(string title, float scale, float widthRatio = 0.68f, float heightRatio = 0.72f)
+    public SubmenuOverlay(
+        string title,
+        float scale,
+        float widthRatio = 0.68f,
+        float heightRatio = 0.72f
+    )
     {
         SetAnchorsPreset(LayoutPreset.FullRect);
         Visible = false;
@@ -23,7 +28,11 @@ public class SubmenuOverlay : Control
 
         // Dim whatever is behind so the panel reads as a modal layer, and give
         // tapping outside an obvious way to close.
-        _scrim = new ColorRect { Color = new Color(0f, 0f, 0f, 0.55f), MouseFilter = MouseFilterEnum.Stop };
+        _scrim = new ColorRect
+        {
+            Color = new Color(0f, 0f, 0f, 0.55f),
+            MouseFilter = MouseFilterEnum.Stop,
+        };
         _scrim.SetAnchorsPreset(LayoutPreset.FullRect);
         _scrim.GuiInput += OnScrimInput;
         AddChild(_scrim);
@@ -78,11 +87,15 @@ public class SubmenuOverlay : Control
         Content.AddThemeConstantOverride("separation", (int)(10 * scale));
         gutter.AddChild(Content);
 
-        var titleLabel = new StyledLabel(title, scale, fontSize: 26, align: HorizontalAlignment.Left);
+        var titleLabel = new StyledLabel(
+            title,
+            scale,
+            fontSize: 26,
+            align: HorizontalAlignment.Left
+        );
         titleLabel.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         header.AddChild(titleLabel);
-
     }
 
     // NinePatchRect over the game's panel art when available; the launcher's own
@@ -129,7 +142,11 @@ public class SubmenuOverlay : Control
 
     private void OnScrimInput(InputEvent evt)
     {
-        if (evt is InputEventMouseButton { Pressed: true } or InputEventScreenTouch { Pressed: true })
+        if (
+            evt
+            is InputEventMouseButton { Pressed: true }
+                or InputEventScreenTouch { Pressed: true }
+        )
             Hide();
     }
 
@@ -143,8 +160,6 @@ public class SubmenuOverlay : Control
     // The game puts the flag's centre here, measured on its settings screen.
     // Tying it to the panel's bottom edge instead left it 275px low.
     private const float BackCenterY = 0.6214f;
-
-
 
     private Vector2 ViewportRelativeSize()
     {

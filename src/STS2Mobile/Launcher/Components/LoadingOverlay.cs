@@ -90,10 +90,7 @@ public class LoadingOverlay : CanvasLayer
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
             Size = new Vector2(labelWidth, labelHeight),
-            Position = new Vector2(
-                vpSize.X - labelWidth - margin,
-                vpSize.Y - labelHeight - margin
-            ),
+            Position = new Vector2(vpSize.X - labelWidth - margin, vpSize.Y - labelHeight - margin),
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
         LauncherTheme.ApplyGameFont(_textLabel, 28, scale);

@@ -46,9 +46,7 @@ public static class AppUpdateInstaller
             {
                 File.Delete(stale);
             }
-            catch
-            {
-            }
+            catch { }
         }
 
         var safeVersion = string.IsNullOrEmpty(version) ? "update" : version;
@@ -57,8 +55,10 @@ public static class AppUpdateInstaller
         using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         http.DefaultRequestHeaders.Add("User-Agent", "StS2-Launcher");
 
-        using var response = await http
-            .GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead)
+        using var response = await http.GetAsync(
+                downloadUrl,
+                HttpCompletionOption.ResponseHeadersRead
+            )
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 

@@ -154,7 +154,6 @@ public static class LauncherPatches
         // survives the scene transition the game performs in GameStartup.
         var overlay = LoadingOverlay.Show(tree);
 
-
         var instanceField = typeof(SaveManager).GetField(
             "_instance",
             BindingFlags.NonPublic | BindingFlags.Static

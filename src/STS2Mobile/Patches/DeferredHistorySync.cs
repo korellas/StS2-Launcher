@@ -51,7 +51,9 @@ internal static class DeferredHistorySync
             return;
         }
 
-        PatchHelper.Log($"[Cloud] Sync timed out after {CloudSyncTimeout.TotalSeconds:F0}s: {path}");
+        PatchHelper.Log(
+            $"[Cloud] Sync timed out after {CloudSyncTimeout.TotalSeconds:F0}s: {path}"
+        );
     }
 
     // Drains the deferred history queue with bounded concurrency. Called once after

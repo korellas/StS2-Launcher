@@ -22,17 +22,19 @@ public class StyledDialog : ColorRect
     private const float PanelWidthRatio = 0.326f;
     private const float PanelHeightRatio = 0.483f;
     private const float RibbonCenterY = 0.838f;
+
     // The label may occupy at most this much of the ribbon before the ribbon is
     // widened to keep it clear of the tapered ends.
     private const float MaxLabelFill = 0.55f;
+
     // Keeps the body clear of the ribbons: their centre line plus half a ribbon.
     private const float BodyBottomRatio = 0.205f;
+
     // One width for both ribbons. They used to carry an inner edge each — 0.335
     // on the left and 0.695 on the right — which are not mirror images, so the
     // decline ribbon came out 10% wider than the accept one. Deriving both from
     // a single figure makes that class of drift impossible.
     private const float RibbonWidthRatio = 0.353f;
-
 
     public StyledDialog(string message, float scale, string title = null)
     {
@@ -57,7 +59,11 @@ public class StyledDialog : ColorRect
 
         var body = BuildPanel(frame, scale, size);
 
-        var heading = new StyledLabel(title ?? Localization.Tr("DIALOG_CONFIRM_TITLE"), scale, fontSize: 28);
+        var heading = new StyledLabel(
+            title ?? Localization.Tr("DIALOG_CONFIRM_TITLE"),
+            scale,
+            fontSize: 28
+        );
         heading.AddThemeColorOverride("font_color", TitleGold);
         body.AddChild(heading);
 
@@ -96,16 +102,18 @@ public class StyledDialog : ColorRect
         // One width for both, taken from whichever label needs more room. Sizing
         // each to its own text is what made the pair asymmetric; sizing both to a
         // fixed fraction is what truncated the longer one.
-        float needed = Mathf.Max(decline.MeasuredTextWidth, accept.MeasuredTextWidth) / MaxLabelFill;
+        float needed =
+            Mathf.Max(decline.MeasuredTextWidth, accept.MeasuredTextWidth) / MaxLabelFill;
         float width = Mathf.Max(panelSize.X * RibbonWidthRatio, needed);
 
         foreach (var (button, confirm) in new[] { (decline, false), (accept, true) })
         {
             // Height follows the artwork's own aspect rather than an anchor band,
             // so the ribbon is never stretched into unrelated proportions.
-            float height = button.SpriteSize.X > 0
-                ? width * button.SpriteSize.Y / button.SpriteSize.X
-                : panelSize.Y * 0.117f;
+            float height =
+                button.SpriteSize.X > 0
+                    ? width * button.SpriteSize.Y / button.SpriteSize.X
+                    : panelSize.Y * 0.117f;
 
             button.AnchorTop = RibbonCenterY;
             button.AnchorBottom = RibbonCenterY;
