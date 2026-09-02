@@ -103,6 +103,16 @@ fi
 APK_SIZE=$(ls -lh "$APK_PATH" | awk '{print $5}')
 echo "✓ APK built: $APK_PATH ($APK_SIZE)"
 
+# Package the same canonical notices that are embedded in the APK. Keeping the
+# release attachment derived from android/assets/legal avoids a second copy
+# drifting away from what users receive in the application.
+LEGAL_ARCHIVE="$APK_DIR/StS2Launcher-v$VERSION-legal-notices.zip"
+(
+    cd "$ROOT/android/assets"
+    COPYFILE_DISABLE=1 zip -qr "$LEGAL_ARCHIVE" legal
+)
+echo "✓ Legal notices: $LEGAL_ARCHIVE"
+
 # Commit + tag + push
 TAG="v$VERSION"
 echo "→ Committing version bump + tagging $TAG"
@@ -129,7 +139,7 @@ NOTES_FILE=$(mktemp)
 } > "$NOTES_FILE"
 
 # Create GitHub release and upload APK.
-GH_ARGS=(release create "$TAG" "$APK_PATH" --title "$TAG" --notes-file "$NOTES_FILE")
+GH_ARGS=(release create "$TAG" "$APK_PATH" "$LEGAL_ARCHIVE" --title "$TAG" --notes-file "$NOTES_FILE")
 if [[ "$DRAFT" == true ]]; then GH_ARGS+=(--draft); fi
 if [[ "$PRERELEASE" == true ]]; then GH_ARGS+=(--prerelease); fi
 

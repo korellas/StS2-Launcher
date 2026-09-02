@@ -126,6 +126,9 @@ android {
     ndkVersion versions.ndkVersion
 
     packagingOptions {
+        // Dependency-provided files collide at these generic paths. The release
+        // packages consolidated canonical texts explicitly under assets/legal/;
+        // these exclusions do not remove the underlying notice obligations.
         exclude 'META-INF/LICENSE'
         exclude 'META-INF/NOTICE'
 

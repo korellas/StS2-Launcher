@@ -1,0 +1,25 @@
+FMOD Engine and FMOD Studio attribution
+
+Copyright (c) Firelight Technologies Pty Ltd.
+Terms: https://www.fmod.com/legal
+Attribution requirements: https://www.fmod.com/attribution
+
+Made using FMOD Studio by Firelight Technologies Pty Ltd.
+
+FMOD runtime libraries may be present in built APKs but are not licensed by the
+project's MIT License. The applicable FMOD license, project registration, and
+startup logo/credit requirements remain binding on each distributor.
+
+FMOD codec notices
+
+FMOD includes Ogg, Vorbis, FLAC and Opus codecs under the Xiph BSD 3-Clause
+license in BSD-3-CLAUSE.txt:
+
+- Ogg: Copyright (c) 2002, Xiph.org Foundation
+- Vorbis: Copyright (c) 2002-2020, Xiph.org Foundation
+- Tremor: Copyright (c) 2002, Xiph.org Foundation
+- FLAC: Copyright (C) 2000-2009 Josh Coalson; Copyright (C) 2011-2025
+  Xiph.Org Foundation
+- Opus: Copyright 2001-2023 Xiph.Org, Skype Limited, Octasic, Jean-Marc Valin,
+  Timothy B. Terriberry, CSIRO, Gregory Maxwell, Mark Borgerding,
+  Erik de Castro Lopo, Mozilla, and Amazon

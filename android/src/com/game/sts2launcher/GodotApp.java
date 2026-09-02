@@ -44,12 +44,14 @@ import java.net.URLEncoder;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.List;
@@ -138,6 +140,7 @@ public class GodotApp extends GodotActivity {
 		extractAssetFile("launcher_bg.png", "launcher_bg.png");
 		extractAssetFile("launcher_font.ttf", "launcher_font.ttf");
 		extractAssetFile("launcher_logo.png", "launcher_logo.png");
+		extractAssetFile("google-translate-attribution.png", "google-translate-attribution.png");
 
 		super.onCreate(savedInstanceState);
 
@@ -350,6 +353,21 @@ public class GodotApp extends GodotActivity {
 		}
 	}
 
+	public String readBundledLegalNotices() {
+		try (InputStream in = getAssets().open("legal/NOTICE.txt");
+				ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+			byte[] buffer = new byte[8192];
+			int count;
+			while ((count = in.read(buffer)) >= 0) {
+				out.write(buffer, 0, count);
+			}
+			return new String(out.toByteArray(), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			Log.w(TAG, "Could not read bundled legal notices", e);
+			return "";
+		}
+	}
+
 	@Override
 	public List<String> getCommandLine() {
 		List<String> commands = new ArrayList<>(super.getCommandLine());
@@ -460,26 +478,25 @@ public class GodotApp extends GodotActivity {
 	// throw away a run in progress without warning.
 	// ---- On-device translation -------------------------------------------------
 	//
-	// Uses the platform's translation framework rather than bundling a model:
-	// whichever service the device ships answers the request, which on a Galaxy
-	// means Samsung's own translator instead of a generic offline model. It needs
-	// API 31 and a translation service to be present, so every entry point here
-	// reports failure rather than assuming, and the caller can fall back.
+	// Uses the platform translation framework when available and Google ML Kit as
+	// the explicit fallback. Every completed request records its provider so the
+	// launcher can show Google's required attribution only for ML Kit output.
 
 	private final Executor translationExecutor = Executors.newSingleThreadExecutor();
 	private volatile String translationResult;
 	private volatile String translationState = "idle";
+	private volatile String translationProvider = "";
 
 	// Logged once so an unsupported device is diagnosable from the console rather
 	// than looking like a silent failure.
 	public String translationCapabilities() {
 		if (Build.VERSION.SDK_INT < 31) {
-			return "unsupported: needs API 31, device is " + Build.VERSION.SDK_INT;
+			return "on-device (ML Kit)";
 		}
 		try {
 			TranslationManager manager = getSystemService(TranslationManager.class);
 			if (manager == null) {
-				return "unavailable: no TranslationManager on this device";
+				return "on-device (ML Kit)";
 			}
 			Set<TranslationCapability> caps = manager.getOnDeviceTranslationCapabilities(
 					TranslationSpec.DATA_FORMAT_TEXT, TranslationSpec.DATA_FORMAT_TEXT);
@@ -498,7 +515,22 @@ public class GodotApp extends GodotActivity {
 			}
 			return sb.toString();
 		} catch (Throwable t) {
-			return "error: " + t;
+			return "on-device (ML Kit fallback)";
+		}
+	}
+
+	public boolean translationWillUseMlKit() {
+		if (Build.VERSION.SDK_INT < 31) {
+			return true;
+		}
+		try {
+			TranslationManager manager = getSystemService(TranslationManager.class);
+			Set<TranslationCapability> caps = manager == null ? null
+					: manager.getOnDeviceTranslationCapabilities(
+							TranslationSpec.DATA_FORMAT_TEXT, TranslationSpec.DATA_FORMAT_TEXT);
+			return caps == null || caps.isEmpty();
+		} catch (Throwable t) {
+			return true;
 		}
 	}
 
@@ -508,6 +540,7 @@ public class GodotApp extends GodotActivity {
 	public void startTranslation(String text, String sourceLanguage, String targetLanguage) {
 		translationResult = null;
 		translationState = "running";
+		translationProvider = "";
 
 		if (text == null || text.isEmpty()) {
 			translationState = "failed";
@@ -553,6 +586,7 @@ public class GodotApp extends GodotActivity {
 											response.getTranslationResponseValues().get(0);
 									if (value.getStatusCode() == TranslationResponseValue.STATUS_SUCCESS) {
 										translationResult = String.valueOf(value.getText());
+										translationProvider = "platform";
 										translationState = "done";
 									} else {
 										translationState = "failed";
@@ -591,6 +625,7 @@ public class GodotApp extends GodotActivity {
 					.addOnSuccessListener(ignored -> translator.translate(text)
 							.addOnSuccessListener(result -> {
 								translationResult = result;
+								translationProvider = "google_mlkit";
 								translationState = "done";
 								translator.close();
 							})
@@ -616,6 +651,10 @@ public class GodotApp extends GodotActivity {
 
 	public String getTranslationResult() {
 		return translationResult == null ? "" : translationResult;
+	}
+
+	public String getTranslationProvider() {
+		return translationProvider;
 	}
 
 	public void moveToBackground() {

@@ -56,7 +56,8 @@ public class LauncherView
         parent.AddChild(menu);
         _menu = menu;
 
-        // Sits above the entries where the text title used to be.
+        // The replacement artwork identifies compatibility. The adjacent plain
+        // text makes the project's unofficial status explicit.
         var logo = LauncherTheme.LoadLogo();
         if (logo != null)
         {
@@ -69,8 +70,30 @@ public class LauncherView
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             };
             menu.AddChild(mark);
-            menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(28 * scale)) });
         }
+        else
+        {
+            var title = new Label
+            {
+                Text = Localization.Tr("LAUNCHER_TITLE"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            };
+            title.AddThemeFontSizeOverride("font_size", (int)(34 * scale));
+            title.AddThemeColorOverride("font_color", LauncherTheme.Cream);
+            menu.AddChild(title);
+        }
+
+        var unofficial = new Label
+        {
+            Text = Localization.Tr("UNOFFICIAL_NOTICE"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        unofficial.AddThemeFontSizeOverride("font_size", (int)(12 * scale));
+        unofficial.AddThemeColorOverride("font_color", LauncherTheme.Dim);
+        menu.AddChild(unofficial);
+        menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(20 * scale)) });
 
         _statusLabel = new StyledLabel(Localization.Tr("STATUS_INITIALIZING"), scale, fontSize: 15);
         _statusLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -96,12 +119,21 @@ public class LauncherView
         // Settings controls are built by ActionSection but belong in a submenu,
         // so they are reparented rather than duplicated: every signal the
         // controller already connected keeps working untouched.
-        var settingsOverlay = new SubmenuOverlay(Localization.Tr("MENU_SETTINGS"), scale, widthRatio: 0.58f, heightRatio: 0.66f);
+        var settingsOverlay = new SubmenuOverlay(
+            Localization.Tr("MENU_SETTINGS"),
+            scale,
+            widthRatio: 0.58f,
+            heightRatio: 0.66f
+        );
         Actions.RemoveChild(Actions.SettingsGroup);
         settingsOverlay.Content.AddChild(Actions.SettingsGroup);
         parent.AddChild(settingsOverlay);
 
-        var newsOverlay = new SubmenuOverlay(Localization.Tr("MENU_NEWS"), scale, heightRatio: 0.78f);
+        var newsOverlay = new SubmenuOverlay(
+            Localization.Tr("MENU_NEWS"),
+            scale,
+            heightRatio: 0.78f
+        );
         News = new NewsSection(scale);
         News.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         newsOverlay.Content.AddChild(News);
@@ -132,7 +164,11 @@ public class LauncherView
 
         parent.AddChild(newsOverlay);
 
-        var consoleOverlay = new SubmenuOverlay(Localization.Tr("MENU_CONSOLE"), scale, heightRatio: 0.78f);
+        var consoleOverlay = new SubmenuOverlay(
+            Localization.Tr("MENU_CONSOLE"),
+            scale,
+            heightRatio: 0.78f
+        );
         Log = new LogView(scale);
         Log.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         Log.GuiInput += DismissKeyboard;
@@ -140,7 +176,11 @@ public class LauncherView
 
         // Copy dumps the whole log to the clipboard: selecting text in a
         // RichTextLabel by touch is fiddly enough that one tap is worth keeping.
-        var copyLogsButton = new GameMenuButton(Localization.Tr("ACTION_COPY_LOG"), scale, fontSize: 15);
+        var copyLogsButton = new GameMenuButton(
+            Localization.Tr("ACTION_COPY_LOG"),
+            scale,
+            fontSize: 15
+        );
         copyLogsButton.Pressed += () =>
         {
             DisplayServer.ClipboardSet(Log.GetParsedText());
@@ -148,6 +188,14 @@ public class LauncherView
         };
         consoleOverlay.Content.AddChild(copyLogsButton);
         parent.AddChild(consoleOverlay);
+
+        var legalOverlay = new SubmenuOverlay(
+            Localization.Tr("LEGAL_TITLE"),
+            scale,
+            heightRatio: 0.78f
+        );
+        legalOverlay.Content.AddChild(new LegalInfoView(scale));
+        parent.AddChild(legalOverlay);
 
         // Secondary entries sit closer together than PLAY does, giving the menu
         // an obvious primary action instead of four equal-weight lines.
@@ -167,9 +215,12 @@ public class LauncherView
         menu.AddChild(consoleEntry);
         _consoleEntry = consoleEntry;
 
+        var legalEntry = new GameMenuButton(Localization.Tr("MENU_LEGAL"), scale);
+        legalEntry.Pressed += legalOverlay.Open;
+        menu.AddChild(legalEntry);
+
         var quitEntry = new GameMenuButton(Localization.Tr("MENU_QUIT"), scale);
-        quitEntry.Pressed += () =>
-            ShowConfirmation(Localization.Tr("QUIT_CONFIRM"), QuitApp);
+        quitEntry.Pressed += () => ShowConfirmation(Localization.Tr("QUIT_CONFIRM"), QuitApp);
         menu.AddChild(quitEntry);
 
         // Footer: version on the left, FMOD attribution on the right. The credit

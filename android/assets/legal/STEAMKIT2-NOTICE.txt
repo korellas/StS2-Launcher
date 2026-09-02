@@ -1,0 +1,24 @@
+SteamKit2 3.4.0
+Source: https://github.com/SteamRE/SteamKit
+Package source commit: 1c7bc9c41a529e8fbb1e6890f1e4dbcdc5200cb7
+Package metadata license expression: LGPL-2.1-only
+
+The package-carried copyright notice reproduced below says version 2.1 or, at
+the recipient's option, any later version. This file records both statements
+instead of resolving that upstream metadata conflict.
+
+Copyright (C) 2018 Ryan Stecker & SteamRE Team
+
+This library is free software; you can redistribute it and/or modify it under
+the terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option) any
+later version.
+
+This library is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See LGPL-2.1.txt for the complete license.
+
+The launcher packages SteamKit2 as a separate managed assembly. Recipients may
+replace that assembly in a rebuilt APK and may obtain the corresponding source
+from the source and commit above. This notice does not grant any right to use
+Steam services beyond Valve's applicable agreements.

@@ -20,6 +20,7 @@ public class NewsArticleView : VBoxContainer
     private readonly StyledLabel _date;
     private readonly StyledLabel _translateStatus;
     private readonly RichTextLabel _body;
+    private readonly TextureRect _googleAttribution;
     private readonly float _scale;
     private readonly Button _translateButton;
     private const string BulletMarker = "\u2022";
@@ -38,6 +39,7 @@ public class NewsArticleView : VBoxContainer
     private string _url = "";
     private string _originalBody = "";
     private bool _showingTranslation;
+    private bool _usedGoogleMlKit;
 
     // Set once a request fails, so a device without a translation service doesn't
     // spend a spinner on every article that gets opened.
@@ -60,11 +62,15 @@ public class NewsArticleView : VBoxContainer
 
         header.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
-        _translateButton = new GameMenuButton(Localization.Tr("NEWS_TRANSLATE"), scale, fontSize: 17);
+        _translateButton = new GameMenuButton(TranslateActionText(), scale, fontSize: 17);
         _translateButton.Pressed += Translate;
         header.AddChild(_translateButton);
 
-        var original = new GameMenuButton(Localization.Tr("NEWS_OPEN_ORIGINAL"), scale, fontSize: 17);
+        var original = new GameMenuButton(
+            Localization.Tr("NEWS_OPEN_ORIGINAL"),
+            scale,
+            fontSize: 17
+        );
         original.Pressed += () => OpenOriginalRequested?.Invoke(_url);
         header.AddChild(original);
 
@@ -74,7 +80,8 @@ public class NewsArticleView : VBoxContainer
         _translateStatus = new StyledLabel("", scale, fontSize: 15, HorizontalAlignment.Left);
         _translateStatus.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _translateStatus.AddThemeColorOverride("font_color", new Color(0.85f, 0.66f, 0.42f));
-        _translateStatus.Text = $"{Localization.Tr("NEWS_TRANSLATE")}: {_translation.Capabilities()}";
+        _translateStatus.Text =
+            $"{Localization.Tr("NEWS_TRANSLATE")}: {_translation.Capabilities()}";
         AddChild(_translateStatus);
 
         _title = new StyledLabel("", scale, fontSize: 30, HorizontalAlignment.Left);
@@ -84,6 +91,9 @@ public class NewsArticleView : VBoxContainer
         _date = new StyledLabel("", scale, fontSize: 17, HorizontalAlignment.Left);
         _date.Modulate = new Color(1f, 1f, 1f, 0.6f);
         AddChild(_date);
+
+        _googleAttribution = BuildGoogleAttribution(scale);
+        AddChild(_googleAttribution);
 
         _body = new RichTextLabel
         {
@@ -129,10 +139,12 @@ public class NewsArticleView : VBoxContainer
 
         _originalBody = NewsMarkup.ToGodotBbcode(item.Contents);
         _showingTranslation = false;
+        _usedGoogleMlKit = false;
+        _googleAttribution.Visible = false;
         _body.Text = string.IsNullOrWhiteSpace(_originalBody)
             ? Localization.Tr("NEWS_NO_BODY")
             : _originalBody;
-        _translateButton.Text = Localization.Tr("NEWS_TRANSLATE");
+        _translateButton.Text = TranslateActionText();
         _translateButton.Disabled = string.IsNullOrWhiteSpace(_originalBody);
         Visible = true;
 
@@ -147,7 +159,8 @@ public class NewsArticleView : VBoxContainer
         {
             _showingTranslation = false;
             _body.Text = _originalBody;
-            _translateButton.Text = Localization.Tr("NEWS_TRANSLATE");
+            _googleAttribution.Visible = false;
+            _translateButton.Text = TranslateActionText();
             return;
         }
 
@@ -162,6 +175,8 @@ public class NewsArticleView : VBoxContainer
 
         _sourceLines.Clear();
         _translatedLines.Clear();
+        _usedGoogleMlKit = false;
+        _googleAttribution.Visible = false;
         _sourceLines.AddRange(GroupIntoParagraphs(plain));
         _lineIndex = 0;
 
@@ -253,8 +268,19 @@ public class NewsArticleView : VBoxContainer
     private void FinishTranslation()
     {
         _poll.Stop();
+
+        if (_usedGoogleMlKit && _googleAttribution.Texture == null)
+        {
+            PatchHelper.Log(
+                "[Translate] Google attribution asset missing; refusing to show ML Kit output"
+            );
+            ReportUnavailable();
+            return;
+        }
+
         _showingTranslation = true;
         _body.Text = string.Join("\n", _translatedLines.Select(line => line.TrimEnd()));
+        _googleAttribution.Visible = _usedGoogleMlKit;
         _translateButton.Disabled = false;
         _translateButton.Text = Localization.Tr("NEWS_SHOW_ORIGINAL");
     }
@@ -262,6 +288,7 @@ public class NewsArticleView : VBoxContainer
     private void ReportUnavailable()
     {
         _translationUnavailable = true;
+        _googleAttribution.Visible = false;
         _translateButton.Disabled = false;
         _translateButton.Text = Localization.Tr("NEWS_TRANSLATE_UNAVAILABLE");
 
@@ -279,6 +306,7 @@ public class NewsArticleView : VBoxContainer
 
             case TranslationBridge.State.Done:
                 _poll.Stop();
+                _usedGoogleMlKit |= _translation.ResultUsesGoogleMlKit();
                 _translatedLines.Add(_translation.Result());
                 _lineIndex++;
                 if (!StartNextLine())
@@ -290,5 +318,42 @@ public class NewsArticleView : VBoxContainer
                 ReportUnavailable();
                 return;
         }
+    }
+
+    private string TranslateActionText() =>
+        Localization.Tr(
+            _translation.WillUseGoogleMlKit() ? "NEWS_TRANSLATE_GOOGLE" : "NEWS_TRANSLATE"
+        );
+
+    private static TextureRect BuildGoogleAttribution(float scale)
+    {
+        var rect = new TextureRect
+        {
+            Visible = false,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            CustomMinimumSize = new Vector2((int)(264 * scale), (int)(24 * scale)),
+            MouseFilter = MouseFilterEnum.Ignore,
+        };
+
+        try
+        {
+            var path = System.IO.Path.Combine(OS.GetDataDir(), "google-translate-attribution.png");
+            if (!System.IO.File.Exists(path))
+            {
+                PatchHelper.Log($"[Translate] Google attribution asset not found at {path}");
+                return rect;
+            }
+
+            var image = new Image();
+            image.LoadPngFromBuffer(System.IO.File.ReadAllBytes(path));
+            rect.Texture = ImageTexture.CreateFromImage(image);
+        }
+        catch (Exception ex)
+        {
+            PatchHelper.Log($"[Translate] Google attribution load failed: {ex.Message}");
+        }
+
+        return rect;
     }
 }

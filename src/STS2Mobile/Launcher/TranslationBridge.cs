@@ -27,6 +27,18 @@ public sealed class TranslationBridge
 
     public bool Available => _godotApp != null;
 
+    public bool WillUseGoogleMlKit()
+    {
+        try
+        {
+            return _godotApp != null && (bool)_godotApp.Call("translationWillUseMlKit");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     // Logged once at startup: an unsupported device should be diagnosable from
     // the console rather than looking like the feature silently doing nothing.
     public string Capabilities()
@@ -82,6 +94,18 @@ public sealed class TranslationBridge
         catch
         {
             return "";
+        }
+    }
+
+    public bool ResultUsesGoogleMlKit()
+    {
+        try
+        {
+            return (string)_godotApp?.Call("getTranslationProvider") == "google_mlkit";
+        }
+        catch
+        {
+            return false;
         }
     }
 }

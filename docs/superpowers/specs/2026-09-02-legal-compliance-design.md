@@ -24,9 +24,11 @@ removed:
   artwork.
 - `art/splash.png`: replace with independently created landscape artwork or a
   neutral composition derived from the new app icon.
-- `art/launcher-logo.png`: remove without replacement. The launcher title will
-  be rendered as ordinary text so an image cannot be mistaken for an official
-  game logo.
+- `art/launcher-logo.png`: replace with the maintainer-supplied hand-drawn logo.
+  Its original color and lettering will be preserved while only the outer alpha
+  edge is feathered by about one pixel. Because it uses the game's name, a plain
+  unofficial/non-affiliation statement will remain immediately adjacent in the
+  launcher UI.
 - `art/reference/`: remove the game screenshots without replacement.
 - Processed Android and launcher assets derived from the files above will be
   regenerated from the new sources.
@@ -44,12 +46,15 @@ Preferred source specifications:
   safe area and no text.
 - Launcher background: `1920x1080` PNG, landscape, with a quiet central/lower
   region so controls remain readable.
+- Launcher logo: transparent landscape PNG, independent artwork rather than an
+  official logo copy, with no use outside compatibility identification.
 - Splash artwork: `1920x1080` PNG, landscape, with the mark centered and no
   embedded product name. It may be derived from the app icon.
 
-The app-facing title will say `Unofficial StS2 Launcher`, accompanied by a
-plain-language statement that the project is not affiliated with or endorsed
-by Mega Crit or Valve. `StS2` is used only to identify compatibility.
+The Android-facing title will say `Unofficial StS2 Launcher`. The hand-drawn
+launcher logo will be accompanied by a plain-language statement that the
+project is not affiliated with or endorsed by Mega Crit or Valve. The game name
+is used only to identify compatibility.
 
 Runtime use of resources from game files downloaded by an authenticated owner
 is not changed in this cleanup. Those resources are not distributed in the
@@ -177,9 +182,11 @@ Validation will include:
 ## Acceptance criteria
 
 - No official game screenshot remains in the tracked tree.
-- No legacy launcher logo or key art remains in the source or APK.
-- The supplied replacement assets have documented redistributable provenance
-  and satisfy the neutral-branding constraints above.
+- No legacy launcher logo or key art remains in the source or APK; the accepted
+  maintainer-supplied replacements are used instead.
+- The source-to-derived mapping for the supplied replacement assets is
+  documented, and public redistribution remains gated on retaining applicable
+  generator/service or authorship evidence.
 - The launcher clearly identifies itself as unofficial and non-affiliated.
 - Required third-party notices are present in the source distribution and APK.
 - ML Kit translation output has the required attribution and privacy disclosure.
