@@ -73,24 +73,13 @@ public class LauncherView
         }
         else
         {
-            var title = new Label
-            {
-                Text = Localization.Tr("LAUNCHER_TITLE"),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                AutowrapMode = TextServer.AutowrapMode.WordSmart,
-            };
-            title.AddThemeFontSizeOverride("font_size", (int)(34 * scale));
-            title.AddThemeColorOverride("font_color", LauncherTheme.Cream);
+            var title = new StyledLabel(Localization.Tr("LAUNCHER_TITLE"), scale, fontSize: 34);
+            title.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             menu.AddChild(title);
         }
 
-        var unofficial = new Label
-        {
-            Text = Localization.Tr("UNOFFICIAL_NOTICE"),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
-        };
-        unofficial.AddThemeFontSizeOverride("font_size", (int)(12 * scale));
+        var unofficial = new StyledLabel(Localization.Tr("UNOFFICIAL_NOTICE"), scale, fontSize: 12);
+        unofficial.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         unofficial.AddThemeColorOverride("font_color", LauncherTheme.Dim);
         menu.AddChild(unofficial);
         menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(20 * scale)) });

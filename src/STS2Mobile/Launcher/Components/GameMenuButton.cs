@@ -57,7 +57,7 @@ public class GameMenuButton : Button
         foreach (var state in new[] { "normal", "hover", "pressed", "focus", "disabled" })
             AddThemeStyleboxOverride(state, new StyleBoxEmpty());
 
-        LauncherTheme.ApplyFont(this, fontSize, scale);
+        LauncherTheme.ApplyGameFont(this, fontSize, scale);
         AddThemeColorOverride("font_color", onParchment ? LauncherTheme.Ink : LauncherTheme.Cream);
         AddThemeColorOverride("font_hover_color", LauncherTheme.Gold);
         AddThemeColorOverride("font_pressed_color", LauncherTheme.Gold);

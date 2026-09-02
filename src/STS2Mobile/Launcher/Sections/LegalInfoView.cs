@@ -15,16 +15,19 @@ public sealed class LegalInfoView : VBoxContainer
             Text = LegalNotices.Load(),
             FitContent = true,
             ScrollActive = false,
-            SelectionEnabled = true,
+            SelectionEnabled = false,
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
             CustomMinimumSize = new Vector2(0, (int)(420 * scale)),
-            MouseFilter = MouseFilterEnum.Pass,
+            MouseFilter = MouseFilterEnum.Ignore,
+            FocusMode = FocusModeEnum.None,
         };
-        body.AddThemeFontSizeOverride("normal_font_size", (int)(17 * scale));
+        LauncherTheme.ApplyGameRichTextFont(body, 17, scale);
         body.AddThemeColorOverride("default_color", LauncherTheme.Cream);
         body.AddThemeConstantOverride("line_separation", (int)(7 * scale));
+        body.AddThemeStyleboxOverride("normal", new StyleBoxEmpty());
+        body.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
         AddChild(body);
     }
 }

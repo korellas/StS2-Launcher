@@ -9,7 +9,7 @@ public class StyledLineEdit : LineEdit
         PlaceholderText = placeholder;
         Secret = secret;
         CustomMinimumSize = new Vector2(0, (int)(38 * scale));
-        AddThemeFontSizeOverride("font_size", (int)(14 * scale));
+        LauncherTheme.ApplyGameFont(this, 14, scale);
         ContextMenuEnabled = true;
         ShortcutKeysEnabled = true;
         SelectAllOnFocus = true;

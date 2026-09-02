@@ -131,6 +131,41 @@ public static class LauncherTheme
         ApplyFont(control, fontSize, scale);
     }
 
+    public static void ApplyGameRichTextFont(
+        RichTextLabel control,
+        int fontSize,
+        float scale,
+        int glyphSpacing = 0
+    )
+    {
+        Font normal = GameFont() ?? Font;
+        Font bold = GameFont(bold: true) ?? normal;
+
+        if (normal != null)
+        {
+            control.AddThemeFontOverride(
+                "normal_font",
+                glyphSpacing == 0
+                    ? normal
+                    : new FontVariation { BaseFont = normal, SpacingGlyph = glyphSpacing }
+            );
+        }
+
+        if (bold != null)
+        {
+            control.AddThemeFontOverride(
+                "bold_font",
+                glyphSpacing == 0
+                    ? bold
+                    : new FontVariation { BaseFont = bold, SpacingGlyph = glyphSpacing }
+            );
+        }
+
+        int scaledSize = (int)(fontSize * scale);
+        control.AddThemeFontSizeOverride("normal_font_size", scaledSize);
+        control.AddThemeFontSizeOverride("bold_font_size", scaledSize);
+    }
+
     public static void ApplyFont(Control control, int fontSize, float scale)
     {
         if (Font != null)

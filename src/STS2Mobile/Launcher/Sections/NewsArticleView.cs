@@ -109,17 +109,9 @@ public class NewsArticleView : VBoxContainer
             // but a drag reaches the ScrollContainer instead of dying here.
             MouseFilter = MouseFilterEnum.Pass,
         };
-        var bodyFont = LauncherTheme.GameFont();
-        if (bodyFont != null)
-        {
-            // The game font is drawn tight for short menu labels. At article
-            // length that reads as a wall, so open the glyph spacing up a little.
-            var spaced = new FontVariation { BaseFont = bodyFont, SpacingGlyph = 1 };
-            _body.AddThemeFontOverride("normal_font", spaced);
-            _body.AddThemeFontOverride("bold_font", spaced);
-        }
-        _body.AddThemeFontSizeOverride("normal_font_size", (int)(22 * scale));
-        _body.AddThemeFontSizeOverride("bold_font_size", (int)(22 * scale));
+        // The game font is drawn tight for short menu labels. At article length
+        // that reads as a wall, so open the glyph spacing up a little.
+        LauncherTheme.ApplyGameRichTextFont(_body, 22, scale, glyphSpacing: 1);
         _body.AddThemeColorOverride("default_color", LauncherTheme.Cream);
         // Long prose needs air; the game font is drawn for short labels.
         _body.AddThemeConstantOverride("line_separation", (int)(11 * scale));
