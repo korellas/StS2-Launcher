@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using STS2Mobile.Launcher;
 
@@ -22,38 +23,11 @@ public class GameMenuButton : Button
 
         var theme = GameAssets.Load<Theme>(GameAssets.MenuButtonTheme);
         if (theme != null)
-        {
-            // Apply the game's theme and then leave it alone. Theme *overrides*
-            // outrank the theme itself, so adding our own font and colours on top
-            // silently discarded everything we mounted the game pack for.
             Theme = theme;
 
-            // The theme is keyed on Label, so Button's own styleboxes are absent
-            // from it and Godot falls back to the engine default — a grey rounded
-            // rectangle that showed up as a frame around every entry. Clearing
-            // them leaves the text the theme actually styles.
-            foreach (var state in new[] { "normal", "hover", "pressed", "focus", "disabled" })
-                AddThemeStyleboxOverride(state, new StyleBoxEmpty());
-
-            // The theme carries colours and styleboxes but no size, so without
-            // this every entry renders at Godot's default and looks like fine
-            // print next to the artwork.
-            AddThemeFontSizeOverride("font_size", (int)(fontSize * scale));
-
-            // The theme's font has no Hangul; swap it out rather than render boxes.
-            if (Localization.IsKorean)
-            {
-                var korean = GameAssets.Load<Font>(GameAssets.FontKorean);
-                if (korean != null)
-                    AddThemeFontOverride("font", korean);
-            }
-            if (onParchment)
-                AddThemeColorOverride("font_color", LauncherTheme.Ink);
-            return;
-        }
-
-        // Without the game pack, approximate the same shape: text only, no
-        // background, so the fallback differs in typeface rather than in form.
+        // The game's menu theme is keyed on Label, while this control is a Button.
+        // Set Button's text properties explicitly so English does not fall back to
+        // Godot's default face and every entry stays legible over the artwork.
         foreach (var state in new[] { "normal", "hover", "pressed", "focus", "disabled" })
             AddThemeStyleboxOverride(state, new StyleBoxEmpty());
 
@@ -61,9 +35,10 @@ public class GameMenuButton : Button
         AddThemeColorOverride("font_color", onParchment ? LauncherTheme.Ink : LauncherTheme.Cream);
         AddThemeColorOverride("font_hover_color", LauncherTheme.Gold);
         AddThemeColorOverride("font_pressed_color", LauncherTheme.Gold);
+        AddThemeColorOverride("font_hover_pressed_color", LauncherTheme.Gold);
+        AddThemeColorOverride("font_focus_color", LauncherTheme.Gold);
         AddThemeColorOverride("font_disabled_color", LauncherTheme.Dim);
-        AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.8f));
-        AddThemeConstantOverride("shadow_offset_y", (int)(2 * scale));
-        AddThemeConstantOverride("shadow_outline_size", (int)(3 * scale));
+        AddThemeColorOverride("font_outline_color", new Color(0f, 0f, 0f, 0.88f));
+        AddThemeConstantOverride("outline_size", Math.Max(1, (int)(3 * scale)));
     }
 }

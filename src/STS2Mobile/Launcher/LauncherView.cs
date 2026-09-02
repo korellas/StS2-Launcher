@@ -46,8 +46,8 @@ public class LauncherView
         {
             AnchorLeft = 0.5f,
             AnchorRight = 0.5f,
-            AnchorTop = 0.52f,
-            AnchorBottom = 0.52f,
+            AnchorTop = 0.56f,
+            AnchorBottom = 0.56f,
             GrowHorizontal = Control.GrowDirection.Both,
             GrowVertical = Control.GrowDirection.Both,
         };
@@ -78,15 +78,15 @@ public class LauncherView
             menu.AddChild(title);
         }
 
-        var unofficial = new StyledLabel(Localization.Tr("UNOFFICIAL_NOTICE"), scale, fontSize: 12);
+        var unofficial = new StyledLabel(Localization.Tr("UNOFFICIAL_NOTICE"), scale, fontSize: 13);
         unofficial.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        unofficial.AddThemeColorOverride("font_color", LauncherTheme.Dim);
+        unofficial.AddThemeColorOverride("font_color", new Color(0.88f, 0.84f, 0.74f, 0.94f));
         menu.AddChild(unofficial);
-        menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(20 * scale)) });
+        menu.AddChild(new Control { CustomMinimumSize = new Vector2(0, (int)(8 * scale)) });
 
-        _statusLabel = new StyledLabel(Localization.Tr("STATUS_INITIALIZING"), scale, fontSize: 15);
+        _statusLabel = new StyledLabel(Localization.Tr("STATUS_INITIALIZING"), scale, fontSize: 16);
         _statusLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _statusLabel.Modulate = new Color(1f, 1f, 1f, 0.72f);
+        _statusLabel.Modulate = new Color(1f, 1f, 1f, 0.95f);
         menu.AddChild(_statusLabel);
 
         // Breathing room between the greeting and the entries, so PLAY reads as
