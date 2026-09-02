@@ -12,11 +12,13 @@ using SteamKit2.Internal;
 namespace STS2Mobile.Steam;
 
 // ICloudSaveStore backed by SteamKit2 CCloud unified messages.
-public class SteamKit2CloudSaveStore : ICloudSaveStore, ISaveStore, IDisposable
+// ICloudSaveStore already extends ISaveStore, so naming both was redundant — and
+// it is the one structural difference between this and the probe type that loads
+// cleanly on the device, which inherits ISaveStore's members instead of declaring
+// them alongside a derived interface.
+public class SteamKit2CloudSaveStore : ICloudSaveStore, IDisposable
 {
     private const uint AppId = 2868840;
-
-    internal static SteamKit2CloudSaveStore Instance { get; private set; }
 
     private readonly SteamConnection _connection;
     private readonly CloudFileCache _cache;
@@ -33,7 +35,7 @@ public class SteamKit2CloudSaveStore : ICloudSaveStore, ISaveStore, IDisposable
         _cache = new CloudFileCache(_connection);
         _writeQueue = new CloudWriteQueue();
 
-        Instance = this;
+        CloudStoreHolder.Current = this;
     }
 
     public void Flush(int timeoutMs = 5000)
@@ -47,8 +49,8 @@ public class SteamKit2CloudSaveStore : ICloudSaveStore, ISaveStore, IDisposable
         _writeQueue.Dispose();
         _connection.Dispose();
         _http.Dispose();
-        if (Instance == this)
-            Instance = null;
+        if (CloudStoreHolder.Current == this)
+            CloudStoreHolder.Current = null;
     }
 
     public string ReadFile(string path)

@@ -40,16 +40,14 @@ public class SubmenuOverlay : Control
 
         var frame = BuildFrame(center, scale, widthRatio, heightRatio);
 
-        var back = new GameBackButton(scale)
-        {
-            AnchorTop = 0.66f,
-            AnchorBottom = 0.66f,
-            GrowVertical = GrowDirection.Both,
-            OffsetLeft = (int)(34 * scale),
-            OffsetRight = (int)(150 * scale),
-        };
-        back.Pressed += Hide;
-        AddChild(back);
+        // Anchored to the panel, not the screen. It used to sit 34px from the
+        // viewport's left edge at 66% of its height — figures with no relationship
+        // to the panel, so the button drifted away from it as the panel resized
+        // and ended up stranded in empty background.
+        _back = new GameBackButton(scale);
+        _back.Pressed += Hide;
+        AddChild(_back);
+        PositionBack();
 
         var header = new HBoxContainer();
         header.AddThemeConstantOverride("separation", (int)(12 * scale));
@@ -138,6 +136,15 @@ public class SubmenuOverlay : Control
     private float _widthRatio;
     private float _heightRatio;
     private Control _frame;
+    private GameBackButton _back;
+
+    private const float BackClipRatio = 0.174f;
+
+    // The game puts the flag's centre here, measured on its settings screen.
+    // Tying it to the panel's bottom edge instead left it 275px low.
+    private const float BackCenterY = 0.6214f;
+
+
 
     private Vector2 ViewportRelativeSize()
     {
@@ -151,8 +158,37 @@ public class SubmenuOverlay : Control
     {
         if (_frame != null)
             _frame.CustomMinimumSize = ViewportRelativeSize();
+        PositionBack();
         Visible = true;
         Opened?.Invoke();
+    }
+
+    // The panel is centred, so its edges follow from its size. Re-run on open
+    // because folding the device changes the viewport under a live overlay.
+    private void PositionBack()
+    {
+        if (_back == null)
+            return;
+
+        var panel = ViewportRelativeSize();
+        var button = _back.CustomMinimumSize;
+
+        // Flush against the screen's left edge, not the panel's. Hanging it off
+        // the panel put it in mid-air once the panel narrowed.
+        _back.AnchorLeft = 0f;
+        _back.AnchorRight = 0f;
+        // Hung off the left edge, not flush against it. Thresholding both
+        // screenshots shows the game runs 20.9% of the flag's width past the
+        // screen: its flag measures 217px across where the sprite's proportions
+        // put the whole thing at 274. Sitting ours fully on screen is why it read
+        // as about twice the size when it is 1.37x.
+        _back.OffsetLeft = -button.X * BackClipRatio;
+        _back.OffsetRight = _back.OffsetLeft + button.X;
+
+        _back.AnchorTop = BackCenterY;
+        _back.AnchorBottom = BackCenterY;
+        _back.OffsetTop = -button.Y * 0.5f;
+        _back.OffsetBottom = button.Y * 0.5f;
     }
 
     public new void Hide() => Visible = false;

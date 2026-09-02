@@ -1,0 +1,27 @@
+Google ML Kit on-device Translation
+
+Usage guidelines:
+https://developers.google.com/ml-kit/language/translation/translation-terms
+
+Terms and privacy:
+https://developers.google.com/ml-kit/terms
+
+Data disclosure guidance:
+https://developers.google.com/ml-kit/android-data-disclosure
+
+Attribution requirements and official badge source:
+https://docs.cloud.google.com/translate/attribution
+https://docs.cloud.google.com/static/translate/images/google-translate-attribution.zip
+
+Translation input and output are processed on device and are not sent to Google
+servers by ML Kit. The SDK may contact Google to obtain models, fixes, and
+compatibility information. Google states that ML Kit also sends performance and
+utilization metrics, including device/app information, diagnostics, event/error
+information, and configured translation languages.
+
+Required Google translation disclaimer:
+
+THIS SERVICE MAY CONTAIN TRANSLATIONS POWERED BY GOOGLE. GOOGLE DISCLAIMS ALL
+WARRANTIES RELATED TO THE TRANSLATIONS, EXPRESS OR IMPLIED, INCLUDING ANY
+WARRANTIES OF ACCURACY, RELIABILITY, AND ANY IMPLIED WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.

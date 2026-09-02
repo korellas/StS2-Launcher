@@ -7,11 +7,25 @@ namespace STS2Mobile.Launcher.Components;
 // prompt is indistinguishable from one the game raises itself.
 public class GameRibbonButton : Button
 {
+    // Natural sprite dimensions, so callers size the ribbon from the artwork's
+    // own aspect instead of stretching it into whatever box a ratio produces.
+    public Vector2 SpriteSize { get; } = Vector2.Zero;
+
+    private readonly Font _labelFont;
+    private readonly int _labelSize;
+
+    // What the label actually needs. The ribbon used to be sized purely from a
+    // fraction of the panel, so a three-syllable word like "아니요" did not fit
+    // and ClipText silently rendered it as "아".
+    public float MeasuredTextWidth =>
+        _labelFont?.GetStringSize(Text, HorizontalAlignment.Left, -1, _labelSize).X ?? 0f;
+
     public GameRibbonButton(string text, float scale, bool confirm)
     {
         Text = text;
-        // No minimum: the dialog anchors these to measured fractions of the panel.
-        ClipText = true;
+        // Not clipped: the dialog sizes these to fit the label, and an overflow
+        // that is visible can be reported, where a truncation cannot.
+        ClipText = false;
 
         var sprite = GameAssets.Load<Texture2D>(
             confirm ? GameAssets.PopupConfirmButton : GameAssets.PopupCancelButton
@@ -19,6 +33,8 @@ public class GameRibbonButton : Button
 
         if (sprite != null)
         {
+            SpriteSize = new Vector2(sprite.GetWidth(), sprite.GetHeight());
+
             // Only the horizontal margins are set. SetTextureMarginAll would also
             // fix the vertical ones, and a stylebox's texture margins act as a
             // minimum size — which is what inflated these into squares instead of
@@ -41,6 +57,8 @@ public class GameRibbonButton : Button
                 AddThemeStyleboxOverride(state, new StyleBoxEmpty());
         }
 
+        _labelSize = (int)(19 * scale);
+        _labelFont = LauncherTheme.GameFont(bold: true);
         LauncherTheme.ApplyGameFont(this, 19, scale, bold: true);
         AddThemeColorOverride("font_color", Colors.White);
         AddThemeColorOverride("font_hover_color", LauncherTheme.Cream);

@@ -1,5 +1,10 @@
 # StS2 Launcher
 
+> This file preserves upstream technical documentation as a historical
+> snapshot. Its license and distribution statements do not establish that a
+> public APK is cleared. Current project guidance is in
+> [DISTRIBUTION.md](DISTRIBUTION.md).
+
 An Android launcher for Slay the Spire 2, built on a custom Godot 4.5.1 engine with .NET/Mono and Harmony runtime patching.
 
 > **Disclaimer**: This is an unofficial community project. Slay the Spire 2 is developed and published by Mega Crit Games. A valid Steam account that owns Slay the Spire 2 is required. Game files are downloaded directly from Steam after authentication. No game assets are included in this repository.

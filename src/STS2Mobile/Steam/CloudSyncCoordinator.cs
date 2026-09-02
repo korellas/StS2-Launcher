@@ -134,11 +134,15 @@ public static class CloudSyncCoordinator
         }
     }
 
-    public static async Task<string> ManualPushAllAsync(string accountName, string refreshToken)
+    public static async Task<string> ManualPushAllAsync(
+        string accountName,
+        string refreshToken,
+        Action<int, int> onProgress = null
+    )
     {
         var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
         var cloudStore =
-            SteamKit2CloudSaveStore.Instance
+            CloudStoreHolder.Current
             ?? new SteamKit2CloudSaveStore(accountName, refreshToken);
 
         var paths = GetSaveFilePaths(localStore);
@@ -175,6 +179,7 @@ public static class CloudSyncCoordinator
                     continue;
 
                 string content = localStore.ReadFile(path);
+                onProgress?.Invoke(count + 1, paths.Count);
                 PatchHelper.Log($"[Cloud] Push: queuing {path} ({content.Length} bytes)");
                 cloudStore.WriteFile(path, content);
                 count++;
@@ -190,11 +195,15 @@ public static class CloudSyncCoordinator
         return $"{paths.Count}/{count}/0";
     }
 
-    public static async Task<string> ManualPullAllAsync(string accountName, string refreshToken)
+    public static async Task<string> ManualPullAllAsync(
+        string accountName,
+        string refreshToken,
+        Action<int, int> onProgress = null
+    )
     {
         var localStore = new GodotFileIo(UserDataPathProvider.GetAccountScopedBasePath(null));
         var cloudStore =
-            SteamKit2CloudSaveStore.Instance
+            CloudStoreHolder.Current
             ?? new SteamKit2CloudSaveStore(accountName, refreshToken);
 
         var paths = GetSaveFilePaths(cloudStore);
@@ -228,8 +237,10 @@ public static class CloudSyncCoordinator
                 if (!cloudStore.FileExists(path))
                 {
                     skipped++;
+                    onProgress?.Invoke(downloaded + skipped, paths.Count);
                     continue;
                 }
+                onProgress?.Invoke(downloaded + skipped + 1, paths.Count);
                 PatchHelper.Log($"[Cloud] Pull: downloading {path}");
                 var pullTime = cloudStore.GetLastModifiedTime(path);
                 string content = await cloudStore.ReadFileAsync(path);

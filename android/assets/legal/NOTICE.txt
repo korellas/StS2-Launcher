@@ -1,0 +1,71 @@
+비공식 StS2 런처 — 법적 고지 및 개인정보 안내
+
+이 앱은 Mega Crit 또는 Valve와 제휴하거나 보증받은 앱이 아닙니다.
+게임명은 호환되는 게임을 식별하기 위해서만 사용합니다.
+
+Steam 계정 데이터
+
+런처는 사용자가 입력한 Steam 자격 증명과 토큰을 SteamKit2를 통해
+Steam에 직접 전송합니다. 갱신 토큰은 Android Keystore로 암호화되어 이
+기기에 저장됩니다. 이 프로젝트는 계정 정보를 수집하는 별도 운영자
+서버나 분석 서비스를 추가하지 않습니다.
+
+기기 내 번역
+
+Google ML Kit 번역 모델은 필요할 때 다운로드되며, 번역 입력과 결과는
+기기에서 처리되어 Google 서버로 전송되지 않습니다. 다만 Google의
+안내에 따르면 ML Kit SDK는 모델·수정·호환성 정보를 받기 위해 서버에
+접속할 수 있고, 기기/앱 정보, 성능·사용량 지표, 번역 언어와 오류·이벤트
+정보를 진단 및 사용 분석 목적으로 Google에 전송할 수 있습니다.
+Google ML Kit 결과에는 번역 화면에서 Google 표시가 붙습니다.
+
+THIS SERVICE MAY CONTAIN TRANSLATIONS POWERED BY GOOGLE. GOOGLE DISCLAIMS ALL
+WARRANTIES RELATED TO THE TRANSLATIONS, EXPRESS OR IMPLIED, INCLUDING ANY
+WARRANTIES OF ACCURACY, RELIABILITY, AND ANY IMPLIED WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+라이선스와 배포
+
+전체 제3자 라이선스와 고지는 APK의 assets/legal/ 디렉터리에 포함되며
+릴리스 APK와 함께 배포됩니다. 저장소의 MIT 라이선스는 기여자가 라이선스할
+권리가 있는 코드와 자산에만 적용됩니다. 이 고지는 비공식 Android 포트,
+Steam 접속 방식 또는 Spine Runtime 재배포에 필요한 권한을 대신하지
+않습니다. 배포자는 그 권한과 FMOD 조건을 별도로 확인해야 합니다.
+
+------------------------------------------------------------
+
+Unofficial StS2 Launcher — Legal and Privacy Notice
+
+This app is not affiliated with or endorsed by Mega Crit or Valve. The game
+name is used only to identify compatibility.
+
+Steam account data
+
+The launcher sends Steam credentials and tokens entered by the user directly
+to Steam through SteamKit2. Refresh tokens are encrypted with Android Keystore
+and stored on this device. This project adds no operator account-collection
+backend or analytics service.
+
+On-device translation
+
+Google ML Kit downloads translation models when needed. Translation input and
+output are processed on device and are not sent to Google servers by ML Kit.
+Google states that the SDK may contact its servers for models, fixes, and
+compatibility information and may send device/app information, performance and
+utilization metrics, configured translation languages, and diagnostic event or
+error information. Google ML Kit results carry Google attribution in the
+translation view.
+
+THIS SERVICE MAY CONTAIN TRANSLATIONS POWERED BY GOOGLE. GOOGLE DISCLAIMS ALL
+WARRANTIES RELATED TO THE TRANSLATIONS, EXPRESS OR IMPLIED, INCLUDING ANY
+WARRANTIES OF ACCURACY, RELIABILITY, AND ANY IMPLIED WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+Licenses and distribution
+
+Complete third-party licenses and notices are packaged under assets/legal/ in
+the APK and distributed beside release APKs. The repository's MIT License
+applies only to code and assets its contributors have the right to license.
+These notices do not supply permission for an unofficial Android port, a Steam
+access method, or Spine Runtime redistribution. Each distributor must resolve
+those rights and the applicable FMOD conditions separately.

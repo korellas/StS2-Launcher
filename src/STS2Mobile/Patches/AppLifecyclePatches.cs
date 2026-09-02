@@ -87,7 +87,7 @@ public static class AppLifecyclePatches
             // Flush pending cloud writes before the OS may kill the process
             try
             {
-                SteamKit2CloudSaveStore.Instance?.Flush(5000);
+                CloudStoreHolder.Current?.Flush(5000);
             }
             catch (Exception ex)
             {
@@ -257,7 +257,7 @@ public static class AppLifecyclePatches
         {
             try
             {
-                SteamKit2CloudSaveStore.Instance?.Flush(5000);
+                CloudStoreHolder.Current?.Flush(5000);
             }
             catch { }
 

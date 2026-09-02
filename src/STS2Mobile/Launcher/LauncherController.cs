@@ -560,10 +560,11 @@ public class LauncherController
         RunCloudTransfer(
             "CLOUD_PUSH_CONFIRM",
             "CLOUD_PUSH_RUNNING",
-            () =>
+            progress =>
                 CloudSyncCoordinator.ManualPushAllAsync(
                     LauncherPatches.SavedAccountName,
-                    LauncherPatches.SavedRefreshToken
+                    LauncherPatches.SavedRefreshToken,
+                    progress
                 )
         );
 
@@ -571,10 +572,11 @@ public class LauncherController
         RunCloudTransfer(
             "CLOUD_PULL_CONFIRM",
             "CLOUD_PULL_RUNNING",
-            () =>
+            progress =>
                 CloudSyncCoordinator.ManualPullAllAsync(
                     LauncherPatches.SavedAccountName,
-                    LauncherPatches.SavedRefreshToken
+                    LauncherPatches.SavedRefreshToken,
+                    progress
                 )
         );
 
@@ -582,7 +584,11 @@ public class LauncherController
     // behind a submenu, and had no error handling: an exception skipped the
     // re-enable and left the buttons dead until the launcher restarted. Status
     // goes on screen and the buttons are restored in a finally.
-    private void RunCloudTransfer(string confirmKey, string runningKey, Func<Task<string>> transfer)
+    private void RunCloudTransfer(
+        string confirmKey,
+        string runningKey,
+        Func<Action<int, int>, Task<string>> transfer
+    )
     {
         ShowConfirmation(
             Localization.Tr(confirmKey),
@@ -591,6 +597,22 @@ public class LauncherController
                 _view.Actions.SetPushPullDisabled(true);
                 _view.Actions.SetCloudStatus(Localization.Tr(runningKey));
                 _view.AppendLog(Localization.Tr(runningKey));
+
+                // "내려받는 중…" alone gave no way to tell a working transfer from a
+                // stuck one, and a save set runs to hundreds of history files.
+                void Progress(int done, int total)
+                {
+                    if (total <= 0)
+                        return;
+                    var text = Localization.Tr(
+                        "CLOUD_PROGRESS",
+                        Localization.Tr(runningKey),
+                        done,
+                        total,
+                        done * 100 / total
+                    );
+                    _runOnMainThread(() => _view.Actions.SetCloudStatus(text));
+                }
 
                 Task.Run(async () =>
                 {
@@ -601,7 +623,7 @@ public class LauncherController
                         // "done" and "there was nothing in the cloud" looked
                         // identical on screen, which is exactly the question being
                         // asked when sync appears not to work.
-                        var parts = (await transfer()).Split('/');
+                        var parts = (await transfer(Progress)).Split('/');
                         result = Localization.Tr("CLOUD_DONE_COUNTS", parts[0], parts[1], parts[2]);
                     }
                     catch (Exception ex)
@@ -614,7 +636,16 @@ public class LauncherController
                         var interfaces = SaveStoreDiagnostics.DescribeInterfaces();
                         result = Localization.Tr("CLOUD_FAILED", ex.Message) + "\n\n" + interfaces;
                         PatchHelper.Log($"[Cloud] {ex}");
-                        PatchHelper.Log($"[Cloud] {interfaces}");
+                        // Chunked: Android truncates a log line at 4KB and the
+                        // report is longer, which cut off the probe results that
+                        // are the point of it.
+                        for (int i = 0; i < interfaces.Length; i += 700)
+                        {
+                            PatchHelper.Log(
+                                $"[Cloud] ({i / 700}) "
+                                    + interfaces.Substring(i, Math.Min(700, interfaces.Length - i))
+                            );
+                        }
                     }
 
                     _runOnMainThread(() =>

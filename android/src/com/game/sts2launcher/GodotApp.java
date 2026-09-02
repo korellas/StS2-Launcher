@@ -42,12 +42,16 @@ import android.content.SharedPreferences;
 
 import java.net.URLEncoder;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.List;
@@ -136,6 +140,7 @@ public class GodotApp extends GodotActivity {
 		extractAssetFile("launcher_bg.png", "launcher_bg.png");
 		extractAssetFile("launcher_font.ttf", "launcher_font.ttf");
 		extractAssetFile("launcher_logo.png", "launcher_logo.png");
+		extractAssetFile("google-translate-attribution.png", "google-translate-attribution.png");
 
 		super.onCreate(savedInstanceState);
 
@@ -204,6 +209,8 @@ public class GodotApp extends GodotActivity {
 
 		destDir.mkdirs();
 
+		Set<String> bclNames = new HashSet<>();
+
 		try {
 			String[] bclFiles = getAssets().list("dotnet_bcl");
 			if (bclFiles != null) {
@@ -220,14 +227,19 @@ public class GodotApp extends GodotActivity {
 					}
 				}
 				Log.i(TAG, "Copied " + count + " BCL assemblies from assets");
+				bclNames.addAll(Arrays.asList(bclFiles));
 			}
 		} catch (IOException e) {
 			Log.e(TAG, "Failed to copy BCL assemblies", e);
 		}
 
-		// Only copy game assemblies that don't already exist in BCL. The depot has
-		// desktop
-		// CoreCLR versions that are incompatible with Android's Mono runtime.
+		// The depot ships desktop CoreCLR builds of the BCL alongside the game's own
+		// assemblies, and those would break Android's Mono runtime, so anything the
+		// APK already provided is left alone. That guard used to be "skip whatever
+		// exists", which also pinned sts2.dll to whatever was copied the very first
+		// time: a game update left the device running new game data against old game
+		// code, and left this project compiling against an interface the device no
+		// longer had.
 		if (!srcDir.exists() || !srcDir.isDirectory()) {
 			Log.w(TAG, "Game assemblies source dir not found: " + srcDir.getAbsolutePath());
 			return;
@@ -245,8 +257,12 @@ public class GodotApp extends GodotActivity {
 				if (name.endsWith(".so")) {
 					continue;
 				}
+				if (bclNames.contains(name)) {
+					continue;
+				}
 				File dest = new File(destDir, name);
-				if (dest.exists()) {
+				if (dest.exists() && dest.length() == src.length()
+						&& dest.lastModified() >= src.lastModified()) {
 					continue;
 				}
 				try {
@@ -258,6 +274,39 @@ public class GodotApp extends GodotActivity {
 			}
 		}
 		Log.i(TAG, "Copied " + count + " game assembly files");
+
+		exportGameAssemblies(destDir);
+	}
+
+	// Copies the assemblies the runtime actually loads somewhere adb can reach.
+	// The mod is compiled against a checked-in sts2.dll, and when the game updates
+	// past it the compiler stops seeing new interface members as implemented — a
+	// mismatch that costs a whole debugging session to find from the outside,
+	// because the resulting failure names neither the assembly nor the member.
+	// App-private storage is unreadable without a debuggable build, so mirror them
+	// out to the external files dir instead.
+	private void exportGameAssemblies(File srcDir) {
+		try {
+			File outDir = getExternalFilesDir(null);
+			if (outDir == null)
+				return;
+			File out = new File(outDir, "runtime-assemblies");
+			if (!out.exists() && !out.mkdirs())
+				return;
+
+			for (String name : new String[] { "sts2.dll", "SteamKit2.dll" }) {
+				File src = new File(srcDir, name);
+				if (!src.isFile())
+					continue;
+				File dest = new File(out, name);
+				if (dest.exists() && dest.length() == src.length())
+					continue;
+				copyFile(src, dest);
+				Log.i(TAG, "Exported " + name + " to " + dest.getAbsolutePath());
+			}
+		} catch (Exception e) {
+			Log.w(TAG, "Could not export runtime assemblies", e);
+		}
 	}
 
 	private File findAssembliesDir() {
@@ -301,6 +350,21 @@ public class GodotApp extends GodotActivity {
 			}
 		} catch (IOException e) {
 			Log.w(TAG, "Failed to extract " + assetPath, e);
+		}
+	}
+
+	public String readBundledLegalNotices() {
+		try (InputStream in = getAssets().open("legal/NOTICE.txt");
+				ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+			byte[] buffer = new byte[8192];
+			int count;
+			while ((count = in.read(buffer)) >= 0) {
+				out.write(buffer, 0, count);
+			}
+			return new String(out.toByteArray(), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			Log.w(TAG, "Could not read bundled legal notices", e);
+			return "";
 		}
 	}
 
@@ -414,26 +478,25 @@ public class GodotApp extends GodotActivity {
 	// throw away a run in progress without warning.
 	// ---- On-device translation -------------------------------------------------
 	//
-	// Uses the platform's translation framework rather than bundling a model:
-	// whichever service the device ships answers the request, which on a Galaxy
-	// means Samsung's own translator instead of a generic offline model. It needs
-	// API 31 and a translation service to be present, so every entry point here
-	// reports failure rather than assuming, and the caller can fall back.
+	// Uses the platform translation framework when available and Google ML Kit as
+	// the explicit fallback. Every completed request records its provider so the
+	// launcher can show Google's required attribution only for ML Kit output.
 
 	private final Executor translationExecutor = Executors.newSingleThreadExecutor();
 	private volatile String translationResult;
 	private volatile String translationState = "idle";
+	private volatile String translationProvider = "";
 
 	// Logged once so an unsupported device is diagnosable from the console rather
 	// than looking like a silent failure.
 	public String translationCapabilities() {
 		if (Build.VERSION.SDK_INT < 31) {
-			return "unsupported: needs API 31, device is " + Build.VERSION.SDK_INT;
+			return "on-device (ML Kit)";
 		}
 		try {
 			TranslationManager manager = getSystemService(TranslationManager.class);
 			if (manager == null) {
-				return "unavailable: no TranslationManager on this device";
+				return "on-device (ML Kit)";
 			}
 			Set<TranslationCapability> caps = manager.getOnDeviceTranslationCapabilities(
 					TranslationSpec.DATA_FORMAT_TEXT, TranslationSpec.DATA_FORMAT_TEXT);
@@ -452,7 +515,22 @@ public class GodotApp extends GodotActivity {
 			}
 			return sb.toString();
 		} catch (Throwable t) {
-			return "error: " + t;
+			return "on-device (ML Kit fallback)";
+		}
+	}
+
+	public boolean translationWillUseMlKit() {
+		if (Build.VERSION.SDK_INT < 31) {
+			return true;
+		}
+		try {
+			TranslationManager manager = getSystemService(TranslationManager.class);
+			Set<TranslationCapability> caps = manager == null ? null
+					: manager.getOnDeviceTranslationCapabilities(
+							TranslationSpec.DATA_FORMAT_TEXT, TranslationSpec.DATA_FORMAT_TEXT);
+			return caps == null || caps.isEmpty();
+		} catch (Throwable t) {
+			return true;
 		}
 	}
 
@@ -462,6 +540,7 @@ public class GodotApp extends GodotActivity {
 	public void startTranslation(String text, String sourceLanguage, String targetLanguage) {
 		translationResult = null;
 		translationState = "running";
+		translationProvider = "";
 
 		if (text == null || text.isEmpty()) {
 			translationState = "failed";
@@ -507,6 +586,7 @@ public class GodotApp extends GodotActivity {
 											response.getTranslationResponseValues().get(0);
 									if (value.getStatusCode() == TranslationResponseValue.STATUS_SUCCESS) {
 										translationResult = String.valueOf(value.getText());
+										translationProvider = "platform";
 										translationState = "done";
 									} else {
 										translationState = "failed";
@@ -545,6 +625,7 @@ public class GodotApp extends GodotActivity {
 					.addOnSuccessListener(ignored -> translator.translate(text)
 							.addOnSuccessListener(result -> {
 								translationResult = result;
+								translationProvider = "google_mlkit";
 								translationState = "done";
 								translator.close();
 							})
@@ -570,6 +651,10 @@ public class GodotApp extends GodotActivity {
 
 	public String getTranslationResult() {
 		return translationResult == null ? "" : translationResult;
+	}
+
+	public String getTranslationProvider() {
+		return translationProvider;
 	}
 
 	public void moveToBackground() {
