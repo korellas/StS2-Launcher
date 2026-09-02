@@ -41,6 +41,9 @@ cp "$PUBLISH_DIR"/STS2Mobile.dll "$PUBLISH_DIR"/SteamKit2.dll \
 
 cp "$ROOT/upstream/godot-export/.godot/mono/publish/arm64/GodotSharp.dll" "$BCL_DIR/"
 
+echo "Verifying required package inputs..."
+bash "$ROOT/scripts/verify-package-assets.sh" inputs "$BUILD_DIR/assets"
+
 # Pick the newest installed Mono.android-arm64 runtime pack version (was hardcoded to 9.0.7).
 CRYPTO_PACK_DIR="$HOME/.nuget/packages/microsoft.netcore.app.runtime.mono.android-arm64"
 if [ -d "$CRYPTO_PACK_DIR" ]; then
@@ -82,4 +85,8 @@ echo "Building APK..."
 cd "$BUILD_DIR"
 ./gradlew assembleMonoRelease
 
-echo "Done: $APK_DIR/StS2Launcher-v$NEW_NAME.apk"
+APK_PATH="$APK_DIR/StS2Launcher-v$NEW_NAME.apk"
+echo "Verifying packaged APK assets..."
+bash "$ROOT/scripts/verify-package-assets.sh" apk "$APK_PATH"
+
+echo "Done: $APK_PATH"
