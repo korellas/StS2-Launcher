@@ -70,9 +70,26 @@ public static class AssetPreloadPatches
             )
         );
 
+        PatchHelper.Patch(
+            harmony,
+            t,
+            "CheckLoadingStatus",
+            postfix: PatchHelper.Method(
+                typeof(AssetPreloadPatches),
+                nameof(CheckLoadingStatusPostfix)
+            )
+        );
+
         PatchHelper.Log(
             $"[Preload] Serialised ProcessLoadingQueue (max {MaxConcurrent} in-flight)"
         );
+    }
+
+    public static void CheckLoadingStatusPostfix(object __instance)
+    {
+        // Process checks completion after filling the queue. Refill freed slots
+        // now so the loader can work during the wait for the next frame.
+        ProcessLoadingQueuePrefix(__instance);
     }
 
     public static bool ProcessLoadingQueuePrefix(object __instance)
