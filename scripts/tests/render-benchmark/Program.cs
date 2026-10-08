@@ -40,9 +40,27 @@ var path = Path.Combine(Path.GetTempPath(), "sts2-bench-test-" + Guid.NewGuid() 
 data.Results.Add(
     new BenchmarkResult
     {
-        Case = "Cards",
+        Case = "Merchant",
         Variant = "baseline",
         Metrics = summary,
+        LoadTimings = new()
+        {
+            new BenchmarkLoadTiming
+            {
+                From = "CombatIdle",
+                To = "Merchant",
+                DurationMs = 123.5,
+                FirstVisit = true,
+            },
+        },
+    }
+);
+data.Boots.Add(
+    new BenchmarkBootTiming
+    {
+        Phase = 1,
+        LaunchToSceneMs = 2000,
+        GameInitializationMs = 1500,
     }
 );
 data.Save(path);
@@ -50,12 +68,45 @@ var loaded = RenderBenchmarkData.Load(path);
 Check(
     loaded.Phase == 1
         && loaded.Results[0].Metrics.FrameP99Ms == 40
-        && loaded.Results[0].Metrics.GpuMeanMs == 4,
+        && loaded.Results[0].Metrics.GpuMeanMs == 4
+        && loaded.Results[0].LoadTimings.Single().DurationMs == 123.5
+        && loaded.Results[0].LoadTimings.Single().FirstVisit
+        && loaded.Boots.Single().GameInitializationMs == 1500
+        && loaded.Boots.Single().LaunchToSceneMs == 2000,
     "Resume and results survive offline restart"
 );
 File.Delete(path);
 Console.WriteLine("PASS benchmark statistics, availability, guarded restart, offline persistence");
 var cases = RenderBenchmarkCase.QualityCases().ToArray();
+Check(
+    cases
+        .Select(x => x.Scene)
+        .Distinct()
+        .OrderBy(x => x)
+        .SequenceEqual(
+            new[]
+            {
+                "CombatCards",
+                "CombatEffects",
+                "CombatIdle",
+                "Deck",
+                "Map",
+                "Merchant",
+                "Transitions",
+            }
+        ),
+    "Real combat, merchant, map, deck and transition scenarios must all be compared"
+);
+Check(
+    !new RenderBenchmarkData { Version = 1, Running = true }.CanResume(-2),
+    "Synthetic benchmark jobs must not resume as actual combat benchmarks"
+);
+Check(
+    new RenderBenchmarkData { Version = 1 }
+        .Report()
+        .Contains("Synthetic") && new RenderBenchmarkData().Report().Contains("Actual combat"),
+    "Copied reports must distinguish synthetic results from actual combat results"
+);
 foreach (var group in cases.GroupBy(x => x.Scene))
 {
     var first = group.First();
@@ -88,7 +139,31 @@ Check(
 );
 var report = data.Report();
 Check(
-    report.Contains("GPU=4.000/4.000") && report.Contains("Game assembly"),
+    report.Contains("GPU=4.000/4.000")
+        && report.Contains("Game assembly")
+        && report.Contains("CombatIdle -> Merchant: 123.5 ms")
+        && report.Contains("app launch to first test screen=2000.0 ms"),
     "Copyable report includes provenance and measurements"
 );
+var pacing = RenderBenchmarkCase.PacingCases(1, new[] { 30, 0 }).ToArray();
+Check(
+    pacing
+        .Select(x => x.Scene)
+        .Distinct()
+        .OrderBy(x => x)
+        .SequenceEqual(
+            cases.Select(x => x.Scene).Distinct().Where(x => x != "Transitions").OrderBy(x => x)
+        ),
+    "Native pacing comparisons cover all steady game scenarios"
+);
+foreach (var group in pacing.GroupBy(x => x.Scene))
+{
+    Check(group.Select(x => x.Fps).SequenceEqual(new[] { 30, 0 }), "Every frame cap is compared");
+    foreach (var test in group)
+        Check(
+            (test with { Name = "baseline", Fps = 0 })
+                == new RenderBenchmarkCase(test.Scene, "baseline"),
+            "Pacing comparisons keep visual settings identical"
+        );
+}
 Console.WriteLine("PASS controlled one-option comparisons and repeated baselines");

@@ -721,6 +721,9 @@ public class GodotApp extends GodotActivity {
 	}
 
 	public int getBenchmarkPacing() { return benchmarkPacing; }
+	public long getProcessElapsedMs() {
+		return android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime();
+	}
 	public boolean isActivityResumed() { return activityResumed; }
 	public int getActivityPauseCount() { return activityPauseCount; }
 

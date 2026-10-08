@@ -1,231 +1,297 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Godot;
-using STS2Mobile.Launcher.Components;
+using MegaCrit.Sts2.Core.Assets;
+using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Helpers;
+using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Characters;
+using MegaCrit.Sts2.Core.Models.Encounters;
+using MegaCrit.Sts2.Core.Nodes;
+using MegaCrit.Sts2.Core.Nodes.Cards;
+using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
+using MegaCrit.Sts2.Core.Nodes.Rooms;
+using MegaCrit.Sts2.Core.Nodes.Screens;
+using MegaCrit.Sts2.Core.Nodes.Vfx;
+using MegaCrit.Sts2.Core.Rooms;
+using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.Core.Saves;
+using MegaCrit.Sts2.Core.Saves.Test;
+using MegaCrit.Sts2.Core.Unlocks;
 using STS2Mobile.Patches;
 
 namespace STS2Mobile.Launcher;
 
-// Native nodes keep this entry independent of GameStartup and game service singletons.
-public sealed class RenderBenchmarkFixture
+public sealed class RenderBenchmarkFixture : IDisposable
 {
-    public const string StrikePath =
-        "res://images/atlases/card_atlas.sprites/ironclad/strike_ironclad.tres";
-    public const string DefendPath =
-        "res://images/atlases/card_atlas.sprites/ironclad/defend_ironclad.tres";
-    public const string FramePath =
-        "res://images/atlases/ui_atlas.sprites/card/card_frame_attack_s.tres";
-    public const string BlurPath = "res://shaders/radial_blur.gdshader";
-    public const string DistortionPath =
-        "res://shaders/vfx/distortion/vfx_screen_distortion_outward_shader.gdshader";
-    private readonly Texture2D _strike;
-    private readonly Texture2D _defend;
-    private readonly Texture2D _frame;
-    private readonly Shader _blur;
-    private readonly Shader _distortion;
-    private readonly List<Node2D> _moving = new();
-    private Node2D _scene;
+    private readonly Action _check;
+    private readonly HashSet<string> _visited = new();
+    private Player _player;
+    private RunState _state;
+    private NCombatRoom _room;
+    private string _scenario;
+    private int _effectStep = -1;
+    private ulong _animationStart;
+    private string _currentScreen = "Reset";
+    public List<BenchmarkLoadTiming> LoadTimings { get; } = new();
 
-    public RenderBenchmarkFixture()
+    public RenderBenchmarkFixture(Action check) => _check = check;
+
+    public static void ValidateEntry()
     {
-        _strike = Required<Texture2D>(StrikePath);
-        _defend = Required<Texture2D>(DefendPath);
-        _frame = Required<Texture2D>(FramePath);
-        _blur = Required<Shader>(BlurPath);
-        _distortion = Required<Shader>(DistortionPath);
+        if (NGame.Instance == null || RunManager.Instance.IsInProgress)
+            throw new InvalidOperationException("Benchmark requires a fresh game launcher boot");
     }
 
-    private static T Required<T>(string path)
-        where T : Resource =>
-        GameAssets.Load<T>(path)
-        ?? throw new InvalidOperationException($"Missing benchmark asset: {path}");
-
-    public void Build(SubViewport viewport, Vector2I physicalSize, RenderBenchmarkCase test)
+    public async Task Initialize()
     {
-        _scene?.Free();
-        _moving.Clear();
-        viewport.Size = new Vector2I(
-            Math.Max(1, physicalSize.X * test.Scale / 100),
-            Math.Max(1, physicalSize.Y * test.Scale / 100)
-        );
-        viewport.CanvasTransform = new Transform2D(
+        ValidateEntry();
+        _check();
+        // GameStartup migrates and synchronizes real profiles. Use the game's
+        // initialization and in-memory save APIs directly for this isolated boot.
+        var saves = new SaveManager(new MockGodotFileIo("user://render-benchmark"));
+        SaveManager.MockInstanceForTesting(saves);
+        await OneTimeInitialization.ExecuteVeryEarly();
+        NCard.InitPool();
+        NGridCardHolder.InitPool();
+        OneTimeInitialization.ExecuteEssential();
+        saves.InitProfileId();
+        saves.InitProgressData();
+        saves.InitPrefsData();
+        saves.SetFtuesEnabled(false);
+        OneTimeInitialization.ExecuteDeferred();
+        await PreloadManager.LoadCommonAndMainMenuAssets();
+        _check();
+        GraphicsPatches.StartRuntime(NGame.Instance.GetTree());
+    }
+
+    public async Task Build(RenderBenchmarkCase test)
+    {
+        Dispose();
+        LoadTimings.Clear();
+        _currentScreen = "Reset";
+        _check();
+        var settings = GraphicsPatches.Settings;
+        settings.RenderScale = test.Scale;
+        settings.Msaa = test.Msaa;
+        settings.Hdr = test.Hdr ? 1 : 0;
+        settings.TextureFilter = test.Filter;
+        settings.DirectCardPortraits = test.Direct;
+        settings.RadialBlurSamples = test.Blur;
+        settings.ScreenDistortion = test.Distortion;
+        settings.BackgroundParticles = test.Particles;
+        GraphicsPatches.GraphicsPreferencesPostfix();
+
+        _player = Player.CreateForNewRun<Defect>(UnlockState.all, 1);
+        _state = RunState.CreateForNewRun(
+            new[] { _player },
+            ActModel.GetDefaultList().Select(act => act.ToMutable()).ToArray(),
+            Array.Empty<ModifierModel>(),
+            GameMode.Standard,
             0,
-            new Vector2(viewport.Size.X / 1920f, viewport.Size.Y / 1080f),
-            0,
-            Vector2.Zero
+            RenderBenchmarkCase.Seed
         );
-        viewport.UseHdr2D = test.Hdr;
-        viewport.Msaa2D = GraphicsPatches.GetMsaa(test.Msaa);
-        viewport.CanvasItemDefaultTextureFilter = test.Filter switch
-        {
-            1 => Viewport.DefaultCanvasItemTextureFilter.Nearest,
-            4 or 6 => Viewport.DefaultCanvasItemTextureFilter.LinearWithMipmaps,
-            _ => Viewport.DefaultCanvasItemTextureFilter.Linear,
-        };
-        if (test.Filter == 6)
-            RenderingServer.ViewportSetDefaultCanvasItemTextureFilter(
-                viewport.GetViewportRid(),
-                RenderingServer.CanvasItemTextureFilter.LinearWithMipmapsAnisotropic
-            );
-        _scene = new Node2D();
-        viewport.AddChild(_scene);
-        _scene.AddChild(
-            new ColorRect
+        await TimeScreen(
+            "Run",
+            async () =>
             {
-                Size = new Vector2(1920, 1080),
-                Color = new Color(.055f, .065f, .1f),
-                MouseFilter = Control.MouseFilterEnum.Ignore,
+                RunManager.Instance.SetUpNewSingleplayer(_state, shouldSave: false);
+                RunManager.Instance.CombatReplayWriter.IsEnabled = false;
+                await PreloadManager.LoadRunAssets(new[] { _player.Character });
+                RunManager.Instance.Launch();
+                NGame.Instance.RootSceneContainer.SetCurrentScene(NRun.Create(_state));
+                await RunManager.Instance.SetActInternal(0);
             }
         );
-        if (test.Scene != "Geometry")
-            AddCards(test.Scene == "Cards" ? 24 : 12, test.Direct);
-        if (test.Scene != "Cards")
-            AddGeometry(test.Scene == "Geometry" ? 64 : 16);
-        if (test.Scene == "Effects")
-            AddEffects(test);
+        _scenario = test.Scene;
+        _effectStep = -1;
+        switch (test.Scene)
+        {
+            case "CombatIdle":
+            case "CombatCards":
+            case "CombatEffects":
+                await OpenCombat(test.Scene, transition: false);
+                break;
+            case "Merchant":
+                await OpenMerchant(transition: false);
+                break;
+            case "Map":
+            case "Transitions":
+                await OpenMap();
+                break;
+            case "Deck":
+                await OpenMap();
+                await OpenDeck();
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown benchmark scenario: {test.Scene}");
+        }
+        _animationStart = Time.GetTicksUsec();
+        PatchHelper.Log(
+            $"[Benchmark] Actual game screen ready: {test.Scene}, seed={RenderBenchmarkCase.Seed}"
+        );
     }
 
-    private void AddCards(int count, bool direct)
+    private async Task OpenCombat(string scenario, bool transition)
     {
-        for (int i = 0; i < count; i++)
-        {
-            var card = new Node2D
+        await TimeScreen(
+            scenario,
+            async () =>
             {
-                Position = new Vector2(190 + i % 8 * 220, 195 + i / 8 * 310),
-                Scale = Vector2.One * (.6f + i % 3 * .14f),
-            };
-            _scene.AddChild(card);
-            var portrait = new CanvasGroup { FitMargin = 1, ClearMargin = 1 };
-            card.AddChild(portrait);
-            RenderingServer.CanvasItemSetCanvasGroupMode(
-                portrait.GetCanvasItem(),
-                direct
-                    ? RenderingServer.CanvasGroupMode.Disabled
-                    : RenderingServer.CanvasGroupMode.Transparent,
-                1,
-                true,
-                1,
-                false
-            );
-            portrait.AddChild(
-                new TextureRect
+                if (transition)
+                    await NGame.Instance.Transition.RoomFadeOut();
+                await RunManager.Instance.EnterRoomDebug(
+                    RoomType.Monster,
+                    model: ModelDb.Encounter<ConstructMenagerieNormal>().ToMutable(),
+                    showTransition: transition
+                );
+                _room =
+                    NCombatRoom.Instance
+                    ?? throw new InvalidOperationException("Actual combat scene was not created");
+                // Room loading starts combat asynchronously; wait for the actual hand
+                // and turn setup before measuring, rather than time the initial deal.
+                ulong started = Time.GetTicksMsec();
+                while (
+                    CombatManager.Instance.IsStarting
+                    || RunManager.Instance.ActionExecutor.IsPaused
+                    || _room.Ui.Hand.ActiveHolders.Count == 0
+                )
                 {
-                    Texture = i % 2 == 0 ? _strike : _defend,
-                    Position = new Vector2(-125, -145),
-                    Size = new Vector2(250, 190),
-                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-                    MouseFilter = Control.MouseFilterEnum.Ignore,
+                    _check();
+                    if (Time.GetTicksMsec() - started > 30000)
+                        throw new InvalidOperationException(
+                            "Actual combat hand did not become ready"
+                        );
+                    await NGame.Instance.ToSignal(
+                        NGame.Instance.GetTree(),
+                        SceneTree.SignalName.ProcessFrame
+                    );
                 }
-            );
-            card.AddChild(
-                new TextureRect
-                {
-                    Texture = _frame,
-                    Position = new Vector2(-145, -190),
-                    Size = new Vector2(290, 380),
-                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-                    MouseFilter = Control.MouseFilterEnum.Ignore,
-                }
-            );
-            _moving.Add(card);
-        }
+                if (scenario == "CombatCards")
+                    _room.Ui.Hand.ActiveHolders[0].Call("OnFocus");
+            }
+        );
     }
 
-    private void AddGeometry(int count)
-    {
-        for (int i = 0; i < count; i++)
-        {
-            var polygon = new Polygon2D
+    private Task OpenMerchant(bool transition) =>
+        TimeScreen(
+            "Merchant",
+            async () =>
             {
-                Position = new Vector2(115 + i % 8 * 240, 65 + i / 8 * 135),
-                Polygon = new[]
-                {
-                    new Vector2(-80, -3),
-                    new Vector2(0, -58),
-                    new Vector2(80, 3),
-                    new Vector2(0, 58),
-                },
-                Color = new Color(i % 3 == 0 ? 1.8f : .4f, .5f, .85f, .75f),
-                Antialiased = false,
-            };
-            _scene.AddChild(polygon);
-            _moving.Add(polygon);
-        }
-    }
+                if (transition)
+                    await NGame.Instance.Transition.RoomFadeOut();
+                await RunManager.Instance.EnterRoomDebug(RoomType.Shop, showTransition: transition);
+                var merchant =
+                    NMerchantRoom.Instance
+                    ?? throw new InvalidOperationException("Actual merchant room was not created");
+                merchant.OpenInventory();
+            }
+        );
 
-    private void AddEffects(RenderBenchmarkCase test)
-    {
-        if (test.Particles > 0)
-        {
-            var material = new ParticleProcessMaterial
+    private Task OpenMap() =>
+        TimeScreen(
+            "Map",
+            async () =>
             {
-                ParticleFlagDisableZ = true,
-                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box,
-                EmissionBoxExtents = new Vector3(960, 540, 0),
-                Gravity = new Vector3(0, 20, 0),
-                Direction = new Vector3(1, 0, 0),
-                InitialVelocityMin = 15,
-                InitialVelocityMax = 35,
-                ScaleMin = .035f,
-                ScaleMax = .06f,
-                Color = new Color(.4f, .8f, 1.6f, .4f),
-            };
-            _scene.AddChild(
-                new GpuParticles2D
-                {
-                    Amount = 512 * test.Particles / 100,
-                    Lifetime = 4,
-                    Preprocess = 4,
-                    UseFixedSeed = true,
-                    Seed = 65537,
-                    FixedFps = 60,
-                    Position = new Vector2(960, 540),
-                    VisibilityRect = new Rect2(-1100, -650, 2200, 1300),
-                    Texture = _defend,
-                    ProcessMaterial = material,
-                    Emitting = true,
-                }
-            );
-        }
-        if (test.Distortion)
-        {
-            // Reset screen-reading boundaries explicitly so each effect sees the preceding pass.
-            _scene.AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport });
-            var material = new ShaderMaterial { Shader = _distortion };
-            material.SetShaderParameter("distortion_base_intensity", .035f);
-            _scene.AddChild(
-                new TextureRect
-                {
-                    Texture = _strike,
-                    Material = material,
-                    Size = new Vector2(1920, 1080),
-                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-                    Modulate = new Color(1, 1, 1, .6f),
-                    MouseFilter = Control.MouseFilterEnum.Ignore,
-                }
-            );
-        }
-        if (test.Blur > 0)
-        {
-            _scene.AddChild(new BackBufferCopy { CopyMode = BackBufferCopy.CopyModeEnum.Viewport });
-            var material = new ShaderMaterial { Shader = _blur };
-            material.SetShaderParameter("sampling_count", test.Blur);
-            material.SetShaderParameter("blur_power", .008f);
-            _scene.AddChild(
-                new ColorRect
-                {
-                    Size = new Vector2(1920, 1080),
-                    Material = material,
-                    MouseFilter = Control.MouseFilterEnum.Ignore,
-                }
-            );
-        }
+                NRun.Instance.GlobalUi.CapstoneContainer.Close();
+                if (_state.CurrentRoom == null)
+                    await RunManager.Instance.EnterRoomDebug(RoomType.Map, showTransition: false);
+                NRun.Instance.GlobalUi.MapScreen.Open(isOpenedFromTopBar: true);
+            }
+        );
+
+    private Task OpenDeck() =>
+        TimeScreen(
+            "Deck",
+            () =>
+            {
+                NRun.Instance.GlobalUi.MapScreen.Close(animateOut: false);
+                if (NDeckViewScreen.ShowScreen(_player) == null)
+                    throw new InvalidOperationException("Actual deck screen was not created");
+                return Task.CompletedTask;
+            }
+        );
+
+    private async Task TimeScreen(string target, Func<Task> open)
+    {
+        _check();
+        string from = _currentScreen;
+        ulong start = Time.GetTicksUsec();
+        await open();
+        _check();
+        await NGame.Instance.ToSignal(NGame.Instance.GetTree(), SceneTree.SignalName.ProcessFrame);
+        await NGame.Instance.ToSignal(
+            RenderingServer.Singleton,
+            RenderingServer.SignalName.FramePostDraw
+        );
+        _check();
+        LoadTimings.Add(
+            new BenchmarkLoadTiming
+            {
+                From = from,
+                To = target,
+                DurationMs = (Time.GetTicksUsec() - start) / 1000d,
+                FirstVisit = _visited.Add(target),
+            }
+        );
+        _currentScreen = target;
     }
 
-    public void Animate(double seconds)
+    public async Task RunTransitions()
     {
-        float phase = (float)(seconds * Math.Tau / 5);
-        for (int i = 0; i < _moving.Count; i++)
-            _moving[i].Rotation = .18f * MathF.Sin(phase + i * .37f);
+        // Yield before the first load so the frame sampler also includes any
+        // synchronous scene construction or shader compilation in that load.
+        await NGame.Instance.ToSignal(NGame.Instance.GetTree(), SceneTree.SignalName.ProcessFrame);
+        await OpenCombat("CombatIdle", transition: true);
+        await HoldScreen();
+        await OpenMerchant(transition: true);
+        await HoldScreen();
+        await OpenMap();
+        await HoldScreen();
+        await OpenDeck();
+        await HoldScreen();
+        await OpenMap();
+        await HoldScreen();
+        await OpenCombat("CombatIdle", transition: true);
+        await HoldScreen();
+    }
+
+    private async Task HoldScreen()
+    {
+        _check();
+        var timer = NGame.Instance.GetTree().CreateTimer(.9);
+        await NGame.Instance.ToSignal(timer, SceneTreeTimer.SignalName.Timeout);
+        _check();
+    }
+
+    public void Animate()
+    {
+        if (_scenario != "CombatEffects")
+            return;
+        int step = (int)((Time.GetTicksUsec() - _animationStart) / 2_000_000);
+        if (step == _effectStep)
+            return;
+        _effectStep = step;
+        var target = _room.CreatureNodes.Last(node => !node.Entity.IsPlayer);
+        var source = _room.GetCreatureNode(_player.Creature);
+        source.SetAnimationTrigger("Cast");
+        _room.CombatVfxContainer.AddChild(NHyperbeamVfx.Create(_player.Creature, target.Entity));
+        _room.CombatVfxContainer.AddChild(NHitSparkVfx.Create(target.Entity));
+        _room.CombatVfxContainer.AddChild(NScreamVfx.Create(target.VfxSpawnPosition));
+        _room.RadialBlur(VfxPosition.Center);
+    }
+
+    public void Dispose()
+    {
+        _room = null;
+        if (!RunManager.Instance.IsInProgress)
+            return;
+        RunManager.Instance.CleanUp(graceful: false);
+        NGame.Instance.RootSceneContainer.SetCurrentScene(new Control());
+        // Keep the mock SaveManager active until the cold restart so quit
+        // handlers cannot write benchmark data to the user's real profiles.
     }
 }

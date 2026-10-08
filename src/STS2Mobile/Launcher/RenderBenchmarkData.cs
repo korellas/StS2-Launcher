@@ -9,6 +9,17 @@ namespace STS2Mobile.Launcher;
 
 public sealed record RenderBenchmarkCase(string Scene, string Name)
 {
+    public const string Seed = "MOBILEBENCH";
+    public static readonly string[] Scenes =
+    {
+        "CombatIdle",
+        "CombatCards",
+        "CombatEffects",
+        "Merchant",
+        "Map",
+        "Deck",
+        "Transitions",
+    };
     public int Scale { get; init; } = 100;
     public int Msaa { get; init; }
     public bool Hdr { get; init; }
@@ -21,7 +32,7 @@ public sealed record RenderBenchmarkCase(string Scene, string Name)
 
     public static IEnumerable<RenderBenchmarkCase> QualityCases()
     {
-        foreach (string scene in new[] { "Cards", "Geometry", "Effects" })
+        foreach (string scene in Scenes)
         {
             var baseline = new RenderBenchmarkCase(scene, "baseline-start");
             yield return baseline;
@@ -35,7 +46,7 @@ public sealed record RenderBenchmarkCase(string Scene, string Name)
                 Name = "resolution 85%",
                 Scale = 85,
             };
-            if (scene == "Cards")
+            if (scene is "CombatCards" or "Merchant" or "Deck")
             {
                 yield return baseline with
                 {
@@ -58,14 +69,13 @@ public sealed record RenderBenchmarkCase(string Scene, string Name)
                     Direct = true,
                 };
             }
-            if (scene == "Geometry")
-                foreach (int msaa in new[] { 2, 4, 8 })
-                    yield return baseline with
-                    {
-                        Name = $"MSAA {msaa}x",
-                        Msaa = msaa,
-                    };
-            if (scene == "Effects")
+            foreach (int msaa in new[] { 2, 4, 8 })
+                yield return baseline with
+                {
+                    Name = $"MSAA {msaa}x",
+                    Msaa = msaa,
+                };
+            if (scene == "CombatEffects")
             {
                 yield return baseline with
                 {
@@ -98,6 +108,19 @@ public sealed record RenderBenchmarkCase(string Scene, string Name)
                 Name = "baseline-end",
             };
         }
+    }
+
+    public static IEnumerable<RenderBenchmarkCase> PacingCases(
+        int pacing,
+        IEnumerable<int> frameLimits
+    )
+    {
+        foreach (string scene in Scenes.Where(scene => scene != "Transitions"))
+        foreach (int fps in frameLimits)
+            yield return new RenderBenchmarkCase(scene, $"pacing {pacing}, FPS {fps}")
+            {
+                Fps = fps,
+            };
     }
 }
 
@@ -168,11 +191,27 @@ public sealed class BenchmarkResult
     public string ThermalEnd { get; set; }
     public string Screenshot { get; set; }
     public BenchmarkMetrics Metrics { get; set; }
+    public List<BenchmarkLoadTiming> LoadTimings { get; set; } = new();
+}
+
+public sealed class BenchmarkLoadTiming
+{
+    public string From { get; set; }
+    public string To { get; set; }
+    public double DurationMs { get; set; }
+    public bool FirstVisit { get; set; }
+}
+
+public sealed class BenchmarkBootTiming
+{
+    public int Phase { get; set; }
+    public double GameInitializationMs { get; set; }
+    public double LaunchToSceneMs { get; set; }
 }
 
 public sealed class RenderBenchmarkData
 {
-    public const int FormatVersion = 1;
+    public const int FormatVersion = 2;
     public static readonly int[] PacingModes = { -2, 0, 1, 2 };
     public int Version { get; set; } = FormatVersion;
     public string StartedUtc { get; set; } = DateTime.UtcNow.ToString("O");
@@ -189,6 +228,7 @@ public sealed class RenderBenchmarkData
     public bool ShowResults { get; set; }
     public string Status { get; set; } = "Ready";
     public List<BenchmarkResult> Results { get; set; } = new();
+    public List<BenchmarkBootTiming> Boots { get; set; } = new();
 
     public bool CanResume(int nativePacing) =>
         Version == FormatVersion
@@ -221,10 +261,12 @@ public sealed class RenderBenchmarkData
                 $"Game DLL version {GameLibraryVersion ?? "N/A"} | .NET runtime {RuntimeVersion ?? "N/A"}"
             );
         text.AppendLine(
-            "Fixtures use game textures/shaders and native Canvas2D nodes; this is not full combat performance or battery consumption."
+            Version < 2
+                ? "Synthetic texture/geometry fixtures (legacy); do not compare with actual combat results."
+                : $"Actual combat and game UI: fixed Defect deck, ConstructMenagerieNormal, seed {RenderBenchmarkCase.Seed}. Combat, focused hand, game VFX, merchant inventory, map, deck and native screen transitions; saves are in memory. CPU/GPU measure the full viewport rendering; no battery consumption measurement."
         );
         text.AppendLine(
-            "Quality: uncapped / VSync off / native pacing off. Pacing: same composite scene, automatic cold starts, capped and uncapped."
+            "Quality: uncapped / VSync off / native pacing off. Pacing: same game scenarios, automatic cold starts, capped and uncapped."
         );
         text.AppendLine(
             "CPU/GPU are benchmark viewport rendering ms; frame times are whole-frame cadence. GPU N/A means timestamps unavailable. Warmup and screenshots excluded from samples."
@@ -233,8 +275,14 @@ public sealed class RenderBenchmarkData
             "Baseline repeated before/after each scene's quality comparisons. Compare within the same scene; thermal changes and baseline drift can obscure small differences. No automatic no-effect verdict."
         );
         text.AppendLine(
-            "Shader prewarming is a startup option and is not evaluated by steady rendering tests."
+            "Loading: operation to first rendered frame (combat also waits for its hand); room transitions include native fades. First visit means first operation this boot, not a cleared disk/shader cache. Transition frame samples include fixed presentation pauses. App launch to first test screen is separate from isolated game initialization. Shader prewarming itself is not compared."
         );
+        foreach (var boot in Boots)
+            text.AppendLine(
+                FormattableString.Invariant(
+                    $"Boot phase {boot.Phase}: app launch to first test screen={boot.LaunchToSceneMs:F1} ms, game initialization={boot.GameInitializationMs:F1} ms"
+                )
+            );
         foreach (var result in Results)
         {
             var m = result.Metrics;
@@ -245,6 +293,12 @@ public sealed class RenderBenchmarkData
                 )
             );
             text.AppendLine($"Thermal {result.ThermalStart} → {result.ThermalEnd}");
+            foreach (var load in result.LoadTimings)
+                text.AppendLine(
+                    FormattableString.Invariant(
+                        $"Load {load.From} -> {load.To}: {load.DurationMs:F1} ms, first operation this boot={load.FirstVisit}"
+                    )
+                );
         }
         return text.ToString();
     }
