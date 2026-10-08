@@ -8,6 +8,7 @@ cat > "$check_dir/Check.csproj" <<XML
   <PropertyGroup><TargetFramework>net9.0</TargetFramework><OutputType>Exe</OutputType><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
   <ItemGroup>
     <Compile Include="$repo_root/src/STS2Mobile/Launcher/RenderBenchmarkData.cs" Link="RenderBenchmarkData.cs" />
+    <Compile Include="$repo_root/src/STS2Mobile/Launcher/PixelDifference.cs" Link="PixelDifference.cs" />
     <Compile Include="$repo_root/scripts/tests/render-benchmark/Program.cs" Link="Program.cs" />
   </ItemGroup>
 </Project>

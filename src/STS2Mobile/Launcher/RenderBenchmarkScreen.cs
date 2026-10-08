@@ -50,6 +50,7 @@ public sealed class RenderBenchmarkScreen : Control
     private int _pauseCount;
     private bool _cancelled;
     private bool _restarting;
+    private bool _openingComparison;
     private int _savedFps;
     private bool _savedKeepOn;
     private DisplayServer.VSyncMode _savedVSync;
@@ -307,6 +308,8 @@ public sealed class RenderBenchmarkScreen : Control
 
     private void StartSuite()
     {
+        if (_openingComparison)
+            return;
         try
         {
             RenderBenchmarkFixture.ValidateEntry();
@@ -674,26 +677,35 @@ public sealed class RenderBenchmarkScreen : Control
 
     private void Close()
     {
-        if (_running || _restarting)
+        if (_running || _restarting || _openingComparison)
             return;
         _owner.Show();
         QueueFree();
     }
 
-    private void OpenComparisonPage()
+    private async void OpenComparisonPage()
     {
-        if (_running || _restarting)
+        if (_running || _restarting || _openingComparison)
             return;
+        _openingComparison = true;
+        _start.Disabled = _close.Disabled = true;
         try
         {
             if (_data == null || _data.Results.Count == 0)
                 throw new InvalidOperationException(Tr("BENCH_NO_CAPTURE"));
-            string path = RenderComparisonPage.Write(_data);
+            _status.Text = Tr("COMPARE_DIFF");
+            string path = await RenderComparisonPage.Write(_data, GetTree());
+            _status.Text = Tr("BENCH_COMPLETED");
             _app.Call("showRenderComparison", path);
         }
         catch (Exception ex)
         {
             _status.Text = Tr("COMPARE_OPEN_FAILED") + " " + ex.Message;
+        }
+        finally
+        {
+            _openingComparison = false;
+            _start.Disabled = _close.Disabled = false;
         }
     }
 

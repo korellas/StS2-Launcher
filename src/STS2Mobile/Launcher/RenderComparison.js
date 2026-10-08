@@ -11,6 +11,15 @@ function makePairs(results) {
   return pairs;
 }
 
+function differenceStats(histogram, threshold) {
+  let total = 0, changed = 0;
+  histogram.forEach((count, delta) => {
+    total += count;
+    if (delta > threshold) changed += count;
+  });
+  return { total, changed, percent: total ? changed * 100 / total : 0 };
+}
+
 function startComparison() {
   const byId = id => document.getElementById(id);
   const data = JSON.parse(byId('benchmark-data').textContent);
@@ -18,6 +27,9 @@ function startComparison() {
   const scene = byId('scene'), variant = byId('variant'), baseline = byId('baseline');
   const views = [byId('view-a'), byId('view-b')];
   const images = [byId('image-a'), byId('image-b')];
+  const diffImage = byId('diff-image'), diffToggle = byId('diff-toggle');
+  const threshold = byId('diff-threshold'), gain = byId('diff-gain');
+  let difference = null, showingDiff = false;
   let zoom = 1, fitting = false, single = false, showChanged = false;
   let generation = 0;
   let focus = { x: .5, y: .5 };
@@ -27,6 +39,7 @@ function startComparison() {
     'direct portraits': '초상화 직접 그리기', 'blur off': '방사형 블러 끄기',
   };
   const optionName = name => optionNames[name] || name;
+  const displayedImages = () => [images[0], showingDiff && difference ? diffImage : images[1]];
   byId('environment').textContent = `App ${data.App} · ${data.Device} · ${data.Resolution} · ${data.StartedUtc}`;
 
   function fill(select, options) {
@@ -40,17 +53,18 @@ function startComparison() {
     };
   }
   function position(index) {
-    const view = views[index], image = images[index];
+    const view = views[index], image = displayedImages()[index];
     view.scrollLeft = focus.x * Math.max(image.width, view.clientWidth) - view.clientWidth / 2;
     view.scrollTop = focus.y * Math.max(image.height, view.clientHeight) - view.clientHeight / 2;
   }
   function layout() {
-    if (!images.every(image => image.naturalWidth)) return;
+    const displayed = displayedImages();
+    if (!displayed.every(image => image.naturalWidth)) return;
     const ratio = window.devicePixelRatio || 1;
-    if (fitting) zoom = Math.min(...images.flatMap((image, index) =>
+    if (fitting) zoom = Math.min(...displayed.flatMap((image, index) =>
       views[index].parentElement.hidden ? [] : [Math.min(views[index].clientWidth / image.naturalWidth, views[index].clientHeight / image.naturalHeight) * ratio]));
-    for (let i = 0; i < images.length; i++) {
-      const image = images[i], stage = image.parentElement;
+    for (let i = 0; i < displayed.length; i++) {
+      const image = displayed[i], stage = image.parentElement;
       image.style.width = `${image.naturalWidth * zoom / ratio}px`;
       image.style.height = `${image.naturalHeight * zoom / ratio}px`;
       stage.style.width = `${Math.max(image.width, views[i].clientWidth)}px`;
@@ -62,11 +76,32 @@ function startComparison() {
     byId('fit').setAttribute('aria-pressed', String(fitting));
     byId('details').textContent = `${Math.round(zoom * 100)}% · 원본 ${images[0].naturalWidth}×${images[0].naturalHeight} · 변경 ${images[1].naturalWidth}×${images[1].naturalHeight}`;
   }
+  function updateDifference() {
+    const limit = Number(threshold.value), multiplier = Number(gain.value);
+    byId('diff-threshold-value').textContent = String(limit);
+    const colors = Array.from({ length: 256 }, (_, delta) => delta > limit ? Math.min(1, delta * multiplier / 255) : 0);
+    byId('diff-red').setAttribute('tableValues', colors.join(' '));
+    byId('diff-green').setAttribute('tableValues', colors.map(value => value * .5).join(' '));
+    const visible = showingDiff && !!difference;
+    images[1].hidden = visible;
+    diffImage.hidden = !visible;
+    diffToggle.disabled = !difference;
+    diffToggle.setAttribute('aria-pressed', String(visible));
+    const pair = pairs[Number(variant.value)];
+    if (pair) byId('label-b').textContent = visible ? `B · 픽셀 차이 · 강조 ×${multiplier}` : `B · ${optionName(pair.variant.Variant)}`;
+    if (difference) {
+      const stats = differenceStats(difference.Histogram, limit);
+      byId('diff-stats').textContent = `변경 픽셀(차이 > ${limit}) ${stats.percent.toFixed(2)}% · ${stats.changed.toLocaleString()} / ${stats.total.toLocaleString()} · 채널 평균 차이 ${difference.MeanAbsolute.toFixed(3)}/255 · 최대 ${difference.Maximum}/255`;
+    } else byId('diff-stats').textContent = '같은 크기의 차이 이미지가 없습니다. 앱에서 저장된 비교를 다시 열어 주세요.';
+  }
   async function selectPair() {
     const current = pairs[Number(variant.value)];
     if (!current) return;
     const original = current[baseline.value] || current.start || current.end;
     const currentGeneration = ++generation;
+    difference = null;
+    updateDifference();
+    byId('diff-stats').textContent = '차이 이미지를 불러오는 중…';
     baseline.options[0].disabled = !current.start;
     baseline.options[1].disabled = !current.end;
     baseline.value = original === current.start ? 'start' : 'end';
@@ -80,6 +115,19 @@ function startComparison() {
       if (currentGeneration !== generation) return;
       if (images[0].naturalWidth !== images[1].naturalWidth || images[0].naturalHeight !== images[1].naturalHeight)
         byId('error').textContent = '캡처 크기가 달라 동일한 상대 위치로 이동합니다.';
+      const selectedDifference = original === current.start ? current.variant.DiffStart : current.variant.DiffEnd;
+      if (selectedDifference) {
+        diffImage.src = selectedDifference.Screenshot;
+        try {
+          await diffImage.decode();
+          if (currentGeneration !== generation) return;
+          difference = selectedDifference;
+        } catch (error) {
+          if (currentGeneration !== generation) return;
+          byId('error').textContent = '차이 이미지를 열 수 없습니다. 앱에서 저장된 비교를 다시 열어 주세요.';
+        }
+      }
+      updateDifference();
       focus = { x: .5, y: .5 };
       layout();
     } catch (error) {
@@ -92,6 +140,8 @@ function startComparison() {
   }
   scene.onchange = selectScene;
   variant.onchange = baseline.onchange = selectPair;
+  diffToggle.onclick = () => { showingDiff = !showingDiff; updateDifference(); layout(); };
+  threshold.oninput = gain.onchange = updateDifference;
   for (const [id, scale] of [['zoom100', 1], ['zoom200', 2]]) byId(id).onclick = () => {
     fitting = false; zoom = scale; layout();
   };
@@ -112,7 +162,7 @@ function startComparison() {
       const other = views[1 - index];
       if (view.parentElement.hidden) return;
       if (other.scrollLeft === view.scrollLeft && other.scrollTop === view.scrollTop) return;
-      readFocus(view, images[index]);
+      readFocus(view, displayedImages()[index]);
       if (!other.parentElement.hidden) position(1 - index);
     });
     let drag;

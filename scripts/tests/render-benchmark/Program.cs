@@ -211,3 +211,42 @@ foreach (var group in comparisons.GroupBy(test => test.Scene))
         );
 }
 Console.WriteLine("PASS isolated visual capture job and retained option coverage");
+byte[] originalPixels = [10, 20, 30, 255, 50, 60, 70, 255];
+byte[] changedPixels = [14, 18, 32, 255, 50, 60, 70, 254];
+var difference = PixelDifference.Calculate(originalPixels, changedPixels);
+Check(
+    difference.Pixels.SequenceEqual(new byte[] { 4, 4, 4, 255, 1, 1, 1, 255 }),
+    "Difference image stores the maximum RGBA channel delta at each pixel"
+);
+Check(
+    difference.Histogram.Sum() == 2 && difference.Histogram[4] == 1 && difference.Histogram[1] == 1,
+    "Histogram counts pixels, including alpha-only changes"
+);
+Check(
+    difference.Maximum == 4 && difference.MeanAbsolute == 1.125,
+    "Difference statistics use unamplified channel values"
+);
+var identical = PixelDifference.Calculate(originalPixels, originalPixels);
+Check(
+    identical.Histogram[0] == 2 && identical.Maximum == 0 && identical.MeanAbsolute == 0,
+    "Identical captures have zero difference"
+);
+var extreme = PixelDifference.Calculate(new byte[4], new byte[] { 255, 255, 255, 255 });
+Check(
+    extreme.Histogram[255] == 1 && extreme.MeanAbsolute == 255,
+    "Maximum differences do not overflow"
+);
+foreach (var invalid in new[] { Array.Empty<byte>(), new byte[3], new byte[4] })
+{
+    bool rejected = false;
+    try
+    {
+        PixelDifference.Calculate(originalPixels, invalid);
+    }
+    catch (ArgumentException)
+    {
+        rejected = true;
+    }
+    Check(rejected, "Unequal or invalid RGBA buffers cannot be compared");
+}
+Console.WriteLine("PASS exact pixel differences, alpha, histogram and input validation");

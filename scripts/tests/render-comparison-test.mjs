@@ -25,3 +25,14 @@ assert.equal(pairs[1].start, effectsStart, 'Never use a baseline from another sc
 assert.equal(pairs[1].end, null, 'Partial runs may lack the ending baseline');
 assert.equal(makePairs([]).length, 0);
 console.log('PASS same-scene comparison pairing and partial runs');
+
+assert.equal(typeof context.differenceStats, 'function', 'Difference statistics must be available');
+const histogram = Array(256).fill(0);
+histogram[0] = 3; histogram[8] = 1; histogram[9] = 1; histogram[255] = 1;
+assert.equal(context.differenceStats(histogram, 8).changed, 2, 'Threshold is strict and includes large changes');
+assert.equal(context.differenceStats(histogram, 0).changed, 3);
+assert.equal(context.differenceStats(histogram, 255).changed, 0);
+assert.equal(context.differenceStats(histogram, 8).total, 6, 'Coverage counts every pixel');
+assert.equal(context.differenceStats(histogram, 8).percent, 100 / 3);
+assert.equal(context.differenceStats(Array(256).fill(0), 8).percent, 0);
+console.log('PASS adjustable difference coverage from raw histogram');
