@@ -1,4 +1,6 @@
 using Godot;
+using MegaCrit.Sts2.Core.Saves;
+using MegaCrit.Sts2.Core.Settings;
 using STS2Mobile;
 using STS2Mobile.Launcher;
 using STS2Mobile.Patches;
@@ -43,6 +45,48 @@ Check(
     "Retain mobile first-launch initialization"
 );
 Console.WriteLine("PASS legacy MSAA cleanup, retained preferences and native FPS ownership");
+
+var markerPath = Path.Combine(OS.GetUserDataDir(), ".mobile_defaults_applied");
+SaveManager.Instance = new SaveManager(new MegaCrit.Sts2.Core.Saves.Test.MockGodotFileIo());
+SettingsPatches.InitSettingsDataPostfix();
+Check(!File.Exists(markerPath), "A benchmark must not mark real mobile defaults as initialized");
+Check(SaveManager.Instance.SaveCount == 0, "A benchmark must not run real first-launch setup");
+
+SaveManager.Instance = new SaveManager();
+SettingsPatches.InitSettingsDataPostfix();
+Check(File.Exists(markerPath), "Normal PLAY still applies mobile defaults after a benchmark");
+Check(
+    SaveManager.Instance.SettingsSave.AspectRatioSetting == AspectRatioSetting.Auto
+        && SaveManager.Instance.SaveCount == 1,
+    "Normal PLAY persists the automatic aspect ratio"
+);
+
+var markerBytes = File.ReadAllBytes(markerPath);
+typeof(SettingsPatches)
+    .GetField(
+        "_mobileDefaultsChecked",
+        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static
+    )!
+    .SetValue(null, false);
+SaveManager.Instance = new SaveManager(new MegaCrit.Sts2.Core.Saves.Test.MockGodotFileIo());
+SettingsPatches.InitSettingsDataPostfix();
+Check(
+    File.ReadAllBytes(markerPath).SequenceEqual(markerBytes),
+    "A benchmark preserves an existing marker"
+);
+SaveManager.Instance = new SaveManager();
+SaveManager.Instance.SettingsSave.AspectRatioSetting = AspectRatioSetting.SixteenByNine;
+SaveManager.Instance.SettingsSave.Msaa = 4;
+SettingsPatches.InitSettingsDataPostfix();
+Check(
+    SaveManager.Instance.SettingsSave.AspectRatioSetting == AspectRatioSetting.SixteenByNine
+        && SaveManager.Instance.SettingsSave.Msaa == 4
+        && SaveManager.Instance.SaveCount == 0,
+    "A benchmark followed by PLAY preserves existing user preferences"
+);
+Console.WriteLine(
+    "PASS benchmark-first mobile defaults isolation and existing preference preservation"
+);
 
 namespace Godot
 {
@@ -135,6 +179,15 @@ namespace Godot
 namespace HarmonyLib
 {
     public sealed class Harmony { }
+
+    public static class AccessTools
+    {
+        public static System.Reflection.FieldInfo Field(Type type, string name) =>
+            type.GetField(
+                name,
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance
+            )!;
+    }
 }
 
 namespace MegaCrit.Sts2.Core.Nodes
@@ -159,6 +212,7 @@ namespace MegaCrit.Sts2.Core.Settings
     public enum AspectRatioSetting
     {
         Auto,
+        SixteenByNine,
     }
 }
 
@@ -166,18 +220,29 @@ namespace MegaCrit.Sts2.Core.Saves
 {
     public sealed class SaveManager
     {
-        public static SaveManager Instance { get; } = new();
-        public SettingsSave SettingsSave { get; } = new();
+        private readonly object _saveStore;
 
-        public void SaveSettings() { }
+        public SaveManager(object saveStore = null) => _saveStore = saveStore ?? new object();
+
+        public static SaveManager Instance { get; set; } = new();
+        public SettingsSave SettingsSave { get; } = new();
+        public int SaveCount { get; private set; }
+
+        public void SaveSettings() => SaveCount++;
     }
 
     public sealed class SettingsSave
     {
         public MegaCrit.Sts2.Core.Settings.VSyncType VSync { get; set; }
-        public MegaCrit.Sts2.Core.Settings.AspectRatioSetting AspectRatioSetting { get; set; }
+        public MegaCrit.Sts2.Core.Settings.AspectRatioSetting AspectRatioSetting { get; set; } =
+            MegaCrit.Sts2.Core.Settings.AspectRatioSetting.SixteenByNine;
         public int Msaa { get; set; }
     }
+}
+
+namespace MegaCrit.Sts2.Core.Saves.Test
+{
+    public sealed class MockGodotFileIo { }
 }
 
 namespace STS2Mobile

@@ -4,6 +4,7 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Saves;
+using MegaCrit.Sts2.Core.Saves.Test;
 using MegaCrit.Sts2.Core.Settings;
 
 namespace STS2Mobile.Patches;
@@ -41,6 +42,11 @@ public static class SettingsPatches
 
     public static void InitSettingsDataPostfix()
     {
+        if (
+            AccessTools.Field(typeof(SaveManager), "_saveStore").GetValue(SaveManager.Instance)
+            is MockGodotFileIo
+        )
+            return;
         if (_mobileDefaultsChecked)
             return;
         _mobileDefaultsChecked = true;

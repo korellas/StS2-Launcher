@@ -81,6 +81,7 @@ public sealed class RenderBenchmarkFixture : IDisposable
         var saves = new SaveManager(new MockGodotFileIo("user://render-benchmark"));
         SaveManager.MockInstanceForTesting(saves);
         await OneTimeInitialization.ExecuteVeryEarly();
+        saves.SettingsSave.AspectRatioSetting = MegaCrit.Sts2.Core.Settings.AspectRatioSetting.Auto;
         NCard.InitPool();
         NGridCardHolder.InitPool();
         OneTimeInitialization.ExecuteEssential();
