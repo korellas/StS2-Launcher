@@ -180,6 +180,8 @@ public sealed class RenderBenchmarkData
     public string Engine { get; set; }
     public string App { get; set; }
     public string GameAssembly { get; set; }
+    public string GameLibraryVersion { get; set; }
+    public string RuntimeVersion { get; set; }
     public string Renderer { get; set; }
     public string Resolution { get; set; }
     public int Phase { get; set; }
@@ -214,6 +216,10 @@ public sealed class RenderBenchmarkData
         text.AppendLine(
             $"UTC {StartedUtc}\nApp {App} | Engine {Engine}\nDevice {Device}\nRenderer {Renderer}\nResolution {Resolution}\nGame assembly {GameAssembly}"
         );
+        if (GameLibraryVersion != null || RuntimeVersion != null)
+            text.AppendLine(
+                $"Game DLL version {GameLibraryVersion ?? "N/A"} | .NET runtime {RuntimeVersion ?? "N/A"}"
+            );
         text.AppendLine(
             "Fixtures use game textures/shaders and native Canvas2D nodes; this is not full combat performance or battery consumption."
         );

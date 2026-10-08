@@ -16,6 +16,28 @@ public static class Localization
 
     private static readonly Dictionary<string, string> Korean = new()
     {
+        ["VERSION_TITLE"] = "버전 정보",
+        ["VERSION_LAUNCHER"] = "런처",
+        ["VERSION_GAME_FILES"] = "다운로드한 게임",
+        ["VERSION_GAME_DLL"] = "실행 중인 게임 DLL",
+        ["VERSION_ENGINE"] = "Godot 엔진",
+        ["VERSION_RUNTIME"] = ".NET 런타임",
+        ["VERSION_UNAVAILABLE"] = "정보 없음",
+        ["VERSION_COPY"] = "버전 정보 복사",
+        ["BENCH_RESULTS_TAB"] = "측정 결과",
+        ["BENCH_CAPTURE_TAB"] = "화면 비교",
+        ["BENCH_SCENE_CARDS"] = "카드",
+        ["BENCH_SCENE_GEOMETRY"] = "도형",
+        ["BENCH_SCENE_EFFECTS"] = "화면 효과",
+        ["BENCH_FRAME_TIMES"] = "프레임 평균 / p95 / p99",
+        ["BENCH_RESULTS_HELP"] =
+            "같은 장면의 결과끼리 비교하세요. CPU·GPU는 테스트 장면의 렌더링 시간이며, 실제 전투 전체나 배터리 소비량은 아닙니다.",
+        ["BENCH_NO_CAPTURE"] = "아직 저장된 비교 화면이 없습니다.",
+        ["BENCH_READY"] = "자동 비교를 시작하면 옵션 적용과 재시작까지 진행합니다.",
+        ["BENCH_COMPLETED"] = "자동 비교가 완료됐습니다. 원래 설정으로 복귀했습니다.",
+        ["BENCH_CANCELLED"] = "중단됐습니다. 완료한 항목의 결과는 보관했습니다.",
+        ["BENCH_INTERRUPTED"] =
+            "이전 테스트가 끊겼습니다. 완료한 결과를 확인하거나 다시 시작할 수 있습니다.",
         ["BENCH_TITLE"] = "렌더링 벤치마크",
         ["BENCH_INFO"] =
             "고정된 카드·도형·화면 효과 장면에서 옵션을 자동 비교합니다. 페이싱 적용을 위한 재시작도 자동으로 진행합니다. 테스트 중에는 조작하거나 화면을 접지 말아 주세요. 완료 후 원래 설정으로 돌아오며 결과와 비교 화면은 오프라인으로 보관됩니다.",
@@ -170,6 +192,28 @@ public static class Localization
     // appear here, and Tr falls back to this table before returning the key.
     private static readonly Dictionary<string, string> English = new()
     {
+        ["VERSION_TITLE"] = "Version information",
+        ["VERSION_LAUNCHER"] = "Launcher",
+        ["VERSION_GAME_FILES"] = "Downloaded game",
+        ["VERSION_GAME_DLL"] = "Loaded game DLL",
+        ["VERSION_ENGINE"] = "Godot engine",
+        ["VERSION_RUNTIME"] = ".NET runtime",
+        ["VERSION_UNAVAILABLE"] = "Unavailable",
+        ["VERSION_COPY"] = "Copy version information",
+        ["BENCH_RESULTS_TAB"] = "Results",
+        ["BENCH_CAPTURE_TAB"] = "Visual comparison",
+        ["BENCH_SCENE_CARDS"] = "Cards",
+        ["BENCH_SCENE_GEOMETRY"] = "Geometry",
+        ["BENCH_SCENE_EFFECTS"] = "Screen effects",
+        ["BENCH_FRAME_TIMES"] = "Frame mean / p95 / p99",
+        ["BENCH_RESULTS_HELP"] =
+            "Compare results within the same scene. CPU and GPU measure scene rendering, not full combat performance or battery consumption.",
+        ["BENCH_NO_CAPTURE"] = "No comparison images saved yet.",
+        ["BENCH_READY"] = "Start automatic comparison to apply options and restart as needed.",
+        ["BENCH_COMPLETED"] = "Comparison completed. Your original settings are restored.",
+        ["BENCH_CANCELLED"] = "Cancelled. Completed results were preserved.",
+        ["BENCH_INTERRUPTED"] =
+            "The previous test was interrupted. View completed results or start again.",
         ["BENCH_TITLE"] = "Rendering benchmark",
         ["BENCH_INFO"] =
             "Automatically compares options in fixed card, geometry and screen-effect scenes, including cold restarts for frame pacing. Leave the app untouched and do not resize the screen. Your settings are restored at the end. Results and comparison images remain available offline.",

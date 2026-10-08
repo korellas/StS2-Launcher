@@ -119,6 +119,9 @@ public class LauncherView
         );
         Actions.RemoveChild(Actions.SettingsGroup);
         settingsOverlay.Content.AddChild(Actions.SettingsGroup);
+        var versions = new VersionSection(scale);
+        Actions.SettingsGroup.AddChild(versions);
+        settingsOverlay.Opened += versions.Refresh;
         var graphics = new GraphicsSection(scale, Actions.GraphicsGroup) { Visible = false };
         graphics.HelpRequested += ShowGraphicsHelp;
         graphics.BenchmarkRequested += () => RenderBenchmarkScreen.Open((LauncherUI)parent);

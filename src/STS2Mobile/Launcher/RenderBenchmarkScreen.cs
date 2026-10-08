@@ -19,8 +19,12 @@ public sealed class RenderBenchmarkScreen : Control
     private readonly LauncherUI _owner;
     private readonly float _scale;
     private readonly VBoxContainer _panel;
+    private readonly Control _background;
+    private readonly Control _frame;
     private readonly StyledLabel _status;
-    private readonly TextEdit _report;
+    private readonly VBoxContainer _resultRows;
+    private readonly Control _resultsPage;
+    private readonly Control _capturePage;
     private readonly GameMenuButton _start;
     private readonly GameMenuButton _cancel;
     private readonly GameMenuButton _close;
@@ -99,9 +103,9 @@ public sealed class RenderBenchmarkScreen : Control
 
     private static void Open(LauncherUI owner, RenderBenchmarkData data, bool resume = false)
     {
-        owner.Hide();
         var screen = new RenderBenchmarkScreen(owner, data);
         owner.GetTree().Root.AddChild(screen);
+        owner.Hide();
         var window = screen.GetTree().Root;
         window.FocusExited += screen.OnFocusExited;
         screen.TreeExiting += () =>
@@ -119,56 +123,91 @@ public sealed class RenderBenchmarkScreen : Control
         _data = data;
         ZIndex = 200;
         SetAnchorsPreset(LayoutPreset.FullRect);
-        _scale = Math.Max(owner.Size.X, owner.Size.Y) / 960f;
+        _scale = Math.Max(.65f, Math.Min(owner.Size.X / 960f, owner.Size.Y / 600f));
+        _background = new ScreenBackground();
+        AddChild(_background);
         AddChild(
             new ColorRect
             {
-                Color = new Color(.025f, .03f, .055f),
+                Color = new Color(0, 0, 0, .55f),
                 Size = owner.Size,
                 MouseFilter = MouseFilterEnum.Stop,
             }
         );
-        _panel = new VBoxContainer { Position = owner.Size * .04f, Size = owner.Size * .92f };
+        var frame = new PanelContainer
+        {
+            AnchorLeft = .04f,
+            AnchorRight = .96f,
+            AnchorTop = .04f,
+            AnchorBottom = .96f,
+        };
+        StyleBox style = LauncherTheme.Panel(_scale);
+        var texture = GameAssets.Load<Texture2D>(GameAssets.PopupPanel);
+        if (texture != null)
+        {
+            var art = new StyleBoxTexture
+            {
+                Texture = texture,
+                ModulateColor = LauncherTheme.PanelSlate,
+            };
+            art.SetTextureMarginAll(Math.Min(texture.GetWidth(), texture.GetHeight()) / 3f);
+            style = art;
+        }
+        style.SetContentMarginAll(20 * _scale);
+        frame.AddThemeStyleboxOverride("panel", style);
+        AddChild(frame);
+        _frame = frame;
+        _panel = new VBoxContainer();
         _panel.AddThemeConstantOverride("separation", (int)(8 * _scale));
-        AddChild(_panel);
-        _panel.AddChild(new StyledLabel(Tr("BENCH_TITLE"), _scale, 22, HorizontalAlignment.Left));
+        frame.AddChild(_panel);
+        var title = new StyledLabel(Tr("BENCH_TITLE"), _scale, 24, HorizontalAlignment.Left);
+        title.AddThemeColorOverride("font_color", LauncherTheme.Gold);
+        _panel.AddChild(title);
         var description = new StyledLabel(Tr("BENCH_INFO"), _scale, 13, HorizontalAlignment.Left)
         {
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         };
+        description.AddThemeColorOverride("font_color", LauncherTheme.Dim);
         _panel.AddChild(description);
         _status = new StyledLabel("", _scale, 14, HorizontalAlignment.Left)
         {
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         };
         _panel.AddChild(_status);
-        var buttons = new HBoxContainer();
-        _panel.AddChild(buttons);
-        _start = Button(buttons, "BENCH_START", StartSuite);
-        _cancel = Button(buttons, "BENCH_CANCEL", Cancel);
-        _close = Button(buttons, "BENCH_CLOSE", Close);
-        Button(
-            buttons,
-            "BENCH_COPY",
-            () =>
-            {
-                DisplayServer.ClipboardSet(_data?.Report() ?? Tr("BENCH_NO_RESULT"));
-                _status.Text = Tr("BENCH_COPIED");
-            }
-        );
-        var results = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
-        _panel.AddChild(results);
-        _report = new TextEdit
+        var environment = new StyledLabel(
+            $"{Tr("VERSION_LAUNCHER")} {_data?.App ?? STS2Mobile.Steam.AppUpdateChecker.GetInstalledVersion()} · Godot {_data?.Engine ?? Engine.GetVersionInfo()["string"].AsString()}",
+            _scale,
+            12,
+            HorizontalAlignment.Left
+        )
         {
-            Editable = false,
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            SizeFlagsVertical = SizeFlags.ExpandFill,
-            CustomMinimumSize = new Vector2(owner.Size.X * .5f, 0),
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
         };
-        _report.AddThemeFontSizeOverride("font_size", (int)(12 * _scale));
-        results.AddChild(_report);
-        var gallery = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        results.AddChild(gallery);
+        environment.AddThemeColorOverride("font_color", LauncherTheme.Dim);
+        _panel.AddChild(environment);
+        var tabs = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        var resultsTab = new SettingsTabButton(Tr("BENCH_RESULTS_TAB"), _scale);
+        var captureTab = new SettingsTabButton(Tr("BENCH_CAPTURE_TAB"), _scale);
+        tabs.AddChild(resultsTab);
+        tabs.AddChild(captureTab);
+        _panel.AddChild(tabs);
+        var body = new Control { SizeFlagsVertical = SizeFlags.ExpandFill };
+        _panel.AddChild(body);
+        var scroll = new ScrollContainer
+        {
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        scroll.SetAnchorsPreset(LayoutPreset.FullRect);
+        LauncherTheme.ApplyGameScrollbar(scroll, _scale);
+        body.AddChild(scroll);
+        _resultsPage = scroll;
+        _resultRows = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        _resultRows.AddThemeConstantOverride("separation", (int)(12 * _scale));
+        scroll.AddChild(_resultRows);
+        var gallery = new VBoxContainer();
+        gallery.SetAnchorsPreset(LayoutPreset.FullRect);
+        body.AddChild(gallery);
+        _capturePage = gallery;
         _captureLabel = new StyledLabel("", _scale, 12)
         {
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
@@ -179,10 +218,9 @@ public sealed class RenderBenchmarkScreen : Control
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             SizeFlagsVertical = SizeFlags.ExpandFill,
-            CustomMinimumSize = new Vector2(owner.Size.X * .3f, 0),
         };
         gallery.AddChild(_capture);
-        var arrows = new HBoxContainer();
+        var arrows = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         gallery.AddChild(arrows);
         var previous = new GameMenuButton("◀", _scale, fontSize: 14);
         var next = new GameMenuButton("▶", _scale, fontSize: 14);
@@ -190,6 +228,33 @@ public sealed class RenderBenchmarkScreen : Control
         arrows.AddChild(next);
         previous.Pressed += () => ChangeCapture(-1);
         next.Pressed += () => ChangeCapture(1);
+        resultsTab.Pressed += () => SelectTab(false);
+        captureTab.Pressed += () => SelectTab(true);
+        SelectTab(false);
+        void SelectTab(bool captures)
+        {
+            _resultsPage.Visible = !captures;
+            _capturePage.Visible = captures;
+            resultsTab.SetSelected(!captures);
+            captureTab.SetSelected(captures);
+        }
+        _panel.AddChild(SettingsRow.Separator(_scale));
+        var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        buttons.AddThemeConstantOverride("separation", (int)(20 * _scale));
+        _panel.AddChild(buttons);
+        _start = Button(buttons, "BENCH_START", StartSuite);
+        _start.AddThemeColorOverride("font_color", LauncherTheme.Gold);
+        _cancel = Button(buttons, "BENCH_CANCEL", Cancel);
+        Button(
+            buttons,
+            "BENCH_COPY",
+            () =>
+            {
+                DisplayServer.ClipboardSet(_data?.Report() ?? Tr("BENCH_NO_RESULT"));
+                _status.Text = Tr("BENCH_COPIED");
+            }
+        );
+        _close = Button(buttons, "BENCH_CLOSE", Close);
         _cancel.Visible = false;
         ShowResults();
     }
@@ -220,6 +285,8 @@ public sealed class RenderBenchmarkScreen : Control
                 Engine = Godot.Engine.GetVersionInfo()["string"].AsString(),
                 App = LauncherModel.GetGodotApp().Call("getVersionName").AsString(),
                 GameAssembly = typeof(NGame).Assembly.ManifestModule.ModuleVersionId.ToString(),
+                GameLibraryVersion = LibraryVersions.ReadLoaded("sts2")?.Version,
+                RuntimeVersion = System.Environment.Version.ToString(),
                 Renderer =
                     $"{RenderingServer.GetCurrentRenderingMethod()} / {RenderingServer.GetCurrentRenderingDriverName()} / {RenderingServer.GetVideoAdapterName()}",
                 Resolution = $"{size.X}x{size.Y}",
@@ -273,7 +340,8 @@ public sealed class RenderBenchmarkScreen : Control
                 );
             _fixture ??= new RenderBenchmarkFixture();
             DisplayServer.ScreenSetKeepOn(true);
-            _panel.Visible = false;
+            _frame.Visible = false;
+            _background.Visible = false;
             _cancel.Visible = true;
             // Progress is the only launcher control drawn during sampling.
             _panel.RemoveChild(_status);
@@ -296,7 +364,7 @@ public sealed class RenderBenchmarkScreen : Control
             };
             _preview.SetAnchorsPreset(LayoutPreset.FullRect);
             AddChild(_preview);
-            MoveChild(_preview, 1);
+            MoveChild(_preview, _frame.GetIndex());
             RenderingServer.ViewportSetMeasureRenderTime(_viewport.GetViewportRid(), true);
             DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
             var tests = new List<RenderBenchmarkCase>();
@@ -487,10 +555,62 @@ public sealed class RenderBenchmarkScreen : Control
 
     private void ShowResults()
     {
-        _report.Text = _data?.Report() ?? Tr("BENCH_NO_RESULT");
-        _status.Text = _data?.Status ?? "";
+        _status.Text = _data?.Status switch
+        {
+            "Completed" => Tr("BENCH_COMPLETED"),
+            "Running" => Tr("BENCH_MEASURE"),
+            "Cancelled; completed cases preserved" => Tr("BENCH_CANCELLED"),
+            "Interrupted; completed cases preserved" => Tr("BENCH_INTERRUPTED"),
+            null or "Ready" => Tr("BENCH_READY"),
+            var status => status,
+        };
+        AddResultText(Tr("BENCH_RESULTS_HELP"), 12, LauncherTheme.Dim);
+        if (_data == null || _data.Results.Count == 0)
+            AddResultText(Tr("BENCH_NO_RESULT"), 18, LauncherTheme.Cream);
+        else
+        {
+            foreach (var result in _data.Results)
+            {
+                var metrics = result.Metrics;
+                AddResultText(
+                    $"{SceneName(result.Case)} · {result.Variant}",
+                    17,
+                    LauncherTheme.Gold
+                );
+                AddResultText(
+                    $"FPS {metrics.Fps:F1}   ·   CPU {metrics.CpuMeanMs:F2} ms   ·   GPU {metrics.GpuMeanMs?.ToString("F2") ?? "N/A"} ms",
+                    16,
+                    LauncherTheme.Cream
+                );
+                AddResultText(
+                    $"{Tr("BENCH_FRAME_TIMES")} {metrics.FrameMeanMs:F2} / {metrics.FrameP95Ms:F2} / {metrics.FrameP99Ms:F2} ms",
+                    13,
+                    LauncherTheme.Dim
+                );
+                _resultRows.AddChild(SettingsRow.Separator(_scale));
+            }
+        }
         ChangeCapture(0);
     }
+
+    private void AddResultText(string text, int fontSize, Color color)
+    {
+        var label = new StyledLabel(text, _scale, fontSize, HorizontalAlignment.Left)
+        {
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        label.AddThemeColorOverride("font_color", color);
+        _resultRows.AddChild(label);
+    }
+
+    private static string SceneName(string scene) =>
+        scene switch
+        {
+            "Cards" => Tr("BENCH_SCENE_CARDS"),
+            "Geometry" => Tr("BENCH_SCENE_GEOMETRY"),
+            "Effects" => Tr("BENCH_SCENE_EFFECTS"),
+            _ => scene,
+        };
 
     private void ChangeCapture(int direction)
     {
@@ -498,11 +618,14 @@ public sealed class RenderBenchmarkScreen : Control
             ?.Results.Where(x => x.Screenshot != null && File.Exists(x.Screenshot))
             .ToArray();
         if (captures == null || captures.Length == 0)
+        {
+            _captureLabel.Text = Tr("BENCH_NO_CAPTURE");
             return;
+        }
         _captureIndex = (_captureIndex + direction + captures.Length) % captures.Length;
         var result = captures[_captureIndex];
         _captureLabel.Text =
-            $"{_captureIndex + 1}/{captures.Length} · {result.Case}: {result.Variant}";
+            $"{_captureIndex + 1}/{captures.Length} · {SceneName(result.Case)}: {result.Variant}";
         using var image = Image.LoadFromFile(result.Screenshot);
         _capture.Texture = ImageTexture.CreateFromImage(image);
     }
