@@ -443,35 +443,6 @@ public class LauncherModel : IDisposable
         catch { }
     }
 
-    internal static readonly int[] FrameLimitOptions = { 30, 60, 120, 0 };
-    private static string FrameLimitPrefPath => Path.Combine(OS.GetDataDir(), "mobile_fps_limit");
-
-    public static int LoadFrameLimitPref()
-    {
-        try
-        {
-            if (
-                File.Exists(FrameLimitPrefPath)
-                && int.TryParse(File.ReadAllText(FrameLimitPrefPath).Trim(), out int fps)
-                && Array.IndexOf(FrameLimitOptions, fps) >= 0
-            )
-                return fps;
-        }
-        catch { }
-        return 60;
-    }
-
-    public static void SaveFrameLimitPref(int fps)
-    {
-        if (Array.IndexOf(FrameLimitOptions, fps) < 0)
-            throw new ArgumentOutOfRangeException(nameof(fps));
-        try
-        {
-            File.WriteAllText(FrameLimitPrefPath, fps.ToString());
-        }
-        catch { }
-    }
-
     private static string FpsOverlayPrefPath =>
         Path.Combine(OS.GetDataDir(), "fps_overlay_enabled");
 

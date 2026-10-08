@@ -86,11 +86,9 @@ public static class Localization
         ["GRAPHICS_PRESET_BATTERY"] = "절전",
         ["GRAPHICS_PRESET_CUSTOM"] = "사용자 설정",
         ["GRAPHICS_PRESET_INFO"] =
-            "게임 기본값은 화질 옵션을 원래 설정으로 되돌립니다. 화질 우선은 윤곽선과 텍스처 품질을 높이고, 균형은 해상도를 줄입니다. 절전은 해상도를 낮추고 방사형 흐림을 끕니다.\n\n프레임 제한, 성능 표시, 셰이더 예열, 프레임 페이싱은 유지됩니다. 절전과 함께 FPS를 낮추면 그리는 횟수도 줄일 수 있습니다. 실험적인 카드 직접 그리기는 프리셋에서 사용하지 않습니다. 다음 시작부터 적용됩니다.",
+            "게임 기본값은 모바일 화질 옵션을 원래 설정으로 되돌립니다. 화질 우선은 텍스처 품질을 높이고, 균형은 해상도를 줄입니다. 절전은 해상도를 낮추고 방사형 흐림을 끕니다.\n\n인게임의 FPS 제한·MSAA와 성능 표시, 셰이더 예열, 프레임 페이싱은 유지됩니다. 절전과 함께 인게임 FPS를 낮추면 그리는 횟수도 줄일 수 있습니다. 실험적인 카드 직접 그리기는 프리셋에서 사용하지 않습니다. 다음 시작부터 적용됩니다.",
         ["GRAPHICS_RESOLUTION_INFO"] =
             "화면을 그리는 내부 해상도입니다. 낮출수록 처리할 픽셀이 줄어 GPU 부하를 낮출 수 있지만, 카드와 글자도 흐려질 수 있습니다.\n\n화면 배치와 터치 좌표는 유지됩니다. 다음 시작부터 적용됩니다.",
-        ["GRAPHICS_MSAA_INFO"] =
-            "도형의 가장자리를 여러 번 샘플링하여 계단 모양을 줄입니다. 높을수록 GPU 작업과 메모리 사용이 늘 수 있으며, 모든 이미지나 글자가 개선되는 것은 아닙니다.\n\n게임 기본값은 게임 설정을 따릅니다. 다음 시작부터 적용되고, 변경하면 셰이더를 다시 예열합니다.",
         ["GRAPHICS_HDR_INFO"] =
             "2D 화면을 더 넓은 색 범위로 계산합니다. 일부 빛과 색 효과 표현에 도움이 되지만 렌더 버퍼의 메모리와 대역폭 사용이 늘 수 있습니다. 휴대폰 화면의 HDR 출력 기능을 켜는 옵션은 아닙니다.\n\n다음 시작부터 적용되고, 변경하면 셰이더를 다시 예열합니다.",
         ["GRAPHICS_FILTER_INFO"] =
@@ -107,8 +105,6 @@ public static class Localization
             "게임 시작 시 셰이더를 미리 준비하여 처음 효과가 나올 때의 끊김을 줄이려는 옵션입니다. 처음 준비하는 실행은 더 오래 걸리며, 완료된 예열은 다음 실행에서 생략합니다.\n\n끄면 사전 예열을 건너뜁니다. 아래의 다시 예열 버튼은 다음 시작에 준비를 다시 하도록 예약합니다.",
         ["GRAPHICS_PACING_INFO"] =
             "Android에서 프레임을 화면에 내보내는 간격을 조절합니다. 자동 FPS는 엔진이 간격을 조절하고, 자동 FPS + 파이프라인은 프레임 준비 방식도 조절합니다. 선택한 FPS 유지는 자동 간격 조절을 끕니다.\n\n위의 FPS 제한과는 별개이며, 이 옵션만으로 FPS나 배터리 개선을 보장하지 않습니다. 변경 후 시작을 누르면 앱을 재시작하여 적용합니다.",
-        ["SETTING_FRAME_LIMIT_INFO"] =
-            "초당 화면을 그리는 횟수의 상한입니다. 낮추면 CPU·GPU 작업을 줄일 수 있지만 움직임이 덜 부드러워집니다. 무제한은 이 상한을 해제하며 화면 주사율이나 프레임 페이싱에 따라 제한될 수 있습니다.\n\n기기의 성능과 발열 상태에 따라 선택한 FPS보다 낮게 나올 수 있습니다. 게임 시작 시 적용됩니다.",
         ["SETTING_FPS_OVERLAY_INFO"] =
             "게임 중 FPS와 선택한 성능 정보를 표시합니다. 끄면 표시창과 그 측정 작업을 함께 중단합니다.\n\n표시창을 끄더라도 게임의 프레임 제한과 그래픽 옵션은 유지됩니다.",
         ["SETTING_OVERLAY_CPU_INFO"] =
@@ -126,9 +122,8 @@ public static class Localization
         ["MENU_GRAPHICS"] = "그래픽",
         ["MENU_GENERAL"] = "일반",
         ["GRAPHICS_HELP"] =
-            "이 기기에만 저장됩니다. 다음 시작부터 적용되며 프레임 페이싱을 바꾸면 시작 시 앱을 재시작합니다. 해상도를 낮추면 글자도 흐려질 수 있습니다.",
+            "FPS 제한·VSync·MSAA는 인게임 그래픽 설정에서 조절합니다. 여기의 모바일 옵션은 이 기기에 저장하고 다음 게임 시작부터 적용합니다. 프레임 페이싱 변경은 앱을 다시 시작합니다.",
         ["GRAPHICS_RESOLUTION"] = "렌더 해상도",
-        ["GRAPHICS_MSAA"] = "윤곽선 품질 (MSAA)",
         ["GRAPHICS_HDR"] = "HDR 2D",
         ["GRAPHICS_FILTER"] = "텍스처 필터링",
         ["GRAPHICS_CARD_COMPOSITION"] = "카드 초상화 합성",
@@ -165,8 +160,6 @@ public static class Localization
         ["SETTING_AUTO_SYNC"] = "자동 동기화",
         ["SETTING_BETA_CHANNEL"] = "베타 채널",
         ["SETTING_FPS_OVERLAY"] = "성능 표시",
-        ["SETTING_FRAME_LIMIT"] = "프레임 제한 (FPS)",
-        ["FRAME_LIMIT_UNLIMITED"] = "무제한",
         ["SETTING_OVERLAY_CPU"] = "성능 표시 · CPU",
         ["SETTING_OVERLAY_GPU"] = "성능 표시 · GPU",
         ["SETTING_OVERLAY_TEMP"] = "성능 표시 · 온도",
@@ -291,11 +284,9 @@ public static class Localization
         ["GRAPHICS_PRESET_BATTERY"] = "Power saving",
         ["GRAPHICS_PRESET_CUSTOM"] = "Custom",
         ["GRAPHICS_PRESET_INFO"] =
-            "Game default restores the original visual settings. Quality improves edge and texture quality. Balanced reduces resolution. Power saving lowers resolution and disables radial blur.\n\nFPS limit, performance overlay, shader warmup and frame pacing stay unchanged. Lower the FPS limit as well to draw fewer frames. Presets keep experimental direct card rendering off. Applies on the next game launch.",
+            "Game default restores mobile visual options. Quality raises texture quality; Balanced reduces resolution; Battery lowers resolution and disables radial blur.\n\nIn-game FPS and MSAA, performance display, shader warmup and frame pacing stay unchanged. Lower FPS in the game's settings to draw fewer frames. Presets keep original card portraits. Applies on the next launch.",
         ["GRAPHICS_RESOLUTION_INFO"] =
             "Controls the internal rendering resolution. Lower values reduce the pixels processed by the GPU, but cards and text can look softer.\n\nLayout and touch coordinates stay unchanged. Applies on the next game launch.",
-        ["GRAPHICS_MSAA_INFO"] =
-            "Samples geometry edges to reduce jagged outlines. Higher values can increase GPU work and memory use; not every image or text label benefits.\n\nGame default follows the game setting. Applies on the next launch and schedules shader warmup when changed.",
         ["GRAPHICS_HDR_INFO"] =
             "Calculates 2D rendering with a wider color range. This can help some light and color effects, but may increase render-buffer memory and bandwidth use. It does not enable HDR output on the phone display.\n\nApplies on the next launch and schedules shader warmup when changed.",
         ["GRAPHICS_FILTER_INFO"] =
@@ -312,8 +303,6 @@ public static class Localization
             "Prepares shaders during startup to reduce stutter when effects first appear. Initial preparation takes longer; completed warmup is skipped on later launches.\n\nOff skips pre-warming. The rebuild button below schedules a new warmup for the next launch.",
         ["GRAPHICS_PACING_INFO"] =
             "Controls how Android presents frames. Automatic FPS adjusts frame timing; Automatic FPS + pipeline also adjusts frame preparation. Keep selected FPS disables automatic timing adjustment.\n\nThis is separate from the FPS limit and does not guarantee a higher FPS or lower battery use. Changing it restarts the app when you press PLAY.",
-        ["SETTING_FRAME_LIMIT_INFO"] =
-            "Sets an upper limit on frames drawn per second. Lower values can reduce CPU and GPU work but make motion less smooth. Unlimited removes this cap; display refresh and frame pacing may still limit it.\n\nDevice performance and heat can keep FPS below the chosen limit. Applied when the game starts.",
         ["SETTING_FPS_OVERLAY_INFO"] =
             "Shows FPS and selected performance readings during play. Off stops both the overlay and its measurement work.\n\nThe FPS limit and graphics settings remain active.",
         ["SETTING_OVERLAY_CPU_INFO"] =
@@ -331,9 +320,8 @@ public static class Localization
         ["MENU_GRAPHICS"] = "Graphics",
         ["MENU_GENERAL"] = "General",
         ["GRAPHICS_HELP"] =
-            "Saved on this device. Applies when you next press PLAY; changing frame pacing restarts the app. Lower resolutions can blur text.",
+            "Adjust FPS, VSync and MSAA in the game graphics settings. Mobile options here are saved on this device and apply on the next launch; changing frame pacing restarts the app.",
         ["GRAPHICS_RESOLUTION"] = "Render Resolution",
-        ["GRAPHICS_MSAA"] = "Edge Quality (MSAA)",
         ["GRAPHICS_HDR"] = "HDR 2D",
         ["GRAPHICS_FILTER"] = "Texture Filtering",
         ["GRAPHICS_CARD_COMPOSITION"] = "Card Portrait Composition",
@@ -370,8 +358,6 @@ public static class Localization
         ["SETTING_AUTO_SYNC"] = "Auto Sync",
         ["SETTING_BETA_CHANNEL"] = "Beta Channel",
         ["SETTING_FPS_OVERLAY"] = "FPS Overlay",
-        ["SETTING_FRAME_LIMIT"] = "Frame Limit (FPS)",
-        ["FRAME_LIMIT_UNLIMITED"] = "Unlimited",
         ["SETTING_OVERLAY_CPU"] = "Overlay · CPU",
         ["SETTING_OVERLAY_GPU"] = "Overlay · GPU",
         ["SETTING_OVERLAY_TEMP"] = "Overlay · Temperature",

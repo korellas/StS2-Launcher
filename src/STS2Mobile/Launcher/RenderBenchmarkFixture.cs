@@ -88,7 +88,9 @@ public sealed class RenderBenchmarkFixture : IDisposable
         {
             var settings = GraphicsPatches.Settings;
             settings.RenderScale = test.Scale;
-            settings.Msaa = test.Msaa;
+            SaveManager.Instance.SettingsSave.Msaa = test.Msaa;
+            SaveManager.Instance.SettingsSave.FpsLimit = test.Fps;
+            SaveManager.Instance.SettingsSave.VSync = MegaCrit.Sts2.Core.Settings.VSyncType.Off;
             settings.Hdr = test.Hdr ? 1 : 0;
             settings.TextureFilter = test.Filter;
             settings.DirectCardPortraits = test.Direct;

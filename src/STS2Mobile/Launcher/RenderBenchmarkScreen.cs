@@ -434,7 +434,7 @@ public sealed class RenderBenchmarkScreen : Control
             ulong initializationStart = Time.GetTicksUsec();
             _trace = _engine ? null : BenchmarkTrace.TryStart(_app, GetTree());
             if (_engine)
-                SettingsPatches.SetFrameLimit(0);
+                Godot.Engine.MaxFps = 0;
             _fixture = new RenderBenchmarkFixture(CheckTestState, _trace);
             await _fixture.Initialize();
             double initializationMs = (Time.GetTicksUsec() - initializationStart) / 1000d;
@@ -455,7 +455,7 @@ public sealed class RenderBenchmarkScreen : Control
                 tests.AddRange(RenderBenchmarkCase.QualityCases());
             if (!_comparison && !_engine)
                 tests.AddRange(
-                    RenderBenchmarkCase.PacingCases(expected, LauncherModel.FrameLimitOptions)
+                    RenderBenchmarkCase.PacingCases(expected, RenderBenchmarkCase.FrameLimits)
                 );
             for (int i = 0; i < tests.Count; i++)
             {
@@ -464,12 +464,9 @@ public sealed class RenderBenchmarkScreen : Control
                 Godot.Engine.MaxFps = test.Fps;
                 _status.Text = $"{Tr("BENCH_LOAD_GAME")} · {SceneName(test.Scene)}";
                 await _fixture.Build(test, applyVisuals: !_engine);
-                if (_engine)
-                {
-                    // Game scene initialization can reapply its VSync preference.
-                    DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
-                    Godot.Engine.MaxFps = 0;
-                }
+                // Game scene initialization can reapply its display preferences.
+                DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+                Godot.Engine.MaxFps = test.Fps;
                 CheckCancellation();
                 CheckForeground();
                 if (i == 0)
@@ -632,8 +629,6 @@ public sealed class RenderBenchmarkScreen : Control
             }
             GraphicsPatches.Settings.CopyVisualsFrom(_savedGraphics);
             GraphicsPatches.GraphicsPreferencesPostfix();
-            if (_engine)
-                SettingsPatches.SetFrameLimit(_savedFps);
             Godot.Engine.MaxFps = _savedFps;
             DisplayServer.ScreenSetKeepOn(_savedKeepOn);
             DisplayServer.WindowSetVsyncMode(_savedVSync);

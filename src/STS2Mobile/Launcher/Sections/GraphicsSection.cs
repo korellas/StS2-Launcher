@@ -51,19 +51,6 @@ public class GraphicsSection : VBoxContainer
             value => _settings.RenderScale = value
         );
         AddChoices(
-            "GRAPHICS_MSAA",
-            () => _settings.Msaa,
-            new[]
-            {
-                (-1, Tr("GRAPHICS_GAME_DEFAULT")),
-                (0, Tr("STATE_OFF")),
-                (2, "2×"),
-                (4, "4×"),
-                (8, "8×"),
-            },
-            value => _settings.Msaa = value
-        );
-        AddChoices(
             "GRAPHICS_FILTER",
             () => _settings.TextureFilter,
             new[]
@@ -189,19 +176,6 @@ public class GraphicsSection : VBoxContainer
             }
             foreach (var refresh in _refreshChoices)
                 refresh();
-            if (before.Msaa != _settings.Msaa)
-            {
-                try
-                {
-                    File.Delete(
-                        System.IO.Path.Combine(OS.GetUserDataDir(), "shader_warmup_version")
-                    );
-                }
-                catch (Exception ex)
-                {
-                    PatchHelper.Log($"[Graphics] Could not reset warmup: {ex.Message}");
-                }
-            }
             _status.Text = Tr(
                 GraphicsPatches.RestartRequired ? "GRAPHICS_RESTART_PENDING" : "GRAPHICS_SAVED"
             );

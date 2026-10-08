@@ -121,7 +121,6 @@ public class LauncherController : IDisposable
         _view.Actions.CloudSyncToggled += OnCloudSyncToggled;
         _view.Actions.BetaChannelToggled += OnBetaChannelToggled;
         _view.Actions.FpsOverlayToggled += OnFpsOverlayToggled;
-        _view.Actions.FrameLimitChanged += OnFrameLimitChanged;
         _view.Actions.OverlayRowToggled += OnOverlayRowToggled;
         _view.Actions.CloudPushPressed += OnCloudPushPressed;
         _view.Actions.CloudPullPressed += OnCloudPullPressed;
@@ -146,10 +145,6 @@ public class LauncherController : IDisposable
         var fpsOverlayPref = LauncherModel.LoadFpsOverlayPref();
         _view.Actions.SetFpsOverlayChecked(fpsOverlayPref);
         LauncherPatches.SetFpsOverlayEnabled(fpsOverlayPref);
-
-        var frameLimitPref = LauncherModel.LoadFrameLimitPref();
-        _view.Actions.SetFrameLimitSelected(frameLimitPref);
-        SettingsPatches.SetFrameLimit(frameLimitPref);
 
         foreach (var row in new[] { "cpu", "gpu", "temp" })
         {
@@ -540,12 +535,6 @@ public class LauncherController : IDisposable
     {
         LauncherModel.SaveFpsOverlayPref(pressed);
         LauncherPatches.SetFpsOverlayEnabled(pressed);
-    }
-
-    private void OnFrameLimitChanged(int fps)
-    {
-        LauncherModel.SaveFrameLimitPref(fps);
-        SettingsPatches.SetFrameLimit(fps);
     }
 
     private void OnBetaChannelToggled(bool pressed)

@@ -10,6 +10,7 @@ namespace STS2Mobile.Launcher;
 public sealed record RenderBenchmarkCase(string Scene, string Name)
 {
     public const string Seed = "MOBILEBENCH";
+    public static readonly int[] FrameLimits = { 30, 60, 120, 0 };
     public static readonly string[] Scenes =
     {
         "CombatIdle",

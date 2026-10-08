@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Nodes;
@@ -38,10 +39,7 @@ public static class GraphicsPatches
                 harmony,
                 msaaType,
                 "OnIndexChanged",
-                postfix: PatchHelper.Method(
-                    typeof(GraphicsPatches),
-                    nameof(GraphicsPreferencesPostfix)
-                )
+                postfix: PatchHelper.Method(typeof(GraphicsPatches), nameof(MsaaChangedPostfix))
             );
         var cardType = assembly.GetType("MegaCrit.Sts2.Core.Nodes.Cards.NCard");
         if (cardType != null)
@@ -74,6 +72,19 @@ public static class GraphicsPatches
     public static void GraphicsPreferencesPostfix()
     {
         _runtime?.ApplyViewportSettings();
+    }
+
+    public static void MsaaChangedPostfix()
+    {
+        GraphicsPreferencesPostfix();
+        try
+        {
+            File.Delete(Path.Combine(OS.GetUserDataDir(), "shader_warmup_version"));
+        }
+        catch (Exception ex)
+        {
+            PatchHelper.Log($"[Graphics] Could not reset warmup: {ex.Message}");
+        }
     }
 
     public static void CardReloadPostfix(object __instance)
@@ -124,7 +135,7 @@ public static class GraphicsPatches
 
     public static void ConfigureWarmupViewport(SubViewport viewport)
     {
-        int msaa = Settings.Msaa < 0 ? SaveManager.Instance.SettingsSave.Msaa : Settings.Msaa;
+        int msaa = SaveManager.Instance.SettingsSave.Msaa;
         viewport.Msaa2D = GetMsaa(msaa);
         viewport.UseHdr2D = _runtime?.GetTree().Root.UseHdr2D ?? false;
     }
@@ -152,7 +163,7 @@ public class GraphicsRuntime : Node
         ApplyViewportSettings();
         QueueRenderResize();
         PatchHelper.Log(
-            $"[Graphics] Scale={GraphicsPatches.Settings.RenderScale}%, MSAA={GraphicsPatches.Settings.Msaa}, HDR={GraphicsPatches.Settings.Hdr}, pacing={GraphicsPatches.Settings.FramePacing}"
+            $"[Graphics] Scale={GraphicsPatches.Settings.RenderScale}%, MSAA={_window.Msaa2D}, HDR={GraphicsPatches.Settings.Hdr}, pacing={GraphicsPatches.Settings.FramePacing}"
         );
         PatchHelper.Log(
             $"[Graphics] Native pacing enabled={ProjectSettings.GetSettingWithOverride("display/window/frame_pacing/android/enable_frame_pacing")}, mode={ProjectSettings.GetSettingWithOverride("display/window/frame_pacing/android/swappy_mode")}"
@@ -168,7 +179,7 @@ public class GraphicsRuntime : Node
     public void ApplyViewportSettings()
     {
         var settings = GraphicsPatches.Settings;
-        int msaa = settings.Msaa < 0 ? SaveManager.Instance.SettingsSave.Msaa : settings.Msaa;
+        int msaa = SaveManager.Instance.SettingsSave.Msaa;
         _window.Msaa2D = GraphicsPatches.GetMsaa(msaa);
         _window.UseHdr2D = settings.Hdr < 0 ? _defaultHdr : settings.Hdr == 1;
         var filter = settings.TextureFilter switch

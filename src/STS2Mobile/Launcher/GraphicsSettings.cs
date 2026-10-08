@@ -21,7 +21,6 @@ public sealed class GraphicsSettings
     private const string PacingMode = "window/frame_pacing/android/swappy_mode";
 
     public int RenderScale = 100;
-    public int Msaa = -1;
     public int Hdr;
     public int TextureFilter = -1;
     public bool DirectCardPortraits;
@@ -46,7 +45,6 @@ public sealed class GraphicsSettings
             var values = PresetValues(preset);
             if (
                 RenderScale == values.RenderScale
-                && Msaa == values.Msaa
                 && Hdr == values.Hdr
                 && TextureFilter == values.TextureFilter
                 && DirectCardPortraits == values.DirectCardPortraits
@@ -66,7 +64,6 @@ public sealed class GraphicsSettings
     public void CopyVisualsFrom(GraphicsSettings values)
     {
         RenderScale = values.RenderScale;
-        Msaa = values.Msaa;
         Hdr = values.Hdr;
         TextureFilter = values.TextureFilter;
         DirectCardPortraits = values.DirectCardPortraits;
@@ -79,17 +76,11 @@ public sealed class GraphicsSettings
         preset switch
         {
             GraphicsPreset.GameDefault => new GraphicsSettings(),
-            GraphicsPreset.Quality => new GraphicsSettings { Msaa = 4, TextureFilter = 6 },
-            GraphicsPreset.Balanced => new GraphicsSettings
-            {
-                RenderScale = 85,
-                Msaa = 0,
-                TextureFilter = 4,
-            },
+            GraphicsPreset.Quality => new GraphicsSettings { TextureFilter = 6 },
+            GraphicsPreset.Balanced => new GraphicsSettings { RenderScale = 85, TextureFilter = 4 },
             GraphicsPreset.Battery => new GraphicsSettings
             {
                 RenderScale = 75,
-                Msaa = 0,
                 TextureFilter = 4,
                 RadialBlurSamples = 0,
             },
@@ -105,7 +96,6 @@ public sealed class GraphicsSettings
             if (config.Load(Path) != Error.Ok)
                 return settings;
             settings.RenderScale = ReadInt(config, "render_scale", 100, 50, 75, 85, 100);
-            settings.Msaa = ReadInt(config, "msaa", -1, -1, 0, 2, 4, 8);
             settings.TextureFilter = ReadInt(config, "texture_filter", -1, -1, 1, 2, 4, 6);
             settings.DirectCardPortraits = ReadBool(config, "direct_card_portraits", false);
             settings.RadialBlurSamples = ReadInt(config, "radial_blur_samples", 12, 0, 12);
@@ -128,7 +118,8 @@ public sealed class GraphicsSettings
             if (File.Exists(Path) && config.Load(Path) != Error.Ok)
                 throw new IOException("Could not read existing graphics configuration");
             config.SetValue(Section, "render_scale", RenderScale);
-            config.SetValue(Section, "msaa", Msaa);
+            if (config.HasSectionKey(Section, "msaa"))
+                config.EraseSectionKey(Section, "msaa");
             config.SetValue(Section, "hdr", Hdr);
             config.SetValue(Section, "texture_filter", TextureFilter);
             config.SetValue(Section, "direct_card_portraits", DirectCardPortraits);

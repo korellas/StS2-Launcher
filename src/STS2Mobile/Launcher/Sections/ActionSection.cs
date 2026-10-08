@@ -12,7 +12,6 @@ public class ActionSection : VBoxContainer
     public event Action<bool> CloudSyncToggled;
     public event Action<bool> BetaChannelToggled;
     public event Action<bool> FpsOverlayToggled;
-    public event Action<int> FrameLimitChanged;
     public event Action<string, string> GraphicsHelpRequested;
     public event Action<string, bool> OverlayRowToggled;
     public event Action CloudPushPressed;
@@ -26,7 +25,6 @@ public class ActionSection : VBoxContainer
     private readonly Button _cloudSyncToggle;
     private readonly Button _betaChannelToggle;
     private readonly Button _fpsOverlayToggle;
-    private readonly System.Collections.Generic.Dictionary<int, Button> _frameLimitButtons = new();
     private readonly Button _pushButton;
     private readonly Button _pullButton;
     private readonly Button _updateButton;
@@ -98,32 +96,6 @@ public class ActionSection : VBoxContainer
             BetaChannelToggled?.Invoke(pressed);
         };
         AddSettingRow("SETTING_BETA_CHANNEL", _betaChannelToggle, scale);
-
-        var frameLimitRow = new SettingsRow(Localization.Tr("SETTING_FRAME_LIMIT"), scale);
-        frameLimitRow.AddHelpButton(
-            scale,
-            () => GraphicsHelpRequested?.Invoke("SETTING_FRAME_LIMIT", "SETTING_FRAME_LIMIT_INFO")
-        );
-        var frameLimitGroup = new ButtonGroup();
-        foreach (int fps in LauncherModel.FrameLimitOptions)
-        {
-            var option = new GameMenuButton(
-                fps == 0 ? Localization.Tr("FRAME_LIMIT_UNLIMITED") : fps.ToString(),
-                scale,
-                fontSize: 21
-            );
-            option.ToggleMode = true;
-            option.ButtonGroup = frameLimitGroup;
-            option.Toggled += pressed =>
-            {
-                if (pressed)
-                    FrameLimitChanged?.Invoke(fps);
-            };
-            _frameLimitButtons[fps] = option;
-            frameLimitRow.AddControl(option);
-        }
-        GraphicsGroup.AddChild(frameLimitRow);
-        GraphicsGroup.AddChild(SettingsRow.Separator(scale));
 
         // Debug aid, so it stays available whether or not Steam is connected.
         _fpsOverlayToggle = new GameCheckbox(scale);
@@ -235,12 +207,6 @@ public class ActionSection : VBoxContainer
     public void SetFpsOverlayChecked(bool value)
     {
         _fpsOverlayToggle.ButtonPressed = value;
-    }
-
-    public void SetFrameLimitSelected(int fps)
-    {
-        foreach (var option in _frameLimitButtons)
-            option.Value.SetPressedNoSignal(option.Key == fps);
     }
 
     public void SetBetaChannelChecked(bool value)
