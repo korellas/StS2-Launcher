@@ -320,11 +320,18 @@ Check(
 Check(
     !new RenderBenchmarkData
     {
-        Version = 4,
+        Version = 5,
         EngineOnly = true,
         Running = true,
     }.CanResume(-2),
-    "The attack-only protocol cannot resume as full combat turns"
+    "The longer combat protocol cannot resume as a four-turn comparison"
+);
+Check(RenderBenchmarkCase.CombatTurnLimit == 4, "Both apps stop after four complete combat turns");
+Check(
+    !new RenderBenchmarkData { Version = 5, EngineOnly = true }
+        .Report()
+        .Contains("Up to 4 player turns"),
+    "Older long-sequence reports are not relabeled as four-turn results"
 );
 Check(
     engineJob.Report().Contains("enemy turns")

@@ -11,7 +11,7 @@ public sealed record RenderBenchmarkCase(string Scene, string Name)
 {
     public const string Seed = "MOBILEBENCH";
     public const int EffectIntervalSeconds = 2;
-    public const int CombatTurnLimit = 16;
+    public const int CombatTurnLimit = 4;
     public const int CombatTailSeconds = 2;
     public const int TargetHp = 400;
     public const int PlayerHp = 2000;
@@ -257,7 +257,7 @@ public sealed class BenchmarkBootTiming
 
 public sealed class RenderBenchmarkData
 {
-    public const int FormatVersion = 5;
+    public const int FormatVersion = 6;
     public static readonly int[] PacingModes = { -2, 0, 1, 2 };
     public int Version { get; set; } = FormatVersion;
     public string StartedUtc { get; set; } = DateTime.UtcNow.ToString("O");
@@ -320,9 +320,9 @@ public sealed class RenderBenchmarkData
                     "Legacy engine benchmark: idle combat, merchant and map with inherited visual settings. Do not compare with the controlled boss benchmark."
                 );
             }
-            else if (Version < 5)
+            else if (Version < FormatVersion)
                 text.AppendLine(
-                    "Legacy scripted attack/effects benchmark without enemy turns. Do not compare with the full-turn combat benchmark."
+                    "Legacy combat benchmark with a different sequence or duration. Do not compare with the current protocol."
                 );
             else
                 text.AppendLine(
