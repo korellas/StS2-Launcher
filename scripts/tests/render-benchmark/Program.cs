@@ -328,6 +328,20 @@ Check(
 );
 Check(RenderBenchmarkCase.CombatTurnLimit == 4, "Both apps stop after four complete combat turns");
 Check(
+    !new RenderBenchmarkData
+    {
+        Version = 6,
+        EngineOnly = true,
+        Running = true,
+    }.CanResume(-2),
+    "Boosted-health jobs cannot resume with game-default health"
+);
+Check(
+    engineJob.Report().Contains("game-default player and enemy HP")
+        && !engineJob.Report().Contains("Fixture player HP="),
+    "Reports identify unmodified game health"
+);
+Check(
     !new RenderBenchmarkData { Version = 5, EngineOnly = true }
         .Report()
         .Contains("Up to 4 player turns"),
@@ -339,10 +353,10 @@ Check(
         && !engineJob.Report().Contains("no damage"),
     "The report identifies full combat turns and the fixture controls"
 );
-engineJob.Results[0].Sequence = "turns=4, cards=12, HP=2000->1920";
+engineJob.Results[0].Sequence = "turns=4, cards=12, HP=80->62";
 engineJob.Save(path);
 Check(
-    RenderBenchmarkData.Load(path).Report().Contains("turns=4, cards=12, HP=2000->1920"),
+    RenderBenchmarkData.Load(path).Report().Contains("turns=4, cards=12, HP=80->62"),
     "Observed combat progression survives report persistence"
 );
 File.Delete(path);

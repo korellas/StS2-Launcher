@@ -13,8 +13,6 @@ public sealed record RenderBenchmarkCase(string Scene, string Name)
     public const int EffectIntervalSeconds = 2;
     public const int CombatTurnLimit = 4;
     public const int CombatTailSeconds = 2;
-    public const int TargetHp = 400;
-    public const int PlayerHp = 2000;
     public const int MaxEnergy = 5;
     public static readonly int[] FrameLimits = { 30, 60, 120, 0 };
     public static readonly string[] Scenes =
@@ -257,7 +255,7 @@ public sealed class BenchmarkBootTiming
 
 public sealed class RenderBenchmarkData
 {
-    public const int FormatVersion = 6;
+    public const int FormatVersion = 7;
     public static readonly int[] PacingModes = { -2, 0, 1, 2 };
     public int Version { get; set; } = FormatVersion;
     public string StartedUtc { get; set; } = DateTime.UtcNow.ToString("O");
@@ -322,11 +320,11 @@ public sealed class RenderBenchmarkData
             }
             else if (Version < FormatVersion)
                 text.AppendLine(
-                    "Legacy combat benchmark with a different sequence or duration. Do not compare with the current protocol."
+                    "Legacy combat benchmark with a different fixture or duration. Do not compare with the current protocol."
                 );
             else
                 text.AppendLine(
-                    $"Actual combat, KaiserCrabBoss and WaterfallGiantBoss: fixed Defect effects deck, seed {RenderBenchmarkCase.Seed}; saves in memory. Card actions, end turn, enemy turns, hits, orbs and normal draw, discard and energy progression are measured. Up to {RenderBenchmarkCase.CombatTurnLimit} player turns or combat victory, then {RenderBenchmarkCase.CombatTailSeconds} seconds for remaining effects. Fixture player HP={RenderBenchmarkCase.PlayerHp}, enemy HP={RenderBenchmarkCase.TargetHp}, max energy={RenderBenchmarkCase.MaxEnergy}. The dealt playable cards are used in hand order with MeteorStrike and Hyperbeam prioritized. Identical explicit visual settings are applied to every scene."
+                    $"Actual combat, KaiserCrabBoss and WaterfallGiantBoss: fixed Defect effects deck, seed {RenderBenchmarkCase.Seed}; saves in memory. Card actions, end turn, enemy turns, hits, orbs and normal draw, discard and energy progression are measured. Up to {RenderBenchmarkCase.CombatTurnLimit} player turns or combat end, then {RenderBenchmarkCase.CombatTailSeconds} seconds for remaining effects. Uses game-default player and enemy HP; initial health is recorded per scene. Fixture max energy={RenderBenchmarkCase.MaxEnergy}. The dealt playable cards are used in hand order with MeteorStrike and Hyperbeam prioritized. Identical explicit visual settings are applied to every scene."
                 );
             if (Version >= 3)
                 text.AppendLine(

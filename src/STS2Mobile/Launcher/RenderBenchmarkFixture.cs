@@ -43,8 +43,10 @@ public sealed class RenderBenchmarkFixture : IDisposable
     private int _turnsPlayed;
     private int _cardsPlayed;
     private string _deck;
+    private int _initialPlayerHp;
+    private string _initialEnemyHp;
     public string SequenceSummary =>
-        $"turns={_turnsPlayed}, cards={_cardsPlayed}, HP={RenderBenchmarkCase.PlayerHp}->{_player.Creature.CurrentHp}, combatEnded={!CombatManager.Instance.IsInProgress}, deck={_deck}";
+        $"turns={_turnsPlayed}, cards={_cardsPlayed}, HP={_initialPlayerHp}->{_player.Creature.CurrentHp}, enemiesAtStart={_initialEnemyHp}, combatEnded={!CombatManager.Instance.IsInProgress}, deck={_deck}";
     private string _scenario;
     private int _effectStep = -1;
     private ulong _animationStart;
@@ -234,15 +236,13 @@ public sealed class RenderBenchmarkFixture : IDisposable
                     _room.Ui.Hand.ActiveHolders[0].Call("OnFocus");
                 if (scenario is "CombatTurns" or "KaiserCrabTurns" or "WaterfallGiantTurns")
                 {
-                    await CreatureCmd.SetMaxAndCurrentHp(
-                        _player.Creature,
-                        RenderBenchmarkCase.PlayerHp
+                    _initialPlayerHp = _player.Creature.CurrentHp;
+                    _initialEnemyHp = string.Join(
+                        ",",
+                        _player.Creature.CombatState.Enemies.Select(enemy =>
+                            $"{enemy.Monster.Id.Entry}:{enemy.CurrentHp}/{enemy.MaxHp}"
+                        )
                     );
-                    foreach (var enemy in _room.CreatureNodes.Where(node => !node.Entity.IsPlayer))
-                        await CreatureCmd.SetMaxAndCurrentHp(
-                            enemy.Entity,
-                            RenderBenchmarkCase.TargetHp
-                        );
                 }
             }
         );

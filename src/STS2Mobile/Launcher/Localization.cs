@@ -69,7 +69,7 @@ public static class Localization
         ["ENGINE_BENCH_START"] = "장면 측정 시작",
         ["ENGINE_BENCH_MINIMUM"] = "최저 FPS / 최장 프레임",
         ["ENGINE_BENCH_INFO"] =
-            $"일반 전투·카이저 크랩·폭포 거인에서 고정 덱으로 최대 {RenderBenchmarkCase.CombatTurnLimit}턴 또는 전투 승리까지 진행합니다. 카드 사용, 턴 종료, 구체 발동, 적 공격·피격과 다음 손패 뽑기를 실제 게임 흐름으로 측정합니다. 테스트용 체력과 최대 에너지는 결과에 기록합니다. 같은 화질 설정을 적용하고 FPS 제한·네이티브 페이싱을 해제하며 Mailbox 표시 방식을 요청합니다. 실제 VSync와 주사율도 기록합니다. 캡처·준비·예열은 제외하고 측정 중 끊김은 포함합니다. 종료 후 원래 설정으로 복귀합니다.",
+            $"일반 전투·카이저 크랩·폭포 거인에서 고정 덱으로 최대 {RenderBenchmarkCase.CombatTurnLimit}턴 또는 전투 종료까지 진행합니다. 카드 사용, 턴 종료, 구체 발동, 적 공격·피격과 다음 손패 뽑기를 실제 게임 흐름으로 측정합니다. 원래 게임 체력을 사용하며 시작 체력과 최대 에너지는 결과에 기록합니다. 같은 화질 설정을 적용하고 FPS 제한·네이티브 페이싱을 해제하며 Mailbox 표시 방식을 요청합니다. 실제 VSync와 주사율도 기록합니다. 캡처·준비·예열은 제외하고 측정 중 끊김은 포함합니다. 종료 후 원래 설정으로 복귀합니다.",
         ["BENCH_TITLE"] = "렌더링 벤치마크",
         ["BENCH_INFO"] =
             "실제 전투·손패와 카드 확대·공격 VFX·상점·지도·덱 화면을 자동 비교합니다. 화면 전환과 로딩, 앱 시작 시간도 기록합니다. 고정 시드의 테스트 런과 진행도는 메모리에 분리합니다. 재시작은 자동입니다. 테스트 중에는 조작하거나 화면을 접지 말아 주세요. 완료 후 원래 설정으로 돌아옵니다.",
@@ -270,7 +270,7 @@ public static class Localization
         ["ENGINE_BENCH_START"] = "Start scene measurement",
         ["ENGINE_BENCH_MINIMUM"] = "Minimum FPS / worst frame",
         ["ENGINE_BENCH_INFO"] =
-            $"Play a fixed deck in ordinary combat, Kaiser Crab and Waterfall Giant for up to {RenderBenchmarkCase.CombatTurnLimit} turns or victory. Measure card actions, end turn, orbs, enemy attacks, hits and the next hand through normal game flow. Fixture health and max energy are reported. Identical visuals are enforced; FPS cap and native pacing are disabled, and Mailbox presentation is requested. Actual VSync and refresh rate are reported. No captures; setup and warmup are excluded, measured stalls are retained. Your settings are restored afterward.",
+            $"Play a fixed deck in ordinary combat, Kaiser Crab and Waterfall Giant for up to {RenderBenchmarkCase.CombatTurnLimit} turns or combat end. Measure card actions, end turn, orbs, enemy attacks, hits and the next hand through normal game flow. Game-default health is used; initial health and fixture max energy are reported. Identical visuals are enforced; FPS cap and native pacing are disabled, and Mailbox presentation is requested. Actual VSync and refresh rate are reported. No captures; setup and warmup are excluded, measured stalls are retained. Your settings are restored afterward.",
         ["BENCH_TITLE"] = "Rendering benchmark",
         ["BENCH_INFO"] =
             "Automatically compares actual combat, focused cards, attack VFX, merchant inventory, map and deck screens. Records transitions, loading and app startup. Fixed-seed test saves stay in memory. Restarts are automatic. Leave the app untouched and do not resize the screen. Your settings are restored at the end.",
