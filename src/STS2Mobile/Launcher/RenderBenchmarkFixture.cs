@@ -28,6 +28,7 @@ namespace STS2Mobile.Launcher;
 public sealed class RenderBenchmarkFixture : IDisposable
 {
     private readonly Action _check;
+    private readonly BenchmarkTrace _trace;
     private readonly HashSet<string> _visited = new();
     private Player _player;
     private RunState _state;
@@ -38,7 +39,14 @@ public sealed class RenderBenchmarkFixture : IDisposable
     private string _currentScreen = "Reset";
     public List<BenchmarkLoadTiming> LoadTimings { get; } = new();
 
-    public RenderBenchmarkFixture(Action check) => _check = check;
+    public RenderBenchmarkFixture(Action check)
+        : this(check, null) { }
+
+    internal RenderBenchmarkFixture(Action check, BenchmarkTrace trace)
+    {
+        _check = check;
+        _trace = trace;
+    }
 
     public static void ValidateEntry()
     {
@@ -48,6 +56,7 @@ public sealed class RenderBenchmarkFixture : IDisposable
 
     public async Task Initialize()
     {
+        using var trace = _trace?.Span("Initialize");
         ValidateEntry();
         _check();
         // GameStartup migrates and synchronizes real profiles. Use the game's
@@ -70,6 +79,7 @@ public sealed class RenderBenchmarkFixture : IDisposable
 
     public async Task Build(RenderBenchmarkCase test)
     {
+        using var trace = _trace?.Span($"Build.{test.Scene}.{test.Name}");
         Dispose();
         LoadTimings.Clear();
         _currentScreen = "Reset";
@@ -154,6 +164,7 @@ public sealed class RenderBenchmarkFixture : IDisposable
                 // Room loading starts combat asynchronously; wait for the actual hand
                 // and turn setup before measuring, rather than time the initial deal.
                 ulong started = Time.GetTicksMsec();
+                using var trace = _trace?.Span("Combat.WaitForHand");
                 while (
                     CombatManager.Instance.IsStarting
                     || RunManager.Instance.ActionExecutor.IsPaused
@@ -217,6 +228,7 @@ public sealed class RenderBenchmarkFixture : IDisposable
 
     private async Task TimeScreen(string target, Func<Task> open)
     {
+        using var trace = _trace?.Span("Screen." + target);
         _check();
         string from = _currentScreen;
         ulong start = Time.GetTicksUsec();

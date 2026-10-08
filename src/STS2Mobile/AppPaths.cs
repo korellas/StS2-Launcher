@@ -7,7 +7,11 @@ namespace STS2Mobile;
 // Shared path constants for external storage directories and permission helpers.
 public static class AppPaths
 {
+#if ENGINE_452_TEST
+    private const string ExternalRoot = "/storage/emulated/0/StS2LauncherEngine452Test";
+#else
     private const string ExternalRoot = "/storage/emulated/0/StS2Launcher";
+#endif
     public const string ExternalModsDir = ExternalRoot + "/Mods";
     public const string ExternalSaveBackupsDir = ExternalRoot + "/Saves";
 

@@ -41,6 +41,9 @@ cp "$PUBLISH_DIR"/STS2Mobile.dll "$PUBLISH_DIR"/SteamKit2.dll \
 
 cp "$ROOT/upstream/godot-export/.godot/mono/publish/arm64/GodotSharp.dll" "$BCL_DIR/"
 
+echo "Generating bootstrap PCK..."
+python3 "$ROOT/scripts/make-bootstrap-pck.py"
+
 echo "Verifying required package inputs..."
 bash "$ROOT/scripts/verify-package-assets.sh" inputs "$BUILD_DIR/assets"
 

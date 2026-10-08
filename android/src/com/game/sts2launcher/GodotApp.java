@@ -412,7 +412,7 @@ public class GodotApp extends GodotActivity {
 
 	private String extractBootstrapPck() {
 		File dest = new File(getFilesDir(), "bootstrap.pck");
-		if (dest.exists()) {
+		if (dest.exists() && !versionChanged) {
 			return dest.getAbsolutePath();
 		}
 		try (InputStream in = getAssets().open("bootstrap.pck");
@@ -721,6 +721,7 @@ public class GodotApp extends GodotActivity {
 	}
 
 	public int getBenchmarkPacing() { return benchmarkPacing; }
+	public boolean supportsBenchmarkTracing() { return Build.VERSION.SDK_INT >= 29; }
 	public long getProcessElapsedMs() {
 		return android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime();
 	}

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Generate a minimal Godot 4.5 PCK containing just project.godot.
+"""Generate a minimal Godot 4.5 PCK with a project and empty main scene.
 
 This bootstrap PCK lets the engine initialize normally (project settings,
 .NET/Mono, GodotSharp) so the STS2Mobile launcher can run without game files.
 """
 
+import argparse
 import hashlib
 import struct
 import sys
@@ -30,7 +31,7 @@ _custom_features="dotnet"
 
 config/name="sts2"
 config/features=PackedStringArray("4.5", "Forward Plus", "C#")
-run/main_scene=""
+run/main_scene="res://bootstrap.tscn"
 ; Godot quits on the system back gesture by default, which closed the
 ; launcher outright. The game handles the notification itself; nothing
 ; should be closed just because back was pressed.
@@ -49,6 +50,12 @@ window/handheld/orientation=4
 project/assembly_name="sts2"
 """
 
+BOOTSTRAP_SCENE = """\
+[gd_scene format=3]
+
+[node name="Bootstrap" type="Node"]
+"""
+
 
 def align(offset, alignment=ALIGNMENT):
     return (offset + alignment - 1) & ~(alignment - 1)
@@ -63,27 +70,35 @@ def pad_string_len(s):
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    output = os.path.join(script_dir, "..", "android", "assets", "bootstrap.pck")
-
-    file_data = PROJECT_GODOT.encode("utf-8")
-    file_path = "res://project.godot"
-    file_md5 = hashlib.md5(file_data).digest()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output",
+        default=os.path.join(script_dir, "..", "android", "assets", "bootstrap.pck"),
+    )
+    output = os.path.abspath(parser.parse_args().output)
+    files = [
+        ("res://project.godot", PROJECT_GODOT.encode("utf-8")),
+        ("res://bootstrap.tscn", BOOTSTRAP_SCENE.encode("utf-8")),
+    ]
 
     # Calculate layout
     file_base = align(HEADER_SIZE)  # file data starts after header, aligned
+    file_data = b"".join(data for _, data in files)
     file_end = file_base + len(file_data)
     dir_base = align(file_end)  # directory starts after file data, aligned
 
     # Build directory entry
-    padded_len, path_bytes = pad_string_len(file_path)
-    dir_entry = struct.pack("<I", padded_len)
-    dir_entry += path_bytes + b"\x00" * (padded_len - len(path_bytes))
-    dir_entry += struct.pack("<Q", 0)  # offset relative to file_base
-    dir_entry += struct.pack("<Q", len(file_data))  # file size
-    dir_entry += file_md5  # 16 bytes MD5
-    dir_entry += struct.pack("<I", 0)  # flags (no encryption)
-
-    dir_section = struct.pack("<I", 1) + dir_entry  # 1 file
+    dir_section = struct.pack("<I", len(files))
+    offset = 0
+    for file_path, data in files:
+        padded_len, path_bytes = pad_string_len(file_path)
+        dir_section += struct.pack("<I", padded_len)
+        dir_section += path_bytes + b"\x00" * (padded_len - len(path_bytes))
+        dir_section += struct.pack("<Q", offset)  # relative to file_base
+        dir_section += struct.pack("<Q", len(data))
+        dir_section += hashlib.md5(data).digest()
+        dir_section += struct.pack("<I", 0)  # flags (no encryption)
+        offset += len(data)
 
     # Build header
     header = struct.pack("<I", MAGIC)

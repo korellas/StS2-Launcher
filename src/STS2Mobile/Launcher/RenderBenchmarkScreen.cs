@@ -44,6 +44,7 @@ public sealed class RenderBenchmarkScreen : Control
     private Viewport _viewport;
     private GraphicsSettings _savedGraphics;
     private RenderBenchmarkFixture _fixture;
+    private BenchmarkTrace _trace;
     private bool _running;
     private readonly GodotObject _app;
     private int _pauseCount;
@@ -390,7 +391,8 @@ public sealed class RenderBenchmarkScreen : Control
             AddChild(_cancel);
             _status.Text = Tr("BENCH_LOAD_GAME");
             ulong initializationStart = Time.GetTicksUsec();
-            _fixture = new RenderBenchmarkFixture(CheckTestState);
+            _trace = BenchmarkTrace.TryStart(_app, GetTree());
+            _fixture = new RenderBenchmarkFixture(CheckTestState, _trace);
             await _fixture.Initialize();
             double initializationMs = (Time.GetTicksUsec() - initializationStart) / 1000d;
             CheckForeground();
@@ -452,6 +454,7 @@ public sealed class RenderBenchmarkScreen : Control
                         RenderingServer.Singleton,
                         RenderingServer.SignalName.FramePostDraw
                     );
+                    using var captureTrace = _trace?.Sync("Capture.ReadbackAndPng");
                     using var image = GetViewport().GetTexture().GetImage();
                     if (image.GetFormat() != Image.Format.Rgba8)
                         image.Convert(Image.Format.Rgba8);
@@ -566,6 +569,8 @@ public sealed class RenderBenchmarkScreen : Control
             Godot.Engine.MaxFps = _savedFps;
             DisplayServer.ScreenSetKeepOn(_savedKeepOn);
             DisplayServer.WindowSetVsyncMode(_savedVSync);
+            _trace?.Dispose();
+            _trace = null;
             _running = false;
         }
         // Return through a cold boot so the real Vulkan device also uses the user's pacing.
@@ -583,6 +588,7 @@ public sealed class RenderBenchmarkScreen : Control
 
     private async Task<BenchmarkMetrics> Sample(double seconds, bool record, Task until = null)
     {
+        using var trace = _trace?.Span(record ? "Measure" : "Warmup");
         CheckForeground();
         var samples = new BenchmarkSamples();
         ulong start = Time.GetTicksUsec();
@@ -622,6 +628,7 @@ public sealed class RenderBenchmarkScreen : Control
 
     private void SaveData()
     {
+        using var trace = _trace?.Sync("SaveResults");
         _data.Save(DataPath);
     }
 

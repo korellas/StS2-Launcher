@@ -1,0 +1,123 @@
+--- a/modules/mono/mono_gd/gd_mono.cpp
++++ b/modules/mono/mono_gd/gd_mono.cpp
+@@ -425,6 +425,16 @@
+ using godot_plugins_initialize_fn = bool (*)(void *, GDMonoCache::ManagedCallbacks *, const void **, int32_t);
+ #endif
+ 
++#if defined(ANDROID_ENABLED) && !defined(TOOLS_ENABLED)
++using sts2mobile_initialize_fn = int (*)(void *, GDMonoCache::ManagedCallbacks *, const void **, int32_t);
++sts2mobile_initialize_fn sts2mobile_initialize = nullptr;
++void (*sts2mobile_apply)() = nullptr;
++
++bool initialize_sts2mobile(void *p_handle, GDMonoCache::ManagedCallbacks *r_callbacks, const void **p_interop_funcs, int32_t p_interop_funcs_size) {
++	return sts2mobile_initialize(p_handle, r_callbacks, p_interop_funcs, p_interop_funcs_size) != 0;
++}
++#endif
++
+ #ifdef TOOLS_ENABLED
+ godot_plugins_initialize_fn initialize_hostfxr_and_godot_plugins(bool &r_runtime_initialized) {
+ 	godot_plugins_initialize_fn godot_plugins_initialize = nullptr;
+@@ -594,12 +604,30 @@
+ 
+ 	print_verbose(".NET: CoreCLR initialized");
+ 
+-	coreclr_create_delegate(coreclr_handle, domain_id,
++	rc = coreclr_create_delegate(coreclr_handle, domain_id,
+ 			assembly_name.utf8().get_data(),
+ 			"GodotPlugins.Game.Main",
+ 			"InitializeFromGameProject",
+ 			(void **)&godot_plugins_initialize);
++
++#ifdef ANDROID_ENABLED
++	if (rc != 0 || godot_plugins_initialize == nullptr) {
++		print_verbose(".NET: Game assembly not found, continuing in launcher-only mode");
++		rc = coreclr_create_delegate(coreclr_handle, domain_id,
++				"STS2Mobile", "STS2Mobile.ModEntry", "InitializeGodotSharp",
++				(void **)&sts2mobile_initialize);
++		ERR_FAIL_COND_V_MSG(rc != 0 || sts2mobile_initialize == nullptr, nullptr, ".NET: Failed to get STS2Mobile initialization function pointer");
++		godot_plugins_initialize = &initialize_sts2mobile;
++	}
++
++	rc = coreclr_create_delegate(coreclr_handle, domain_id,
++			"STS2Mobile", "STS2Mobile.ModEntry", "Apply",
++			(void **)&sts2mobile_apply);
++	ERR_FAIL_COND_V_MSG(rc != 0 || sts2mobile_apply == nullptr, nullptr, ".NET: Failed to get STS2Mobile Apply function pointer");
++
++#else
+ 	ERR_FAIL_NULL_V_MSG(godot_plugins_initialize, nullptr, ".NET: Failed to get GodotPlugins initialization function pointer");
++#endif
+ 
+ 	return godot_plugins_initialize;
+ }
+@@ -712,6 +740,13 @@
+ #endif
+ 
+ 	initialized = true;
++
++#if defined(ANDROID_ENABLED) && !defined(TOOLS_ENABLED)
++	ERR_FAIL_NULL_MSG(sts2mobile_apply, ".NET: STS2Mobile Apply function is unavailable");
++	print_verbose(".NET: Calling STS2Mobile.ModEntry.Apply()");
++	sts2mobile_apply();
++	print_verbose(".NET: STS2Mobile applied successfully");
++#endif
+ }
+ 
+ #ifdef TOOLS_ENABLED
+--- a/modules/mono/godotsharp_dirs.cpp
++++ b/modules/mono/godotsharp_dirs.cpp
+@@ -170,8 +170,9 @@
+ 		String appname_safe = Path::get_csharp_project_name();
+ 		String packed_path = "res://.godot/mono/publish/" + arch;
+ #ifdef ANDROID_ENABLED
+-		api_assemblies_dir = packed_path;
+-		print_verbose(".NET: Android platform detected. Setting api_assemblies_dir directly to pck path: " + api_assemblies_dir);
++		// The launcher extracts bundled and downloaded assemblies into its private files directory.
++		api_assemblies_dir = OS::get_singleton()->get_user_data_dir().path_join(".godot/mono/publish").path_join(arch);
++		print_verbose(".NET: Android platform detected. Setting api_assemblies_dir to data path: " + api_assemblies_dir);
+ #else
+ 		if (DirAccess::exists(packed_path)) {
+ 			// The dotnet publish data is packed in the pck/zip.
+--- a/servers/rendering/renderer_rd/renderer_canvas_render_rd.cpp
++++ b/servers/rendering/renderer_rd/renderer_canvas_render_rd.cpp
+@@ -471,7 +471,7 @@
+ RID RendererCanvasRenderRD::_get_pipeline_specialization_or_ubershader(CanvasShaderData *p_shader_data, PipelineKey &r_pipeline_key, PushConstant &r_push_constant, RID p_mesh_instance, void *p_surface, uint32_t p_surface_index, RID *r_vertex_array) {
+ 	r_pipeline_key.ubershader = 0;
+ 
+-	const uint32_t ubershader_iterations = 1;
++	const uint32_t ubershader_iterations = 2;
+ 	while (r_pipeline_key.ubershader < ubershader_iterations) {
+ 		if (r_vertex_array != nullptr) {
+ 			RendererRD::MeshStorage *mesh_storage = RendererRD::MeshStorage::get_singleton();
+@@ -1736,7 +1736,7 @@
+ 
+ 		state.light_uniforms = memnew_arr(LightUniform, MAX_LIGHTS_PER_RENDER);
+ 		Vector<String> variants;
+-		const uint32_t ubershader_iterations = 1;
++		const uint32_t ubershader_iterations = 2;
+ 		for (uint32_t ubershader = 0; ubershader < ubershader_iterations; ubershader++) {
+ 			const String base_define = ubershader ? "\n#define UBERSHADER\n" : "";
+ 			variants.push_back(base_define + ""); // SHADER_VARIANT_QUAD
+--- a/platform/android/display_server_android.cpp
++++ b/platform/android/display_server_android.cpp
+@@ -448,6 +448,11 @@
+ }
+ 
+ void DisplayServerAndroid::send_window_event(DisplayServer::WindowEvent p_event, bool p_deferred) const {
++#if defined(RD_ENABLED)
++	if (p_event == WINDOW_EVENT_FOCUS_OUT && rendering_device) {
++		rendering_device->update_pipeline_cache(true);
++	}
++#endif
+ 	_window_callback(window_event_callback, int(p_event), p_deferred);
+ }
+ 
+@@ -714,7 +719,8 @@
+ void DisplayServerAndroid::notify_application_paused() {
+ #if defined(RD_ENABLED)
+ 	if (rendering_device) {
+-		rendering_device->update_pipeline_cache();
++		// Flush even small cache changes before Android can terminate the process.
++		rendering_device->update_pipeline_cache(true);
+ 	}
+ #endif // defined(RD_ENABLED)
+ }

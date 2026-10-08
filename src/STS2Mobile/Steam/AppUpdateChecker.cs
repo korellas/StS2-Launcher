@@ -19,6 +19,9 @@ public static class AppUpdateChecker
     private const string ReleasesUrl =
         "https://api.github.com/repos/korellas/StS2-Launcher/releases?per_page=10";
 
+#if ENGINE_452_TEST
+    public static Task<AppUpdateResult> CheckAsync() => Task.FromResult(AppUpdateResult.None);
+#else
     public static async Task<AppUpdateResult> CheckAsync()
     {
         var currentVersion = GetInstalledVersion();
@@ -91,6 +94,7 @@ public static class AppUpdateChecker
 
         return new AppUpdateResult(latestVersion, downloadUrl);
     }
+#endif
 
     internal static string GetInstalledVersion()
     {

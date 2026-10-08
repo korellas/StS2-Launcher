@@ -74,7 +74,13 @@ dependencies {
     // .NET dependencies — JAR provides Java-side crypto bindings for the native .so
     String jar = '../vendor/godot/modules/mono/thirdparty/libSystem.Security.Cryptography.Native.Android.jar'
     if (file(jar).exists()) {
-        monoImplementation files(jar)
+        ['debug', 'dev', 'release'].each { buildType ->
+            if (!file("libs/$buildType/libSystem.Security.Cryptography.Native.Android.jar").exists()) {
+                String target = "mono${buildType.capitalize()}Implementation"
+                configurations.maybeCreate(target)
+                add(target, files(jar))
+            }
+        }
     }
 }
 
