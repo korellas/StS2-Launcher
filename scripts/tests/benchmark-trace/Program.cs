@@ -73,6 +73,42 @@ namespace BenchmarkTraceTests
             Check(_existingCalls == before + 1, "Disposing removed another owner's hook");
             Check(!Harmony.GetPatchInfo(start).Owners.Contains("sts2mobile.benchmark.trace"), "Trace hook leaked");
             existing.UnpatchAll(existing.Id);
+            trace_enabled(false);
+            using (var standalone = BenchmarkTrace.TryStart(app, tree, recordDeath: true))
+            {
+                Check(
+                    standalone != null && tree.Listeners == 1,
+                    "Death diagnostics must work without an ADB trace"
+                );
+                standalone.BeginDeathSample();
+                var run = new MegaCrit.Sts2.Core.Runs.RunManager();
+                var result = run.OnEnded(false);
+                Check(
+                    ReferenceEquals(result, run.Saved),
+                    "Timing hooks changed the game's returned value"
+                );
+                Godot.RenderingServer.Canvas = 2;
+                tree.Frame();
+                string report = standalone.DeathReport();
+                Check(
+                    report.Contains("RunManager.OnEnded") && report.Contains("RunManager.ToSave"),
+                    "Nested death timings were not collected"
+                );
+                Check(
+                    report.Contains("ProcessFrame gap") && report.Contains("canvasPipelines=+2"),
+                    "Long frame and pipeline correlation missing"
+                );
+                Check(
+                    trace_open() == 0 && trace_sync_open() == 0,
+                    "Standalone diagnostics wrote native trace spans"
+                );
+                standalone.BeginDeathSample();
+                Check(
+                    !standalone.DeathReport().Contains("RunManager.OnEnded"),
+                    "Diagnostics leaked across benchmark cases"
+                );
+            }
+            Check(tree.Listeners == 0, "Standalone death diagnostics leaked its frame callback");
             Console.WriteLine("Benchmark trace task, exception, gating and cleanup tests passed");
         }
     }
@@ -96,7 +132,79 @@ namespace Godot
     public static class RenderingServer
     {
         public enum RenderingInfo { PipelineCompilationsCanvas, PipelineCompilationsSpecialization }
-        public static ulong GetRenderingInfo(RenderingInfo value) => 0;
+        public static ulong Canvas;
+        public static ulong GetRenderingInfo(RenderingInfo value) => value == RenderingInfo.PipelineCompilationsCanvas ? Canvas : 0;
+    }
+}
+
+namespace MegaCrit.Sts2.Core.Entities.Creatures
+{
+    public sealed class Creature { }
+}
+
+namespace MegaCrit.Sts2.Core.Commands
+{
+    public static class CreatureCmd
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static Task Kill(
+            IReadOnlyCollection<MegaCrit.Sts2.Core.Entities.Creatures.Creature> creatures,
+            bool force
+        ) => Task.CompletedTask;
+    }
+}
+
+namespace MegaCrit.Sts2.Core.Runs
+{
+    public sealed class RunManager
+    {
+        public readonly object Saved = new();
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public object ToSave() => Saved;
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public object OnEnded(bool victory)
+        {
+            Thread.Sleep(80);
+            return ToSave();
+        }
+    }
+}
+
+namespace MegaCrit.Sts2.Core.Nodes
+{
+    public sealed class NRun
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void ShowGameOverScreen(object save) { }
+    }
+}
+
+namespace MegaCrit.Sts2.Core.Nodes.Combat
+{
+    public sealed class NCreature
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public float StartDeathAnim(bool remove) => 0;
+    }
+}
+
+namespace MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen
+{
+    public sealed class NGameOverScreen
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static NGameOverScreen Create(object run, object save) => new();
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void _Ready() { }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void AfterOverlayOpened() { }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void MoveCreaturesToDifferentLayerAndDisableUi() { }
     }
 }
 

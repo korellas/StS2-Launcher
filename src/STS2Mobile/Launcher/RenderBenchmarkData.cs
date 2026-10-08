@@ -231,6 +231,7 @@ public sealed class BenchmarkResult
     public string Variant { get; set; }
     public string Applied { get; set; }
     public string Sequence { get; set; }
+    public string Diagnostics { get; set; }
     public string ThermalStart { get; set; }
     public string ThermalEnd { get; set; }
     public string Screenshot { get; set; }
@@ -366,6 +367,8 @@ public sealed class RenderBenchmarkData
             text.AppendLine($"\n{result.Case} | {result.Variant} | {result.Applied}");
             if (result.Sequence != null)
                 text.AppendLine($"Sequence: {result.Sequence}");
+            if (result.Diagnostics != null)
+                text.AppendLine(result.Diagnostics);
             text.AppendLine(
                 FormattableString.Invariant(
                     $"n={m.Frames}, FPS={m.Fps:F2}, frame avg/p95/p99={m.FrameMeanMs:F3}/{m.FrameP95Ms:F3}/{m.FrameP99Ms:F3} ms, CPU={m.CpuMeanMs:F3} ms, GPU={Format(m.GpuMeanMs)}/{Format(m.GpuP95Ms)} ms avg/p95, canvas draws={m.DrawCallsMean:F1}"

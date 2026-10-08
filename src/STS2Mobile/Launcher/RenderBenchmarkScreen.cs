@@ -432,7 +432,11 @@ public sealed class RenderBenchmarkScreen : Control
             AddChild(_cancel);
             _status.Text = Tr("BENCH_LOAD_GAME");
             ulong initializationStart = Time.GetTicksUsec();
+#if BENCHMARK_DEATH_DIAGNOSTICS
+            _trace = BenchmarkTrace.TryStart(_app, GetTree(), recordDeath: _engine);
+#else
             _trace = _engine ? null : BenchmarkTrace.TryStart(_app, GetTree());
+#endif
             if (_engine)
                 Godot.Engine.MaxFps = 0;
             _fixture = new RenderBenchmarkFixture(CheckTestState, _trace);
@@ -541,6 +545,7 @@ public sealed class RenderBenchmarkScreen : Control
                     metrics = new BenchmarkMetrics();
                 else if (_engine || test.Scene == "Transitions")
                 {
+                    _trace?.BeginDeathSample();
                     var route = _engine ? _fixture.RunCombatTurns() : _fixture.RunTransitions();
                     try
                     {
@@ -568,6 +573,17 @@ public sealed class RenderBenchmarkScreen : Control
                         ),
                         Metrics = metrics,
                         Sequence = _engine ? _fixture.SequenceSummary : null,
+#if BENCHMARK_DEATH_DIAGNOSTICS
+                        Diagnostics =
+                            _trace?.DeathReport()
+                            ?? (
+                                _engine
+                                    ? "Death diagnostics unavailable: hook setup failed; see launcher log."
+                                    : null
+                            ),
+#else
+                        Diagnostics = _trace?.DeathReport(),
+#endif
                         ThermalStart = thermalStart,
                         ThermalEnd = Thermal(),
                         Screenshot = screenshot,

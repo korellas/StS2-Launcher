@@ -42,6 +42,7 @@ data.Results.Add(
     {
         Case = "Merchant",
         Variant = "baseline",
+        Diagnostics = "death diagnostics persistence probe",
         Metrics = summary,
         LoadTimings = new()
         {
@@ -74,6 +75,11 @@ Check(
         && loaded.Boots.Single().GameInitializationMs == 1500
         && loaded.Boots.Single().LaunchToSceneMs == 2000,
     "Resume and results survive offline restart"
+);
+Check(
+    loaded.Results[0].Diagnostics == "death diagnostics persistence probe"
+        && loaded.Report().Contains("death diagnostics persistence probe"),
+    "Death diagnostics survive restart and are included in copied reports"
 );
 File.Delete(path);
 Console.WriteLine("PASS benchmark statistics, availability, guarded restart, offline persistence");
