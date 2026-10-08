@@ -11,6 +11,7 @@ public class GraphicsSection : VBoxContainer
 {
     public event Action<string, string> HelpRequested;
     public event Action BenchmarkRequested;
+    public event Action EngineBenchmarkRequested;
     public event Action ComparisonRequested;
     private readonly List<Action> _refreshChoices = new();
     private readonly GraphicsSettings _settings;
@@ -132,6 +133,9 @@ public class GraphicsSection : VBoxContainer
         var comparison = new GameMenuButton(Tr("COMPARE_TITLE"), scale, fontSize: 16);
         comparison.Pressed += () => ComparisonRequested?.Invoke();
         AddChild(comparison);
+        var engineBenchmark = new GameMenuButton(Tr("ENGINE_BENCH_TITLE"), scale, fontSize: 16);
+        engineBenchmark.Pressed += () => EngineBenchmarkRequested?.Invoke();
+        AddChild(engineBenchmark);
         var benchmark = new GameMenuButton(Tr("BENCH_TITLE"), scale, fontSize: 16);
         benchmark.Pressed += () => BenchmarkRequested?.Invoke();
         AddChild(benchmark);

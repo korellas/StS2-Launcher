@@ -124,6 +124,8 @@ public class LauncherView
         settingsOverlay.Opened += versions.Refresh;
         var graphics = new GraphicsSection(scale, Actions.GraphicsGroup) { Visible = false };
         graphics.HelpRequested += ShowGraphicsHelp;
+        graphics.EngineBenchmarkRequested += () =>
+            RenderBenchmarkScreen.OpenEngine((LauncherUI)parent);
         graphics.BenchmarkRequested += () => RenderBenchmarkScreen.Open((LauncherUI)parent);
         graphics.ComparisonRequested += () =>
             RenderBenchmarkScreen.OpenComparison((LauncherUI)parent);

@@ -18,8 +18,19 @@ public sealed class RenderBenchmarkScreen : Control
         Path.Combine(OS.GetDataDir(), "render-benchmark.json");
     private static string ComparisonDataPath =>
         Path.Combine(OS.GetDataDir(), "render-comparison.json");
+    private static string EngineDataPath => Path.Combine(OS.GetDataDir(), "engine-benchmark.json");
     private readonly bool _comparison;
-    private string DataPath => _comparison ? ComparisonDataPath : BenchmarkDataPath;
+    private readonly bool _engine;
+
+    private static string DataPathFor(RenderBenchmarkData data) =>
+        data.EngineOnly ? EngineDataPath
+        : data.CaptureOnly ? ComparisonDataPath
+        : BenchmarkDataPath;
+
+    private string DataPath =>
+        _engine ? EngineDataPath
+        : _comparison ? ComparisonDataPath
+        : BenchmarkDataPath;
     private string CaptureDirectory =>
         Path.Combine(
             OS.GetDataDir(),
@@ -62,11 +73,12 @@ public sealed class RenderBenchmarkScreen : Control
         int mode = app?.Call("getBenchmarkPacing").AsInt32() ?? -99;
         if (app != null && !app.Call("restoreBenchmarkConfig").AsBool())
             throw new IOException("Could not restore benchmark boot configuration");
+        var engine = LoadData(EngineDataPath);
         var comparison = LoadData(ComparisonDataPath);
         var data =
-            comparison != null && (comparison.Running || comparison.ShowResults)
-                ? comparison
-                : LoadData(BenchmarkDataPath);
+            engine != null && (engine.Running || engine.ShowResults) ? engine
+            : comparison != null && (comparison.Running || comparison.ShowResults) ? comparison
+            : LoadData(BenchmarkDataPath);
         if (data == null)
         {
             if (mode != -99)
@@ -78,7 +90,7 @@ public sealed class RenderBenchmarkScreen : Control
         }
         if (data.CanResume(mode))
         {
-            Open(owner, data, resume: true, comparison: data.CaptureOnly);
+            Open(owner, data, resume: true, comparison: data.CaptureOnly, engine: data.EngineOnly);
             return true;
         }
         if (data.Running)
@@ -86,7 +98,7 @@ public sealed class RenderBenchmarkScreen : Control
             data.Running = false;
             data.Status = "Interrupted; completed cases preserved";
             data.ShowResults = true;
-            data.Save(data.CaptureOnly ? ComparisonDataPath : BenchmarkDataPath);
+            data.Save(DataPathFor(data));
         }
         if (mode != -99)
         {
@@ -96,8 +108,8 @@ public sealed class RenderBenchmarkScreen : Control
         if (data.ShowResults)
         {
             data.ShowResults = false;
-            data.Save(data.CaptureOnly ? ComparisonDataPath : BenchmarkDataPath);
-            Open(owner, data, comparison: data.CaptureOnly);
+            data.Save(DataPathFor(data));
+            Open(owner, data, comparison: data.CaptureOnly, engine: data.EngineOnly);
         }
         return false;
     }
@@ -106,6 +118,9 @@ public sealed class RenderBenchmarkScreen : Control
 
     public static void OpenComparison(LauncherUI owner) =>
         Open(owner, LoadData(ComparisonDataPath), comparison: true);
+
+    public static void OpenEngine(LauncherUI owner) =>
+        Open(owner, LoadData(EngineDataPath), engine: true);
 
     private static RenderBenchmarkData LoadData(string path)
     {
@@ -124,10 +139,11 @@ public sealed class RenderBenchmarkScreen : Control
         LauncherUI owner,
         RenderBenchmarkData data,
         bool resume = false,
-        bool comparison = false
+        bool comparison = false,
+        bool engine = false
     )
     {
-        var screen = new RenderBenchmarkScreen(owner, data, comparison);
+        var screen = new RenderBenchmarkScreen(owner, data, comparison, engine);
         owner.GetTree().Root.AddChild(screen);
         owner.Hide();
         var window = screen.GetTree().Root;
@@ -142,9 +158,15 @@ public sealed class RenderBenchmarkScreen : Control
             Callable.From(screen.OpenComparisonPage).CallDeferred();
     }
 
-    private RenderBenchmarkScreen(LauncherUI owner, RenderBenchmarkData data, bool comparison)
+    private RenderBenchmarkScreen(
+        LauncherUI owner,
+        RenderBenchmarkData data,
+        bool comparison,
+        bool engine
+    )
     {
         _comparison = comparison;
+        _engine = engine;
         _owner = owner;
         _app = LauncherModel.GetGodotApp();
         _data = data;
@@ -187,7 +209,11 @@ public sealed class RenderBenchmarkScreen : Control
         _panel.AddThemeConstantOverride("separation", (int)(8 * _scale));
         frame.AddChild(_panel);
         var title = new StyledLabel(
-            Tr(_comparison ? "COMPARE_TITLE" : "BENCH_TITLE"),
+            Tr(
+                _engine ? "ENGINE_BENCH_TITLE"
+                : _comparison ? "COMPARE_TITLE"
+                : "BENCH_TITLE"
+            ),
             _scale,
             24,
             HorizontalAlignment.Left
@@ -195,7 +221,11 @@ public sealed class RenderBenchmarkScreen : Control
         title.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         _panel.AddChild(title);
         var description = new StyledLabel(
-            Tr(_comparison ? "COMPARE_INFO" : "BENCH_INFO"),
+            Tr(
+                _engine ? "ENGINE_BENCH_INFO"
+                : _comparison ? "COMPARE_INFO"
+                : "BENCH_INFO"
+            ),
             _scale,
             13,
             HorizontalAlignment.Left
@@ -226,6 +256,7 @@ public sealed class RenderBenchmarkScreen : Control
         var captureTab = new SettingsTabButton(Tr("BENCH_CAPTURE_TAB"), _scale);
         tabs.AddChild(resultsTab);
         tabs.AddChild(captureTab);
+        tabs.Visible = !_engine;
         _panel.AddChild(tabs);
         var body = new Control { SizeFlagsVertical = SizeFlags.ExpandFill };
         _panel.AddChild(body);
@@ -278,7 +309,13 @@ public sealed class RenderBenchmarkScreen : Control
         var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         buttons.AddThemeConstantOverride("separation", (int)(20 * _scale));
         _panel.AddChild(buttons);
-        _start = Button(buttons, _comparison ? "COMPARE_START" : "BENCH_START", StartSuite);
+        _start = Button(
+            buttons,
+            _engine ? "ENGINE_BENCH_START"
+                : _comparison ? "COMPARE_START"
+                : "BENCH_START",
+            StartSuite
+        );
         _start.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         _cancel = Button(buttons, "BENCH_CANCEL", Cancel);
         if (_comparison)
@@ -322,6 +359,7 @@ public sealed class RenderBenchmarkScreen : Control
             {
                 Running = true,
                 CaptureOnly = _comparison,
+                EngineOnly = _engine,
                 Device = OS.GetModelName(),
                 Engine = Godot.Engine.GetVersionInfo()["string"].AsString(),
                 App = LauncherModel.GetGodotApp().Call("getVersionName").AsString(),
@@ -385,7 +423,7 @@ public sealed class RenderBenchmarkScreen : Control
             _background.Visible = false;
             _scrim.Color = Colors.Transparent;
             _cancel.Visible = true;
-            // Progress is the only launcher control drawn during sampling.
+            // Move progress outside the panel; engine sampling hides these controls too.
             _panel.RemoveChild(_status);
             _cancel.GetParent().RemoveChild(_cancel);
             _status.Position = new Vector2(20 * _scale, 15 * _scale);
@@ -394,7 +432,9 @@ public sealed class RenderBenchmarkScreen : Control
             AddChild(_cancel);
             _status.Text = Tr("BENCH_LOAD_GAME");
             ulong initializationStart = Time.GetTicksUsec();
-            _trace = BenchmarkTrace.TryStart(_app, GetTree());
+            _trace = _engine ? null : BenchmarkTrace.TryStart(_app, GetTree());
+            if (_engine)
+                SettingsPatches.SetFrameLimit(0);
             _fixture = new RenderBenchmarkFixture(CheckTestState, _trace);
             await _fixture.Initialize();
             double initializationMs = (Time.GetTicksUsec() - initializationStart) / 1000d;
@@ -403,11 +443,17 @@ public sealed class RenderBenchmarkScreen : Control
             RenderingServer.ViewportSetMeasureRenderTime(_viewport.GetViewportRid(), true);
             DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
             var tests = new List<RenderBenchmarkCase>();
-            if (_comparison)
+            if (_engine)
+                tests.AddRange(
+                    new[] { "CombatIdle", "Merchant", "Map" }.Select(
+                        scene => new RenderBenchmarkCase(scene, "fixed visuals")
+                    )
+                );
+            else if (_comparison)
                 tests.AddRange(RenderBenchmarkCase.ComparisonCases());
             else if (_data.Phase == 0)
                 tests.AddRange(RenderBenchmarkCase.QualityCases());
-            if (!_comparison)
+            if (!_comparison && !_engine)
                 tests.AddRange(
                     RenderBenchmarkCase.PacingCases(expected, LauncherModel.FrameLimitOptions)
                 );
@@ -417,7 +463,13 @@ public sealed class RenderBenchmarkScreen : Control
                 var test = tests[i];
                 Godot.Engine.MaxFps = test.Fps;
                 _status.Text = $"{Tr("BENCH_LOAD_GAME")} · {SceneName(test.Scene)}";
-                await _fixture.Build(test);
+                await _fixture.Build(test, applyVisuals: !_engine);
+                if (_engine)
+                {
+                    // Game scene initialization can reapply its VSync preference.
+                    DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+                    Godot.Engine.MaxFps = 0;
+                }
                 CheckCancellation();
                 CheckForeground();
                 if (i == 0)
@@ -433,52 +485,61 @@ public sealed class RenderBenchmarkScreen : Control
                     SaveData();
                 }
                 _status.Text =
-                    $"{Tr("BENCH_WARM")} {_data.Phase + 1}/{(_comparison ? 1 : RenderBenchmarkData.PacingModes.Length)} · {i + 1}/{tests.Count} · {test.Scene}: {test.Name}";
+                    $"{Tr("BENCH_WARM")} {_data.Phase + 1}/{_data.PhaseCount} · {i + 1}/{tests.Count} · {test.Scene}: {test.Name}";
                 await Sample(WarmupSeconds, record: false);
-                if (_comparison)
+                string screenshot = null;
+                if (!_engine)
                 {
-                    _fixture.Animate();
-                    await Sample(.1, record: false);
-                }
-                else
-                    // Capture during the game's beam sequence, outside the timed window.
-                    await Sample(.75, record: false);
-                await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
-                Directory.CreateDirectory(CaptureDirectory);
-                string screenshot = Path.Combine(
-                    CaptureDirectory,
-                    $"case-{_data.Results.Count:D3}.png"
-                );
-                _status.Visible = false;
-                _cancel.Visible = false;
-                try
-                {
+                    if (_comparison)
+                    {
+                        _fixture.Animate();
+                        await Sample(.1, record: false);
+                    }
+                    else
+                        // Capture during the game's beam sequence, outside the timed window.
+                        await Sample(.75, record: false);
                     await ToSignal(
                         RenderingServer.Singleton,
                         RenderingServer.SignalName.FramePostDraw
                     );
-                    using var captureTrace = _trace?.Sync("Capture.ReadbackAndPng");
-                    using var image = GetViewport().GetTexture().GetImage();
-                    if (image.GetFormat() != Image.Format.Rgba8)
-                        image.Convert(Image.Format.Rgba8);
-                    if (_viewport.UseHdr2D)
-                        image.LinearToSrgb();
-                    if (_comparison && image.GetSize() != physical)
-                        // Match RendererCompositorRD's nearest-sampled screen blit.
-                        image.Resize(physical.X, physical.Y, Image.Interpolation.Nearest);
-                    if (image.SavePng(screenshot) != Error.Ok)
-                        throw new IOException("Could not save comparison screenshot");
+                    Directory.CreateDirectory(CaptureDirectory);
+                    screenshot = Path.Combine(
+                        CaptureDirectory,
+                        $"case-{_data.Results.Count:D3}.png"
+                    );
+                    _status.Visible = false;
+                    _cancel.Visible = false;
+                    try
+                    {
+                        await ToSignal(
+                            RenderingServer.Singleton,
+                            RenderingServer.SignalName.FramePostDraw
+                        );
+                        using var captureTrace = _trace?.Sync("Capture.ReadbackAndPng");
+                        using var image = GetViewport().GetTexture().GetImage();
+                        if (image.GetFormat() != Image.Format.Rgba8)
+                            image.Convert(Image.Format.Rgba8);
+                        if (_viewport.UseHdr2D)
+                            image.LinearToSrgb();
+                        if (_comparison && image.GetSize() != physical)
+                            // Match RendererCompositorRD's nearest-sampled screen blit.
+                            image.Resize(physical.X, physical.Y, Image.Interpolation.Nearest);
+                        if (image.SavePng(screenshot) != Error.Ok)
+                            throw new IOException("Could not save comparison screenshot");
+                    }
+                    finally
+                    {
+                        _status.Visible = true;
+                        _cancel.Visible = true;
+                    }
+                    if (!_comparison)
+                        await Sample(.5, record: false);
                 }
-                finally
-                {
-                    _status.Visible = true;
-                    _cancel.Visible = true;
-                }
-                if (!_comparison)
-                    await Sample(.5, record: false);
                 _status.Text =
-                    $"{Tr(_comparison ? "COMPARE_CAPTURE" : "BENCH_MEASURE")} {_data.Phase + 1}/{(_comparison ? 1 : RenderBenchmarkData.PacingModes.Length)} · {i + 1}/{tests.Count} · {test.Scene}: {test.Name}";
+                    $"{Tr(_comparison ? "COMPARE_CAPTURE" : "BENCH_MEASURE")} {_data.Phase + 1}/{_data.PhaseCount} · {i + 1}/{tests.Count} · {test.Scene}: {test.Name}";
                 string thermalStart = Thermal();
+                if (_engine)
+                    _status.Visible = _cancel.Visible = false;
                 BenchmarkMetrics metrics;
                 if (_comparison)
                     metrics = new BenchmarkMetrics();
@@ -495,7 +556,9 @@ public sealed class RenderBenchmarkScreen : Control
                     }
                 }
                 else
-                    metrics = await Sample(SampleSeconds, record: true);
+                    metrics = await Sample(_engine ? 15 : SampleSeconds, record: true);
+                if (_engine)
+                    _status.Visible = _cancel.Visible = true;
                 CheckCancellation();
                 if (!_comparison && metrics.Frames == 0)
                     throw new InvalidOperationException("No rendered frames measured");
@@ -505,7 +568,7 @@ public sealed class RenderBenchmarkScreen : Control
                         Case = test.Scene,
                         Variant = test.Name,
                         Applied =
-                            $"root viewport, scale={GraphicsPatches.Settings.RenderScale}%, HDR={_viewport.UseHdr2D}, MSAA={_viewport.Msaa2D}, filter={test.Filter}, direct={test.Direct}, blur={test.Blur}, distortion={test.Distortion}, backgroundParticles={test.Particles}%, cap={Godot.Engine.MaxFps}, nativePacing={expected}",
+                            $"root viewport, scale={GraphicsPatches.Settings.RenderScale}%, HDR={_viewport.UseHdr2D}, MSAA={_viewport.Msaa2D}, filter={GraphicsPatches.Settings.TextureFilter}, direct={GraphicsPatches.Settings.DirectCardPortraits}, blur={GraphicsPatches.Settings.RadialBlurSamples}, distortion={GraphicsPatches.Settings.ScreenDistortion}, backgroundParticles={GraphicsPatches.Settings.BackgroundParticles}%, cap={Godot.Engine.MaxFps}, nativePacing={expected}",
                         Metrics = metrics,
                         ThermalStart = thermalStart,
                         ThermalEnd = Thermal(),
@@ -516,7 +579,7 @@ public sealed class RenderBenchmarkScreen : Control
                 SaveData();
             }
             _data.Phase++;
-            if (_data.Phase >= (_comparison ? 1 : RenderBenchmarkData.PacingModes.Length))
+            if (_data.Phase >= _data.PhaseCount)
             {
                 _data.Running = false;
                 _data.ShowResults = true;
@@ -569,6 +632,8 @@ public sealed class RenderBenchmarkScreen : Control
             }
             GraphicsPatches.Settings.CopyVisualsFrom(_savedGraphics);
             GraphicsPatches.GraphicsPreferencesPostfix();
+            if (_engine)
+                SettingsPatches.SetFrameLimit(_savedFps);
             Godot.Engine.MaxFps = _savedFps;
             DisplayServer.ScreenSetKeepOn(_savedKeepOn);
             DisplayServer.WindowSetVsyncMode(_savedVSync);
@@ -604,7 +669,7 @@ public sealed class RenderBenchmarkScreen : Control
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             CheckCancellation();
-            if (!_comparison)
+            if (!_comparison && !_engine)
                 _fixture.Animate();
             await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
             CheckCancellation();
@@ -717,7 +782,7 @@ public sealed class RenderBenchmarkScreen : Control
             "Running" => Tr(_comparison ? "COMPARE_CAPTURE" : "BENCH_MEASURE"),
             "Cancelled; completed cases preserved" => Tr("BENCH_CANCELLED"),
             "Interrupted; completed cases preserved" => Tr("BENCH_INTERRUPTED"),
-            null or "Ready" => Tr("BENCH_READY"),
+            null or "Ready" => Tr(_engine ? "ENGINE_BENCH_INFO" : "BENCH_READY"),
             var status => status,
         };
         if (_data != null && _data.Version < RenderBenchmarkData.FormatVersion)
@@ -728,7 +793,11 @@ public sealed class RenderBenchmarkScreen : Control
             ChangeCapture(0);
             return;
         }
-        AddResultText(Tr("BENCH_RESULTS_HELP"), 12, LauncherTheme.Dim);
+        AddResultText(
+            Tr(_engine ? "ENGINE_BENCH_INFO" : "BENCH_RESULTS_HELP"),
+            12,
+            LauncherTheme.Dim
+        );
         foreach (var boot in _data?.Boots ?? new())
             AddResultText(
                 $"{Tr("BENCH_APP_LOAD")} #{boot.Phase + 1}: {boot.LaunchToSceneMs:F0} ms · {Tr("BENCH_GAME_INIT")} {boot.GameInitializationMs:F0} ms",
@@ -757,6 +826,12 @@ public sealed class RenderBenchmarkScreen : Control
                     13,
                     LauncherTheme.Dim
                 );
+                if (_engine)
+                    AddResultText(
+                        $"{Tr("ENGINE_BENCH_MINIMUM")} {metrics.MinimumFps:F1} FPS · {metrics.FrameMaxMs:F2} ms",
+                        13,
+                        LauncherTheme.Cream
+                    );
                 foreach (var load in result.LoadTimings)
                     AddResultText(
                         $"{SceneName(load.From)} → {SceneName(load.To)}: {load.DurationMs:F1} ms · {Tr(load.FirstVisit ? "BENCH_FIRST_VISIT" : "BENCH_REPEAT_VISIT")}",
@@ -766,7 +841,8 @@ public sealed class RenderBenchmarkScreen : Control
                 _resultRows.AddChild(SettingsRow.Separator(_scale));
             }
         }
-        ChangeCapture(0);
+        if (!_engine)
+            ChangeCapture(0);
     }
 
     private void AddResultText(string text, int fontSize, Color color)

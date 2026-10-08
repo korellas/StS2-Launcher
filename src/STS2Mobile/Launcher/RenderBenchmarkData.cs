@@ -151,6 +151,8 @@ public sealed class BenchmarkMetrics
 {
     public int Frames { get; set; }
     public double Fps { get; set; }
+    public double MinimumFps { get; set; }
+    public double FrameMaxMs { get; set; }
     public double FrameMeanMs { get; set; }
     public double FrameP95Ms { get; set; }
     public double FrameP99Ms { get; set; }
@@ -189,6 +191,8 @@ public sealed class BenchmarkSamples
         {
             Frames = _frames.Count,
             Fps = 1000 / mean,
+            MinimumFps = 1000 / ordered[^1],
+            FrameMaxMs = ordered[^1],
             FrameMeanMs = mean,
             FrameP95Ms = Percentile(ordered, .95),
             FrameP99Ms = Percentile(ordered, .99),
@@ -249,6 +253,8 @@ public sealed class RenderBenchmarkData
     public int Phase { get; set; }
     public bool Running { get; set; }
     public bool CaptureOnly { get; set; }
+    public bool EngineOnly { get; set; }
+    public int PhaseCount => CaptureOnly || EngineOnly ? 1 : PacingModes.Length;
     public bool ShowResults { get; set; }
     public string Status { get; set; } = "Ready";
     public List<BenchmarkResult> Results { get; set; } = new();
@@ -258,7 +264,8 @@ public sealed class RenderBenchmarkData
         Version == FormatVersion
         && Running
         && Phase >= 0
-        && Phase < (CaptureOnly ? 1 : PacingModes.Length)
+        && !(CaptureOnly && EngineOnly)
+        && Phase < PhaseCount
         && PacingModes[Phase] == nativePacing;
 
     public void Save(string path)
@@ -276,7 +283,9 @@ public sealed class RenderBenchmarkData
     public string Report()
     {
         var text = new StringBuilder();
-        text.AppendLine($"STS2 controlled rendering benchmark v{Version} | {Status}");
+        text.AppendLine(
+            $"STS2 {(EngineOnly ? "engine scene benchmark" : "controlled rendering benchmark")} v{Version} | {Status}"
+        );
         text.AppendLine(
             $"UTC {StartedUtc}\nApp {App} | Engine {Engine}\nDevice {Device}\nRenderer {Renderer}\nResolution {Resolution}\nGame assembly {GameAssembly}"
         );
@@ -284,23 +293,38 @@ public sealed class RenderBenchmarkData
             text.AppendLine(
                 $"Game DLL version {GameLibraryVersion ?? "N/A"} | .NET runtime {RuntimeVersion ?? "N/A"}"
             );
-        text.AppendLine(
-            Version < 2
-                ? "Synthetic texture/geometry fixtures (legacy); do not compare with actual combat results."
-                : $"Actual combat and game UI: fixed Defect deck, ConstructMenagerieNormal, seed {RenderBenchmarkCase.Seed}. Combat, focused hand, game VFX, merchant inventory, map, deck and native screen transitions; saves are in memory. CPU/GPU measure the full viewport rendering; no battery consumption measurement."
-        );
-        text.AppendLine(
-            "Quality: uncapped / VSync off / native pacing off. Pacing: same game scenarios, automatic cold starts, capped and uncapped."
-        );
-        text.AppendLine(
-            "CPU/GPU are benchmark viewport rendering ms; frame times are whole-frame cadence. GPU N/A means timestamps unavailable. Warmup and screenshots excluded from samples."
-        );
-        text.AppendLine(
-            "Baseline repeated before/after each scene's quality comparisons. Compare within the same scene; thermal changes and baseline drift can obscure small differences. No automatic no-effect verdict."
-        );
-        text.AppendLine(
-            "Loading: operation to first rendered frame (combat also waits for its hand); room transitions include native fades. First visit means first operation this boot, not a cleared disk/shader cache. Transition frame samples include fixed presentation pauses. App launch to first test screen is separate from isolated game initialization. Shader prewarming itself is not compared."
-        );
+        if (EngineOnly)
+        {
+            text.AppendLine(
+                $"Actual idle combat, merchant and map; fixed Defect deck, ConstructMenagerieNormal, seed {RenderBenchmarkCase.Seed}; saves in memory. Visual settings held fixed; inherited game settings use the fixture defaults."
+            );
+            text.AppendLine(
+                "Uncapped / VSync off / native pacing off. No screenshots, texture readback or image encoding. Scene setup, warmup and result saving are outside samples; measured stalls are retained."
+            );
+            text.AppendLine(
+                "Minimum FPS = 1000 / longest measured frame ms, not a rolling average. CPU/GPU measure viewport rendering; frame times measure whole-frame cadence. GPU N/A means timestamps unavailable. No battery measurement."
+            );
+        }
+        else
+        {
+            text.AppendLine(
+                Version < 2
+                    ? "Synthetic texture/geometry fixtures (legacy); do not compare with actual combat results."
+                    : $"Actual combat and game UI: fixed Defect deck, ConstructMenagerieNormal, seed {RenderBenchmarkCase.Seed}. Combat, focused hand, game VFX, merchant inventory, map, deck and native screen transitions; saves are in memory. CPU/GPU measure the full viewport rendering; no battery consumption measurement."
+            );
+            text.AppendLine(
+                "Quality: uncapped / VSync off / native pacing off. Pacing: same game scenarios, automatic cold starts, capped and uncapped."
+            );
+            text.AppendLine(
+                "CPU/GPU are benchmark viewport rendering ms; frame times are whole-frame cadence. GPU N/A means timestamps unavailable. Warmup and screenshots excluded from samples."
+            );
+            text.AppendLine(
+                "Baseline repeated before/after each scene's quality comparisons. Compare within the same scene; thermal changes and baseline drift can obscure small differences. No automatic no-effect verdict."
+            );
+            text.AppendLine(
+                "Loading: operation to first rendered frame (combat also waits for its hand); room transitions include native fades. First visit means first operation this boot, not a cleared disk/shader cache. Transition frame samples include fixed presentation pauses. App launch to first test screen is separate from isolated game initialization. Shader prewarming itself is not compared."
+            );
+        }
         foreach (var boot in Boots)
             text.AppendLine(
                 FormattableString.Invariant(
@@ -316,6 +340,12 @@ public sealed class RenderBenchmarkData
                     $"n={m.Frames}, FPS={m.Fps:F2}, frame avg/p95/p99={m.FrameMeanMs:F3}/{m.FrameP95Ms:F3}/{m.FrameP99Ms:F3} ms, CPU={m.CpuMeanMs:F3} ms, GPU={Format(m.GpuMeanMs)}/{Format(m.GpuP95Ms)} ms avg/p95, canvas draws={m.DrawCallsMean:F1}"
                 )
             );
+            if (EngineOnly)
+                text.AppendLine(
+                    FormattableString.Invariant(
+                        $"minimum FPS={m.MinimumFps:F2}, worst frame={m.FrameMaxMs:F3} ms"
+                    )
+                );
             text.AppendLine($"Thermal {result.ThermalStart} → {result.ThermalEnd}");
             foreach (var load in result.LoadTimings)
                 text.AppendLine(

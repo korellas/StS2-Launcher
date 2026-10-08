@@ -250,3 +250,40 @@ foreach (var invalid in new[] { Array.Empty<byte>(), new byte[3], new byte[4] })
     Check(rejected, "Unequal or invalid RGBA buffers cannot be compared");
 }
 Console.WriteLine("PASS exact pixel differences, alpha, histogram and input validation");
+
+var stall = new BenchmarkSamples();
+stall.Add(8, 1, 5, 10);
+stall.Add(200, 1, 5, 10);
+stall.Add(double.NaN, 1, 5, 10);
+Check(
+    stall.Summarize().MinimumFps == 5 && stall.Summarize().FrameMaxMs == 200,
+    "A real stall remains in minimum FPS and maximum frame time"
+);
+var engineJob = new RenderBenchmarkData { EngineOnly = true, Running = true };
+Check(engineJob.CanResume(-2), "Engine benchmark resumes with native pacing disabled");
+engineJob.Phase = 1;
+Check(!engineJob.CanResume(0), "Engine benchmark never enters an option sweep");
+engineJob.Phase = 0;
+engineJob.Results.Add(
+    new BenchmarkResult
+    {
+        Case = "CombatIdle",
+        Variant = "current visuals",
+        Metrics = stall.Summarize(),
+    }
+);
+engineJob.Save(path);
+var engineLoaded = RenderBenchmarkData.Load(path);
+Check(
+    engineLoaded.EngineOnly && engineLoaded.Results.Single().Metrics.MinimumFps == 5,
+    "Engine identity and worst frame survive restart"
+);
+Check(
+    engineLoaded.Report().Contains("engine scene benchmark")
+        && engineLoaded.Report().Contains("minimum FPS=5.00")
+        && !engineLoaded.Report().Contains("Quality:")
+        && !engineLoaded.Report().Contains("Baseline repeated"),
+    "Engine reports distinguish uncapped no-capture measurements from option comparisons"
+);
+File.Delete(path);
+Console.WriteLine("PASS engine job isolation and unfiltered worst frame");

@@ -62,6 +62,11 @@ public static class Localization
         ["BENCH_CANCELLED"] = "중단됐습니다. 완료한 항목의 결과는 보관했습니다.",
         ["BENCH_INTERRUPTED"] =
             "이전 테스트가 끊겼습니다. 완료한 결과를 확인하거나 다시 시작할 수 있습니다.",
+        ["ENGINE_BENCH_TITLE"] = "엔진 벤치마크",
+        ["ENGINE_BENCH_START"] = "장면 측정 시작",
+        ["ENGINE_BENCH_MINIMUM"] = "최저 FPS / 최장 프레임",
+        ["ENGINE_BENCH_INFO"] =
+            "전투 대기·상점·지도를 캡처 없이 측정합니다. 화질은 고정하고 FPS 제한·VSync·네이티브 페이싱을 해제합니다. 최저 FPS는 가장 긴 프레임에서 계산하며, 준비·예열은 제외하고 측정 중 끊김은 포함합니다. 종료 후 원래 설정으로 복귀합니다.",
         ["BENCH_TITLE"] = "렌더링 벤치마크",
         ["BENCH_INFO"] =
             "실제 전투·손패와 카드 확대·공격 VFX·상점·지도·덱 화면을 자동 비교합니다. 화면 전환과 로딩, 앱 시작 시간도 기록합니다. 고정 시드의 테스트 런과 진행도는 메모리에 분리합니다. 재시작은 자동입니다. 테스트 중에는 조작하거나 화면을 접지 말아 주세요. 완료 후 원래 설정으로 돌아옵니다.",
@@ -262,6 +267,11 @@ public static class Localization
         ["BENCH_CANCELLED"] = "Cancelled. Completed results were preserved.",
         ["BENCH_INTERRUPTED"] =
             "The previous test was interrupted. View completed results or start again.",
+        ["ENGINE_BENCH_TITLE"] = "Engine benchmark",
+        ["ENGINE_BENCH_START"] = "Start scene measurement",
+        ["ENGINE_BENCH_MINIMUM"] = "Minimum FPS / worst frame",
+        ["ENGINE_BENCH_INFO"] =
+            "Measure idle combat, merchant and map without captures. Visual settings stay fixed; FPS cap, VSync and native pacing are disabled. Minimum FPS uses the longest frame. Setup and warmup are excluded; measured stalls are retained. Your settings are restored afterward.",
         ["BENCH_TITLE"] = "Rendering benchmark",
         ["BENCH_INFO"] =
             "Automatically compares actual combat, focused cards, attack VFX, merchant inventory, map and deck screens. Records transitions, loading and app startup. Fixed-seed test saves stay in memory. Restarts are automatic. Leave the app untouched and do not resize the screen. Your settings are restored at the end.",

@@ -77,23 +77,26 @@ public sealed class RenderBenchmarkFixture : IDisposable
         GraphicsPatches.StartRuntime(NGame.Instance.GetTree());
     }
 
-    public async Task Build(RenderBenchmarkCase test)
+    public async Task Build(RenderBenchmarkCase test, bool applyVisuals = true)
     {
         using var trace = _trace?.Span($"Build.{test.Scene}.{test.Name}");
         Dispose();
         LoadTimings.Clear();
         _currentScreen = "Reset";
         _check();
-        var settings = GraphicsPatches.Settings;
-        settings.RenderScale = test.Scale;
-        settings.Msaa = test.Msaa;
-        settings.Hdr = test.Hdr ? 1 : 0;
-        settings.TextureFilter = test.Filter;
-        settings.DirectCardPortraits = test.Direct;
-        settings.RadialBlurSamples = test.Blur;
-        settings.ScreenDistortion = test.Distortion;
-        settings.BackgroundParticles = test.Particles;
-        GraphicsPatches.GraphicsPreferencesPostfix();
+        if (applyVisuals)
+        {
+            var settings = GraphicsPatches.Settings;
+            settings.RenderScale = test.Scale;
+            settings.Msaa = test.Msaa;
+            settings.Hdr = test.Hdr ? 1 : 0;
+            settings.TextureFilter = test.Filter;
+            settings.DirectCardPortraits = test.Direct;
+            settings.RadialBlurSamples = test.Blur;
+            settings.ScreenDistortion = test.Distortion;
+            settings.BackgroundParticles = test.Particles;
+            GraphicsPatches.GraphicsPreferencesPostfix();
+        }
 
         _player = Player.CreateForNewRun<Defect>(UnlockState.all, 1);
         _state = RunState.CreateForNewRun(
