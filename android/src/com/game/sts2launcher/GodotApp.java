@@ -965,6 +965,23 @@ public class GodotApp extends GodotActivity {
 	// doesn't lose the launcher state by getting kicked into a browser app.
 	// Idempotent: closes any existing overlay before opening a new one.
 	public void showWebView(String url) {
+		showWebView(url, false);
+	}
+
+	public void showRenderComparison(String path) {
+		try {
+			File page = new File(path).getCanonicalFile();
+			File expected = new File(getFilesDir(), "render-comparison/index.html").getCanonicalFile();
+			if (!page.equals(expected) || !page.isFile()) {
+				throw new IllegalArgumentException("Comparison page unavailable");
+			}
+			showWebView(Uri.fromFile(page).toString(), true);
+		} catch (IOException error) {
+			throw new IllegalStateException("Could not open comparison page", error);
+		}
+	}
+
+	private void showWebView(String url, boolean localComparison) {
 		if (url == null || url.isEmpty()) {
 			return;
 		}
@@ -977,7 +994,7 @@ public class GodotApp extends GodotActivity {
 		// is blocked in Korea along with the known workaround, and Papago has no
 		// deep link (its /website endpoint drops the parameters and redirects to
 		// the home page).
-		if (openInCustomTab(url)) {
+		if (!localComparison && openInCustomTab(url)) {
 			return;
 		}
 
@@ -1028,9 +1045,10 @@ public class GodotApp extends GodotActivity {
 					(int) (40 * density));
 			translateParams.rightMargin = (int) (12 * density);
 			topBar.addView(translateButton, translateParams);
+			if (localComparison) translateButton.setVisibility(View.GONE);
 
 			TextView urlLabel = new TextView(this);
-			urlLabel.setText(url);
+			urlLabel.setText(localComparison ? "옵션 비교" : url);
 			urlLabel.setTextColor(0xFFB0B0BA);
 			urlLabel.setSingleLine(true);
 			urlLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1057,6 +1075,7 @@ public class GodotApp extends GodotActivity {
 			WebView webView = new WebView(this);
 			WebSettings settings = webView.getSettings();
 			settings.setJavaScriptEnabled(true);
+			settings.setAllowFileAccess(localComparison);
 			settings.setDomStorageEnabled(true);
 			settings.setLoadWithOverviewMode(true);
 			settings.setUseWideViewPort(true);
@@ -1068,7 +1087,7 @@ public class GodotApp extends GodotActivity {
 				@Override
 				public void onPageFinished(WebView view, String finishedUrl) {
 					progress.setVisibility(View.GONE);
-					urlLabel.setText(finishedUrl);
+					if (!localComparison) urlLabel.setText(finishedUrl);
 				}
 
 				@Override

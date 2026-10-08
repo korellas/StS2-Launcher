@@ -122,6 +122,29 @@ public sealed record RenderBenchmarkCase(string Scene, string Name)
                 Fps = fps,
             };
     }
+
+    public static IEnumerable<RenderBenchmarkCase> ComparisonCases()
+    {
+        foreach (var test in QualityCases())
+        {
+            if (
+                test.Scene is not ("CombatCards" or "CombatEffects" or "Merchant")
+                || test.Hdr
+                || !test.Distortion
+                || test.Particles != 100
+                || test.Blur == 6
+            )
+                continue;
+            yield return test;
+            if (test.Scale == 85)
+                foreach (int scale in new[] { 75, 50 })
+                    yield return test with
+                    {
+                        Name = $"resolution {scale}%",
+                        Scale = scale,
+                    };
+        }
+    }
 }
 
 public sealed class BenchmarkMetrics
@@ -225,6 +248,7 @@ public sealed class RenderBenchmarkData
     public string Resolution { get; set; }
     public int Phase { get; set; }
     public bool Running { get; set; }
+    public bool CaptureOnly { get; set; }
     public bool ShowResults { get; set; }
     public string Status { get; set; } = "Ready";
     public List<BenchmarkResult> Results { get; set; } = new();
@@ -234,7 +258,7 @@ public sealed class RenderBenchmarkData
         Version == FormatVersion
         && Running
         && Phase >= 0
-        && Phase < PacingModes.Length
+        && Phase < (CaptureOnly ? 1 : PacingModes.Length)
         && PacingModes[Phase] == nativePacing;
 
     public void Save(string path)

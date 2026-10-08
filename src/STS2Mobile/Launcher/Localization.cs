@@ -26,6 +26,13 @@ public static class Localization
         ["VERSION_COPY"] = "버전 정보 복사",
         ["BENCH_RESULTS_TAB"] = "측정 결과",
         ["BENCH_CAPTURE_TAB"] = "화면 비교",
+        ["COMPARE_TITLE"] = "옵션 비교",
+        ["COMPARE_INFO"] =
+            "옵션이 드러나는 실제 카드·전투 효과·상점 장면을 자동으로 그려 캡처합니다. 완료하면 웹 비교 화면이 열립니다. 원본 픽셀 크기로 확대하고 같은 위치를 나란히 비교할 수 있습니다. 테스트 중에는 화면을 조작하지 마세요. 기존 벤치 결과와 게임 저장 파일은 유지됩니다.",
+        ["COMPARE_START"] = "비교 화면 새로 만들기",
+        ["COMPARE_OPEN"] = "저장된 비교 열기",
+        ["COMPARE_OPEN_FAILED"] = "비교 페이지를 열 수 없습니다.",
+        ["COMPARE_CAPTURE"] = "비교 화면 저장 중",
         ["BENCH_SCENE_CARDS"] = "카드",
         ["BENCH_SCENE_GEOMETRY"] = "도형",
         ["BENCH_SCENE_EFFECTS"] = "화면 효과",
@@ -73,7 +80,7 @@ public static class Localization
         ["GRAPHICS_PRESET_BATTERY"] = "절전",
         ["GRAPHICS_PRESET_CUSTOM"] = "사용자 설정",
         ["GRAPHICS_PRESET_INFO"] =
-            "게임 기본값은 화질 옵션을 원래 설정으로 되돌립니다. 화질 우선은 윤곽선과 텍스처 품질을 높이고, 균형은 해상도와 효과를 일부 줄입니다. 절전은 해상도를 낮추고 흐림·왜곡·배경 입자를 끕니다.\n\n프레임 제한, 성능 표시, 셰이더 예열, 프레임 페이싱은 유지됩니다. 절전과 함께 FPS를 낮추면 그리는 횟수도 줄일 수 있습니다. 실험적인 카드 직접 그리기는 프리셋에서 사용하지 않습니다. 다음 시작부터 적용됩니다.",
+            "게임 기본값은 화질 옵션을 원래 설정으로 되돌립니다. 화질 우선은 윤곽선과 텍스처 품질을 높이고, 균형은 해상도를 줄입니다. 절전은 해상도를 낮추고 방사형 흐림을 끕니다.\n\n프레임 제한, 성능 표시, 셰이더 예열, 프레임 페이싱은 유지됩니다. 절전과 함께 FPS를 낮추면 그리는 횟수도 줄일 수 있습니다. 실험적인 카드 직접 그리기는 프리셋에서 사용하지 않습니다. 다음 시작부터 적용됩니다.",
         ["GRAPHICS_RESOLUTION_INFO"] =
             "화면을 그리는 내부 해상도입니다. 낮출수록 처리할 픽셀이 줄어 GPU 부하를 낮출 수 있지만, 카드와 글자도 흐려질 수 있습니다.\n\n화면 배치와 터치 좌표는 유지됩니다. 다음 시작부터 적용됩니다.",
         ["GRAPHICS_MSAA_INFO"] =
@@ -85,7 +92,7 @@ public static class Localization
         ["GRAPHICS_CARD_COMPOSITION_INFO"] =
             "원본은 게임의 카드 초상화 합성 방식을 유지합니다. 직접 그리기는 일반 카드의 중간 합성 단계를 줄이는 실험 옵션입니다. 별도 마스크가 필요한 카드는 원본 합성을 유지합니다.\n\n그림이나 효과가 이상하면 원본을 사용하세요. 다음 시작부터 적용됩니다.",
         ["GRAPHICS_RADIAL_BLUR_INFO"] =
-            "특정 효과에서 화면을 방사형으로 흐리게 만드는 처리입니다. 낮음은 샘플 수를 줄이고, 끄기는 해당 흐림 처리와 화면 복사를 생략합니다. 효과가 나타나는 순간에만 차이가 납니다.\n\n다음 시작부터 적용됩니다.",
+            "특정 효과에서 화면을 방사형으로 흐리게 만드는 처리입니다. 끄기는 해당 흐림 처리와 화면 복사를 생략합니다. 효과가 나타나는 순간에만 차이가 납니다.\n\n다음 시작부터 적용됩니다.",
         ["GRAPHICS_DISTORTION_INFO"] =
             "화면 전체를 읽어 흔들거나 굴절시키는 일부 효과를 표시합니다. 끄면 해당 효과를 숨겨 관련 렌더 작업을 줄일 수 있습니다. 모든 애니메이션이나 화면 흔들기를 끄지는 않습니다.\n\n다음 시작부터 적용됩니다.",
         ["GRAPHICS_PARTICLES_INFO"] =
@@ -218,6 +225,13 @@ public static class Localization
         ["VERSION_COPY"] = "Copy version information",
         ["BENCH_RESULTS_TAB"] = "Results",
         ["BENCH_CAPTURE_TAB"] = "Visual comparison",
+        ["COMPARE_TITLE"] = "Compare graphics options",
+        ["COMPARE_INFO"] =
+            "Automatically renders and captures actual cards, combat effects and merchant scenes where options are visible. A web comparison page opens when complete, with native pixel zoom and synchronized side-by-side views. Leave the screen untouched during capture. Existing benchmark results and game saves are preserved.",
+        ["COMPARE_START"] = "Create new comparison captures",
+        ["COMPARE_OPEN"] = "Open saved comparison",
+        ["COMPARE_OPEN_FAILED"] = "Could not open comparison page.",
+        ["COMPARE_CAPTURE"] = "Saving comparison captures",
         ["BENCH_SCENE_CARDS"] = "Cards",
         ["BENCH_SCENE_GEOMETRY"] = "Geometry",
         ["BENCH_SCENE_EFFECTS"] = "Screen effects",
@@ -265,7 +279,7 @@ public static class Localization
         ["GRAPHICS_PRESET_BATTERY"] = "Power saving",
         ["GRAPHICS_PRESET_CUSTOM"] = "Custom",
         ["GRAPHICS_PRESET_INFO"] =
-            "Game default restores the original visual settings. Quality improves edge and texture quality. Balanced reduces resolution and some effects. Power saving lowers resolution and disables radial blur, screen distortion and background particles.\n\nFPS limit, performance overlay, shader warmup and frame pacing stay unchanged. Lower the FPS limit as well to draw fewer frames. Presets keep experimental direct card rendering off. Applies on the next game launch.",
+            "Game default restores the original visual settings. Quality improves edge and texture quality. Balanced reduces resolution. Power saving lowers resolution and disables radial blur.\n\nFPS limit, performance overlay, shader warmup and frame pacing stay unchanged. Lower the FPS limit as well to draw fewer frames. Presets keep experimental direct card rendering off. Applies on the next game launch.",
         ["GRAPHICS_RESOLUTION_INFO"] =
             "Controls the internal rendering resolution. Lower values reduce the pixels processed by the GPU, but cards and text can look softer.\n\nLayout and touch coordinates stay unchanged. Applies on the next game launch.",
         ["GRAPHICS_MSAA_INFO"] =
@@ -277,7 +291,7 @@ public static class Localization
         ["GRAPHICS_CARD_COMPOSITION_INFO"] =
             "Original keeps the game's portrait composition. Direct rendering is experimental and skips an intermediate composition step on ordinary cards. Cards that need a separate mask keep original composition.\n\nUse Original if artwork or effects look wrong. Applies on the next launch.",
         ["GRAPHICS_RADIAL_BLUR_INFO"] =
-            "A screen blur used by certain effects. Low reduces its sample count; Off skips that blur and its screen copy. It only matters while the effect is active.\n\nApplies on the next game launch.",
+            "A screen blur used by certain effects. Off skips that blur and its screen copy. It only matters while the effect is active.\n\nApplies on the next game launch.",
         ["GRAPHICS_DISTORTION_INFO"] =
             "Displays selected effects that read and distort the screen. Off hides those effects and can reduce their rendering work. It does not disable all animations or camera shake.\n\nApplies on the next game launch.",
         ["GRAPHICS_PARTICLES_INFO"] =

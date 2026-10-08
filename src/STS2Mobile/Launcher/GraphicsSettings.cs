@@ -22,7 +22,7 @@ public sealed class GraphicsSettings
 
     public int RenderScale = 100;
     public int Msaa = -1;
-    public int Hdr = -1;
+    public int Hdr;
     public int TextureFilter = -1;
     public bool DirectCardPortraits;
     public int RadialBlurSamples = 12;
@@ -84,20 +84,14 @@ public sealed class GraphicsSettings
             {
                 RenderScale = 85,
                 Msaa = 0,
-                Hdr = 0,
                 TextureFilter = 4,
-                RadialBlurSamples = 6,
-                BackgroundParticles = 50,
             },
             GraphicsPreset.Battery => new GraphicsSettings
             {
                 RenderScale = 75,
                 Msaa = 0,
-                Hdr = 0,
                 TextureFilter = 4,
                 RadialBlurSamples = 0,
-                ScreenDistortion = false,
-                BackgroundParticles = 0,
             },
             _ => throw new ArgumentOutOfRangeException(nameof(preset)),
         };
@@ -112,12 +106,9 @@ public sealed class GraphicsSettings
                 return settings;
             settings.RenderScale = ReadInt(config, "render_scale", 100, 50, 75, 85, 100);
             settings.Msaa = ReadInt(config, "msaa", -1, -1, 0, 2, 4, 8);
-            settings.Hdr = ReadInt(config, "hdr", -1, -1, 0, 1);
             settings.TextureFilter = ReadInt(config, "texture_filter", -1, -1, 1, 2, 4, 6);
             settings.DirectCardPortraits = ReadBool(config, "direct_card_portraits", false);
-            settings.RadialBlurSamples = ReadInt(config, "radial_blur_samples", 12, 0, 6, 12);
-            settings.ScreenDistortion = ReadBool(config, "screen_distortion", true);
-            settings.BackgroundParticles = ReadInt(config, "background_particles", 100, 0, 50, 100);
+            settings.RadialBlurSamples = ReadInt(config, "radial_blur_samples", 12, 0, 12);
             settings.ShaderWarmup = ReadBool(config, "shader_warmup", true);
             settings.FramePacing = ReadInt(config, "frame_pacing", -1, -2, -1, 0, 1, 2);
         }

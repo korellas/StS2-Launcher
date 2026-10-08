@@ -167,3 +167,47 @@ foreach (var group in pacing.GroupBy(x => x.Scene))
         );
 }
 Console.WriteLine("PASS controlled one-option comparisons and repeated baselines");
+var captureJob = new RenderBenchmarkData { CaptureOnly = true, Running = true };
+captureJob.Save(path);
+Check(
+    RenderBenchmarkData.Load(path).CaptureOnly,
+    "Capture job identity survives the automatic restart"
+);
+File.Delete(path);
+Check(captureJob.CanResume(-2), "Visual comparison resumes its isolated capture boot");
+captureJob.Phase = 1;
+Check(!captureJob.CanResume(0), "Visual comparison must not enter pacing phases");
+var comparisons = RenderBenchmarkCase.ComparisonCases().ToArray();
+Check(
+    comparisons.All(test =>
+        !test.Hdr && test.Distortion && test.Particles == 100 && test.Blur != 6
+    ),
+    "Removed settings must not be included in the visual comparison job"
+);
+Check(
+    comparisons
+        .Where(test => test.Scale != 100)
+        .Select(test => test.Scale)
+        .Distinct()
+        .OrderBy(x => x)
+        .SequenceEqual(new[] { 50, 75, 85 }),
+    "Capture every retained resolution choice"
+);
+foreach (var group in comparisons.GroupBy(test => test.Scene))
+{
+    Check(
+        group.First().Name == "baseline-start" && group.Last().Name == "baseline-end",
+        "Visual comparison retains paired same-scene baselines"
+    );
+    foreach (var test in group.Skip(1).SkipLast(1))
+        Check(
+            typeof(RenderBenchmarkCase)
+                .GetProperties()
+                .Where(property => property.Name != "Name" && property.Name != "Scene")
+                .Count(property =>
+                    !Equals(property.GetValue(group.First()), property.GetValue(test))
+                ) == 1,
+            "Visual comparison changes exactly one option"
+        );
+}
+Console.WriteLine("PASS isolated visual capture job and retained option coverage");

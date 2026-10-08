@@ -14,9 +14,17 @@ public sealed class RenderBenchmarkScreen : Control
 {
     private const double WarmupSeconds = 2;
     private const double SampleSeconds = 6;
-    private static string DataPath => Path.Combine(OS.GetDataDir(), "render-benchmark.json");
-    private static string CaptureDirectory =>
-        Path.Combine(OS.GetDataDir(), "render-benchmark-captures");
+    private static string BenchmarkDataPath =>
+        Path.Combine(OS.GetDataDir(), "render-benchmark.json");
+    private static string ComparisonDataPath =>
+        Path.Combine(OS.GetDataDir(), "render-comparison.json");
+    private readonly bool _comparison;
+    private string DataPath => _comparison ? ComparisonDataPath : BenchmarkDataPath;
+    private string CaptureDirectory =>
+        Path.Combine(
+            OS.GetDataDir(),
+            _comparison ? "render-comparison-captures" : "render-benchmark-captures"
+        );
     private readonly LauncherUI _owner;
     private readonly float _scale;
     private readonly VBoxContainer _panel;
@@ -52,7 +60,11 @@ public sealed class RenderBenchmarkScreen : Control
         int mode = app?.Call("getBenchmarkPacing").AsInt32() ?? -99;
         if (app != null && !app.Call("restoreBenchmarkConfig").AsBool())
             throw new IOException("Could not restore benchmark boot configuration");
-        var data = LoadData();
+        var comparison = LoadData(ComparisonDataPath);
+        var data =
+            comparison != null && (comparison.Running || comparison.ShowResults)
+                ? comparison
+                : LoadData(BenchmarkDataPath);
         if (data == null)
         {
             if (mode != -99)
@@ -64,7 +76,7 @@ public sealed class RenderBenchmarkScreen : Control
         }
         if (data.CanResume(mode))
         {
-            Open(owner, data, resume: true);
+            Open(owner, data, resume: true, comparison: data.CaptureOnly);
             return true;
         }
         if (data.Running)
@@ -72,7 +84,7 @@ public sealed class RenderBenchmarkScreen : Control
             data.Running = false;
             data.Status = "Interrupted; completed cases preserved";
             data.ShowResults = true;
-            data.Save(DataPath);
+            data.Save(data.CaptureOnly ? ComparisonDataPath : BenchmarkDataPath);
         }
         if (mode != -99)
         {
@@ -82,19 +94,22 @@ public sealed class RenderBenchmarkScreen : Control
         if (data.ShowResults)
         {
             data.ShowResults = false;
-            data.Save(DataPath);
-            Open(owner, data);
+            data.Save(data.CaptureOnly ? ComparisonDataPath : BenchmarkDataPath);
+            Open(owner, data, comparison: data.CaptureOnly);
         }
         return false;
     }
 
-    public static void Open(LauncherUI owner) => Open(owner, LoadData());
+    public static void Open(LauncherUI owner) => Open(owner, LoadData(BenchmarkDataPath));
 
-    private static RenderBenchmarkData LoadData()
+    public static void OpenComparison(LauncherUI owner) =>
+        Open(owner, LoadData(ComparisonDataPath), comparison: true);
+
+    private static RenderBenchmarkData LoadData(string path)
     {
         try
         {
-            return RenderBenchmarkData.Load(DataPath);
+            return RenderBenchmarkData.Load(path);
         }
         catch (Exception ex)
         {
@@ -103,9 +118,14 @@ public sealed class RenderBenchmarkScreen : Control
         }
     }
 
-    private static void Open(LauncherUI owner, RenderBenchmarkData data, bool resume = false)
+    private static void Open(
+        LauncherUI owner,
+        RenderBenchmarkData data,
+        bool resume = false,
+        bool comparison = false
+    )
     {
-        var screen = new RenderBenchmarkScreen(owner, data);
+        var screen = new RenderBenchmarkScreen(owner, data, comparison);
         owner.GetTree().Root.AddChild(screen);
         owner.Hide();
         var window = screen.GetTree().Root;
@@ -116,10 +136,13 @@ public sealed class RenderBenchmarkScreen : Control
         };
         if (resume)
             Callable.From(screen.RunPhase).CallDeferred();
+        else if (comparison && data?.Status == "Completed")
+            Callable.From(screen.OpenComparisonPage).CallDeferred();
     }
 
-    private RenderBenchmarkScreen(LauncherUI owner, RenderBenchmarkData data)
+    private RenderBenchmarkScreen(LauncherUI owner, RenderBenchmarkData data, bool comparison)
     {
+        _comparison = comparison;
         _owner = owner;
         _app = LauncherModel.GetGodotApp();
         _data = data;
@@ -161,10 +184,20 @@ public sealed class RenderBenchmarkScreen : Control
         _panel = new VBoxContainer();
         _panel.AddThemeConstantOverride("separation", (int)(8 * _scale));
         frame.AddChild(_panel);
-        var title = new StyledLabel(Tr("BENCH_TITLE"), _scale, 24, HorizontalAlignment.Left);
+        var title = new StyledLabel(
+            Tr(_comparison ? "COMPARE_TITLE" : "BENCH_TITLE"),
+            _scale,
+            24,
+            HorizontalAlignment.Left
+        );
         title.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         _panel.AddChild(title);
-        var description = new StyledLabel(Tr("BENCH_INFO"), _scale, 13, HorizontalAlignment.Left)
+        var description = new StyledLabel(
+            Tr(_comparison ? "COMPARE_INFO" : "BENCH_INFO"),
+            _scale,
+            13,
+            HorizontalAlignment.Left
+        )
         {
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         };
@@ -243,18 +276,21 @@ public sealed class RenderBenchmarkScreen : Control
         var buttons = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         buttons.AddThemeConstantOverride("separation", (int)(20 * _scale));
         _panel.AddChild(buttons);
-        _start = Button(buttons, "BENCH_START", StartSuite);
+        _start = Button(buttons, _comparison ? "COMPARE_START" : "BENCH_START", StartSuite);
         _start.AddThemeColorOverride("font_color", LauncherTheme.Gold);
         _cancel = Button(buttons, "BENCH_CANCEL", Cancel);
-        Button(
-            buttons,
-            "BENCH_COPY",
-            () =>
-            {
-                DisplayServer.ClipboardSet(_data?.Report() ?? Tr("BENCH_NO_RESULT"));
-                _status.Text = Tr("BENCH_COPIED");
-            }
-        );
+        if (_comparison)
+            Button(buttons, "COMPARE_OPEN", OpenComparisonPage);
+        if (!_comparison)
+            Button(
+                buttons,
+                "BENCH_COPY",
+                () =>
+                {
+                    DisplayServer.ClipboardSet(_data?.Report() ?? Tr("BENCH_NO_RESULT"));
+                    _status.Text = Tr("BENCH_COPIED");
+                }
+            );
         _close = Button(buttons, "BENCH_CLOSE", Close);
         _cancel.Visible = false;
         ShowResults();
@@ -281,6 +317,7 @@ public sealed class RenderBenchmarkScreen : Control
             _data = new RenderBenchmarkData
             {
                 Running = true,
+                CaptureOnly = _comparison,
                 Device = OS.GetModelName(),
                 Engine = Godot.Engine.GetVersionInfo()["string"].AsString(),
                 App = LauncherModel.GetGodotApp().Call("getVersionName").AsString(),
@@ -361,11 +398,14 @@ public sealed class RenderBenchmarkScreen : Control
             RenderingServer.ViewportSetMeasureRenderTime(_viewport.GetViewportRid(), true);
             DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
             var tests = new List<RenderBenchmarkCase>();
-            if (_data.Phase == 0)
+            if (_comparison)
+                tests.AddRange(RenderBenchmarkCase.ComparisonCases());
+            else if (_data.Phase == 0)
                 tests.AddRange(RenderBenchmarkCase.QualityCases());
-            tests.AddRange(
-                RenderBenchmarkCase.PacingCases(expected, LauncherModel.FrameLimitOptions)
-            );
+            if (!_comparison)
+                tests.AddRange(
+                    RenderBenchmarkCase.PacingCases(expected, LauncherModel.FrameLimitOptions)
+                );
             for (int i = 0; i < tests.Count; i++)
             {
                 CheckCancellation();
@@ -385,32 +425,58 @@ public sealed class RenderBenchmarkScreen : Control
                             LaunchToSceneMs = _app.Call("getProcessElapsedMs").AsInt64(),
                         }
                     );
-                    _data.Save(DataPath);
+                    SaveData();
                 }
                 _status.Text =
-                    $"{Tr("BENCH_WARM")} {_data.Phase + 1}/{RenderBenchmarkData.PacingModes.Length} · {i + 1}/{tests.Count} · {test.Scene}: {test.Name}";
+                    $"{Tr("BENCH_WARM")} {_data.Phase + 1}/{(_comparison ? 1 : RenderBenchmarkData.PacingModes.Length)} · {i + 1}/{tests.Count} · {test.Scene}: {test.Name}";
                 await Sample(WarmupSeconds, record: false);
-                // Capture during the game's beam sequence, outside the timed window.
-                await Sample(.75, record: false);
+                if (_comparison)
+                {
+                    _fixture.Animate();
+                    await Sample(.1, record: false);
+                }
+                else
+                    // Capture during the game's beam sequence, outside the timed window.
+                    await Sample(.75, record: false);
                 await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
                 Directory.CreateDirectory(CaptureDirectory);
                 string screenshot = Path.Combine(
                     CaptureDirectory,
                     $"case-{_data.Results.Count:D3}.png"
                 );
-                using (var image = GetViewport().GetTexture().GetImage())
+                _status.Visible = false;
+                _cancel.Visible = false;
+                try
                 {
+                    await ToSignal(
+                        RenderingServer.Singleton,
+                        RenderingServer.SignalName.FramePostDraw
+                    );
+                    using var image = GetViewport().GetTexture().GetImage();
                     if (image.GetFormat() != Image.Format.Rgba8)
                         image.Convert(Image.Format.Rgba8);
+                    if (_viewport.UseHdr2D)
+                        image.LinearToSrgb();
+                    if (_comparison && image.GetSize() != physical)
+                        // Match RendererCompositorRD's nearest-sampled screen blit.
+                        image.Resize(physical.X, physical.Y, Image.Interpolation.Nearest);
                     if (image.SavePng(screenshot) != Error.Ok)
-                        screenshot = null;
+                        throw new IOException("Could not save comparison screenshot");
                 }
-                await Sample(.5, record: false);
+                finally
+                {
+                    _status.Visible = true;
+                    _cancel.Visible = true;
+                }
+                if (!_comparison)
+                    await Sample(.5, record: false);
                 _status.Text =
-                    $"{Tr("BENCH_MEASURE")} {_data.Phase + 1}/{RenderBenchmarkData.PacingModes.Length} · {i + 1}/{tests.Count} · {test.Scene}: {test.Name}";
+                    $"{Tr(_comparison ? "COMPARE_CAPTURE" : "BENCH_MEASURE")} {_data.Phase + 1}/{(_comparison ? 1 : RenderBenchmarkData.PacingModes.Length)} · {i + 1}/{tests.Count} · {test.Scene}: {test.Name}";
                 string thermalStart = Thermal();
                 BenchmarkMetrics metrics;
-                if (test.Scene == "Transitions")
+                if (_comparison)
+                    metrics = new BenchmarkMetrics();
+                else if (test.Scene == "Transitions")
                 {
                     var route = _fixture.RunTransitions();
                     try
@@ -425,7 +491,7 @@ public sealed class RenderBenchmarkScreen : Control
                 else
                     metrics = await Sample(SampleSeconds, record: true);
                 CheckCancellation();
-                if (metrics.Frames == 0)
+                if (!_comparison && metrics.Frames == 0)
                     throw new InvalidOperationException("No rendered frames measured");
                 _data.Results.Add(
                     new BenchmarkResult
@@ -441,16 +507,16 @@ public sealed class RenderBenchmarkScreen : Control
                         LoadTimings = _fixture.LoadTimings.ToList(),
                     }
                 );
-                _data.Save(DataPath);
+                SaveData();
             }
             _data.Phase++;
-            if (_data.Phase >= RenderBenchmarkData.PacingModes.Length)
+            if (_data.Phase >= (_comparison ? 1 : RenderBenchmarkData.PacingModes.Length))
             {
                 _data.Running = false;
                 _data.ShowResults = true;
                 _data.Status = "Completed";
             }
-            _data.Save(DataPath);
+            SaveData();
         }
         catch (Exception ex)
         {
@@ -462,7 +528,7 @@ public sealed class RenderBenchmarkScreen : Control
                     : $"Failed: {ex.Message}";
             try
             {
-                _data.Save(DataPath);
+                SaveData();
             }
             catch (Exception saveError)
             {
@@ -487,7 +553,7 @@ public sealed class RenderBenchmarkScreen : Control
                 _data.Status = $"Failed during combat cleanup: {ex.Message}";
                 try
                 {
-                    _data.Save(DataPath);
+                    SaveData();
                 }
                 catch (Exception saveError)
                 {
@@ -529,7 +595,8 @@ public sealed class RenderBenchmarkScreen : Control
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             CheckCancellation();
-            _fixture.Animate();
+            if (!_comparison)
+                _fixture.Animate();
             await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
             CheckCancellation();
             ulong now = Time.GetTicksUsec();
@@ -551,6 +618,11 @@ public sealed class RenderBenchmarkScreen : Control
         }
         CheckForeground();
         return samples.Summarize();
+    }
+
+    private void SaveData()
+    {
+        _data.Save(DataPath);
     }
 
     private void CheckTestState()
@@ -601,12 +673,29 @@ public sealed class RenderBenchmarkScreen : Control
         QueueFree();
     }
 
+    private void OpenComparisonPage()
+    {
+        if (_running || _restarting)
+            return;
+        try
+        {
+            if (_data == null || _data.Results.Count == 0)
+                throw new InvalidOperationException(Tr("BENCH_NO_CAPTURE"));
+            string path = RenderComparisonPage.Write(_data);
+            _app.Call("showRenderComparison", path);
+        }
+        catch (Exception ex)
+        {
+            _status.Text = Tr("COMPARE_OPEN_FAILED") + " " + ex.Message;
+        }
+    }
+
     private void ShowResults()
     {
         _status.Text = _data?.Status switch
         {
             "Completed" => Tr("BENCH_COMPLETED"),
-            "Running" => Tr("BENCH_MEASURE"),
+            "Running" => Tr(_comparison ? "COMPARE_CAPTURE" : "BENCH_MEASURE"),
             "Cancelled; completed cases preserved" => Tr("BENCH_CANCELLED"),
             "Interrupted; completed cases preserved" => Tr("BENCH_INTERRUPTED"),
             null or "Ready" => Tr("BENCH_READY"),
@@ -614,6 +703,12 @@ public sealed class RenderBenchmarkScreen : Control
         };
         if (_data != null && _data.Version < RenderBenchmarkData.FormatVersion)
             AddResultText(Tr("BENCH_LEGACY_RESULT"), 14, LauncherTheme.Gold);
+        if (_comparison)
+        {
+            AddResultText(Tr("COMPARE_INFO"), 14, LauncherTheme.Cream);
+            ChangeCapture(0);
+            return;
+        }
         AddResultText(Tr("BENCH_RESULTS_HELP"), 12, LauncherTheme.Dim);
         foreach (var boot in _data?.Boots ?? new())
             AddResultText(

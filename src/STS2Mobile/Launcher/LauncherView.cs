@@ -125,6 +125,8 @@ public class LauncherView
         var graphics = new GraphicsSection(scale, Actions.GraphicsGroup) { Visible = false };
         graphics.HelpRequested += ShowGraphicsHelp;
         graphics.BenchmarkRequested += () => RenderBenchmarkScreen.Open((LauncherUI)parent);
+        graphics.ComparisonRequested += () =>
+            RenderBenchmarkScreen.OpenComparison((LauncherUI)parent);
         Actions.GraphicsHelpRequested += ShowGraphicsHelp;
         settingsOverlay.Content.AddChild(graphics);
         foreach (Node child in settingsOverlay.Header.GetChildren())

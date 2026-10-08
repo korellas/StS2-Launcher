@@ -21,4 +21,8 @@
   <ItemGroup>
     <PackageReference Include="SteamKit2" Version="3.4.0" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Launcher/RenderComparison.html" />
+    <EmbeddedResource Include="Launcher/RenderComparison.js" />
+  </ItemGroup>
 </Project>

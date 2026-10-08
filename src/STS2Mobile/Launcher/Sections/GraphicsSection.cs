@@ -11,6 +11,7 @@ public class GraphicsSection : VBoxContainer
 {
     public event Action<string, string> HelpRequested;
     public event Action BenchmarkRequested;
+    public event Action ComparisonRequested;
     private readonly List<Action> _refreshChoices = new();
     private readonly GraphicsSettings _settings;
     private readonly StyledLabel _status;
@@ -62,12 +63,6 @@ public class GraphicsSection : VBoxContainer
             value => _settings.Msaa = value
         );
         AddChoices(
-            "GRAPHICS_HDR",
-            () => _settings.Hdr,
-            new[] { (-1, Tr("GRAPHICS_GAME_DEFAULT")), (0, Tr("STATE_OFF")), (1, Tr("STATE_ON")) },
-            value => _settings.Hdr = value
-        );
-        AddChoices(
             "GRAPHICS_FILTER",
             () => _settings.TextureFilter,
             new[]
@@ -89,25 +84,8 @@ public class GraphicsSection : VBoxContainer
         AddChoices(
             "GRAPHICS_RADIAL_BLUR",
             () => _settings.RadialBlurSamples,
-            new[]
-            {
-                (12, Tr("GRAPHICS_ORIGINAL")),
-                (6, Tr("GRAPHICS_REDUCED")),
-                (0, Tr("STATE_OFF")),
-            },
+            new[] { (12, Tr("GRAPHICS_ORIGINAL")), (0, Tr("STATE_OFF")) },
             value => _settings.RadialBlurSamples = value
-        );
-        AddChoices(
-            "GRAPHICS_DISTORTION",
-            () => _settings.ScreenDistortion ? 1 : 0,
-            new[] { (1, Tr("STATE_ON")), (0, Tr("STATE_OFF")) },
-            value => _settings.ScreenDistortion = value == 1
-        );
-        AddChoices(
-            "GRAPHICS_PARTICLES",
-            () => _settings.BackgroundParticles,
-            new[] { (100, "100%"), (50, "50%"), (0, Tr("STATE_OFF")) },
-            value => _settings.BackgroundParticles = value
         );
         AddChoices(
             "GRAPHICS_WARMUP",
@@ -151,6 +129,9 @@ public class GraphicsSection : VBoxContainer
         _status.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         AddChild(_status);
         AddChild(performanceControls);
+        var comparison = new GameMenuButton(Tr("COMPARE_TITLE"), scale, fontSize: 16);
+        comparison.Pressed += () => ComparisonRequested?.Invoke();
+        AddChild(comparison);
         var benchmark = new GameMenuButton(Tr("BENCH_TITLE"), scale, fontSize: 16);
         benchmark.Pressed += () => BenchmarkRequested?.Invoke();
         AddChild(benchmark);
@@ -204,7 +185,7 @@ public class GraphicsSection : VBoxContainer
             }
             foreach (var refresh in _refreshChoices)
                 refresh();
-            if (before.Msaa != _settings.Msaa || before.Hdr != _settings.Hdr)
+            if (before.Msaa != _settings.Msaa)
             {
                 try
                 {
