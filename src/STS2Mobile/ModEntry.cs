@@ -83,6 +83,7 @@ public static class ModEntry
         ModelDbInitPatch.Apply(_harmony);
         PlatformPatches.Apply(_harmony);
         SettingsPatches.Apply(_harmony);
+        GraphicsPatches.Apply(_harmony);
         FontSubstitutionPatches.Apply(_harmony);
         UiScalePatches.Apply(_harmony);
         MobileLayoutPatches.Apply(_harmony);

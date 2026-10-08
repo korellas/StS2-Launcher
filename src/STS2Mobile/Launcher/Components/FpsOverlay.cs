@@ -74,22 +74,31 @@ public class FpsOverlay : CanvasLayer
     private double _sampleTimer;
     private int _framesSinceSample;
 
-    // Roughly four seconds at 60 fps; long enough to catch a hitch, short
-    // enough that one recovers quickly.
-    private readonly float[] _frameTimes = new float[240];
-    private int _frameTimeCount;
-    private int _frameTimeHead;
-    private float _fpsSum;
-    private int _fpsSamples;
+    private static FpsOverlay _instance;
 
     public static FpsOverlay Show(SceneTree tree)
     {
+        Close();
         var overlay = new FpsOverlay { Layer = 128 };
         overlay.ProcessMode = ProcessModeEnum.Always;
         overlay.Build();
         tree.Root.AddChild(overlay);
         overlay.Attach(tree);
+        _instance = overlay;
         return overlay;
+    }
+
+    public static void Close()
+    {
+        if (!GodotObject.IsInstanceValid(_instance))
+        {
+            _instance = null;
+            return;
+        }
+        var overlay = _instance;
+        overlay.Detach();
+        overlay.Visible = false;
+        overlay.QueueFree();
     }
 
     private static int RowCount() =>
@@ -203,6 +212,8 @@ public class FpsOverlay : CanvasLayer
             return;
         _tree.ProcessFrame -= OnProcessFrame;
         _tree = null;
+        if (ReferenceEquals(_instance, this))
+            _instance = null;
     }
 
     private void OnProcessFrame()
@@ -211,15 +222,14 @@ public class FpsOverlay : CanvasLayer
         double delta = (now - _lastFrameUsec) / 1_000_000.0;
         _lastFrameUsec = now;
 
-        _framesSinceSample++;
-
-        if (delta > 0)
+        if (_tree.Paused || !Visible)
         {
-            _frameTimes[_frameTimeHead] = (float)delta;
-            _frameTimeHead = (_frameTimeHead + 1) % _frameTimes.Length;
-            if (_frameTimeCount < _frameTimes.Length)
-                _frameTimeCount++;
+            _sampleTimer = 0;
+            _framesSinceSample = 0;
+            return;
         }
+
+        _framesSinceSample++;
 
         _sampleTimer += delta;
         if (_sampleTimer < SampleInterval)
@@ -233,23 +243,17 @@ public class FpsOverlay : CanvasLayer
     private void Sample(double elapsed)
     {
         float fps = (float)(_framesSinceSample / elapsed);
-        _fpsSum += fps;
-        _fpsSamples++;
-
-        float average = _fpsSum / _fpsSamples;
         _fpsRow.Push(fps, $"{fps:F0}");
 
         if (_cpuRow != null)
         {
             float? cpu = _stats.ReadCpuPercent(elapsed);
-            float? ram = _stats.ReadRamMegabytes();
             _cpuRow.Push(cpu, cpu is float c ? $"{c:F0} %" : null);
         }
 
         if (_gpuRow != null)
         {
             float? gpu = _stats.ReadGpuPercent();
-            float vram = SystemStatsReader.VideoMemoryMegabytes();
             _gpuRow.Push(gpu, gpu is float g ? $"{g:F0} %" : null);
         }
 
@@ -258,49 +262,6 @@ public class FpsOverlay : CanvasLayer
             float? temp = _stats.ReadTemperatureCelsius();
             _tempRow.Push(temp, temp is float t ? $"{t:F1} °C" : null);
         }
-    }
-
-    // Longest frame in the recent window, as fps. This is where stutter shows up
-    // even when the average looks healthy.
-    //
-    // The window is a ring buffer rather than a grow-then-reset list: the old
-    // version kept every sample until it filled, so a single multi-second frame
-    // pinned the reading for as long as it took to refill. Long frames are still
-    // counted — a stall is a real reading — they just age out of the window.
-    private float WorstFps()
-    {
-        float worst = 0f;
-        for (int i = 0; i < _frameTimeCount; i++)
-        {
-            if (_frameTimes[i] > worst)
-                worst = _frameTimes[i];
-        }
-
-        return worst > 0f ? 1f / worst : 0f;
-    }
-
-    private string _thermalStatus = "";
-    private int _thermalPollCounter;
-
-    // Cheap to read, but it crosses into Java, so poll it once a second.
-    private string ThermalStatus()
-    {
-        if (_thermalPollCounter++ % SampleHz != 0)
-            return _thermalStatus;
-
-        try
-        {
-            var jcw = Engine.GetSingleton("JavaClassWrapper");
-            var wrapper = (GodotObject)jcw.Call("wrap", "com.game.sts2launcher.GodotApp");
-            var godotApp = (GodotObject)wrapper.Call("getInstance");
-            _thermalStatus = (string)godotApp.Call("getThermalStatus");
-        }
-        catch
-        {
-            _thermalStatus = "";
-        }
-
-        return _thermalStatus;
     }
 
     // One "label · value · sparkline" line, with its own fixed axis.

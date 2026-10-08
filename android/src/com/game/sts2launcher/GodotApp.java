@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import android.util.Log;
+import android.util.AtomicFile;
 
 import androidx.activity.EdgeToEdge;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -94,7 +95,11 @@ public class GodotApp extends GodotActivity {
 
 	private static GodotApp instance;
 	private WifiManager.MulticastLock multicastLock;
+	private boolean lanDiscoveryActive;
+	private volatile boolean activityResumed;
+	private volatile int activityPauseCount;
 	private String gameDir;
+	private int benchmarkPacing = -99;
 	// WebView shown over the Godot SurfaceView for in-app article viewing
 	// (Steam community announcements, etc.). Null when no overlay is active.
 	private FrameLayout webViewOverlay;
@@ -121,6 +126,9 @@ public class GodotApp extends GodotActivity {
 	public void onCreate(Bundle savedInstanceState) {
 		instance = this;
 		gameDir = new File(getFilesDir(), "game").getAbsolutePath();
+		if (!restoreBenchmarkConfig()) {
+			throw new IllegalStateException("Could not restore benchmark configuration");
+		}
 
 		SplashScreen splash = SplashScreen.installSplashScreen(this);
 		// Dismiss as soon as Android is ready: the activity's windowBackground is
@@ -143,16 +151,33 @@ public class GodotApp extends GodotActivity {
 		extractAssetFile("google-translate-attribution.png", "google-translate-attribution.png");
 
 		super.onCreate(savedInstanceState);
+	}
 
-		// Android WiFi power saving drops broadcast packets without a MulticastLock.
+	public void setLanDiscoveryActive(boolean active) {
+		runOnUiThread(() -> {
+			lanDiscoveryActive = active;
+			updateMulticastLock();
+		});
+	}
+
+	private void updateMulticastLock() {
 		try {
-			WifiManager wifiMgr = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-			multicastLock = wifiMgr.createMulticastLock("sts2_lan_discovery");
-			multicastLock.setReferenceCounted(false);
-			multicastLock.acquire();
-			Log.i(TAG, "WiFi MulticastLock acquired for LAN discovery");
+			if (lanDiscoveryActive && activityResumed) {
+				if (multicastLock == null) {
+					WifiManager wifiMgr = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+					multicastLock = wifiMgr.createMulticastLock("sts2_lan_discovery");
+					multicastLock.setReferenceCounted(false);
+				}
+				if (!multicastLock.isHeld()) {
+					multicastLock.acquire();
+					Log.i(TAG, "WiFi MulticastLock acquired for LAN discovery");
+				}
+			} else if (multicastLock != null && multicastLock.isHeld()) {
+				multicastLock.release();
+				Log.i(TAG, "WiFi MulticastLock released");
+			}
 		} catch (Exception e) {
-			Log.w(TAG, "Failed to acquire MulticastLock", e);
+			Log.w(TAG, "Failed to update MulticastLock", e);
 		}
 	}
 
@@ -189,19 +214,11 @@ public class GodotApp extends GodotActivity {
 	}
 
 	// Copies .NET BCL from APK assets and game assemblies from the download
-	// directory
-	// into the location Godot expects. Skips if already done unless the APK version
-	// changed.
+	// directory into the location Godot expects. Game updates are independent of
+	// APK updates, so downloaded assemblies are checked on every start.
 	private void setupAssemblies() {
 		File srcDir = findAssembliesDir();
 		File destDir = new File(getFilesDir(), ".godot/mono/publish/arm64");
-
-		File patcherMarker = new File(destDir, "STS2Mobile.dll");
-		File sts2Marker = new File(destDir, "sts2.dll");
-		if (sts2Marker.exists() && patcherMarker.exists() && !versionChanged) {
-			Log.i(TAG, "Assemblies already set up at: " + destDir.getAbsolutePath());
-			return;
-		}
 
 		if (versionChanged) {
 			Log.i(TAG, "New version detected, re-copying all assemblies");
@@ -216,6 +233,9 @@ public class GodotApp extends GodotActivity {
 			if (bclFiles != null) {
 				int count = 0;
 				for (String name : bclFiles) {
+					if (!versionChanged && new File(destDir, name).exists()) {
+						continue;
+					}
 					try (InputStream in = getAssets().open("dotnet_bcl/" + name);
 							OutputStream out = new FileOutputStream(new File(destDir, name))) {
 						byte[] buf = new byte[8192];
@@ -373,6 +393,7 @@ public class GodotApp extends GodotActivity {
 		List<String> commands = new ArrayList<>(super.getCommandLine());
 		File pckFile = new File(gameDir, PCK_FILE);
 		if (pckFile.exists()) {
+			prepareBenchmarkConfig();
 			commands.add("--main-pack");
 			commands.add(pckFile.getAbsolutePath());
 			Log.i(TAG, "Loading PCK from: " + pckFile.getAbsolutePath());
@@ -411,7 +432,17 @@ public class GodotApp extends GodotActivity {
 	@Override
 	public void onResume() {
 		super.onResume();
+		activityResumed = true;
+		updateMulticastLock();
 		updateWindowAppearance.run();
+	}
+
+	@Override
+	public void onPause() {
+		activityPauseCount++;
+		activityResumed = false;
+		updateMulticastLock();
+		super.onPause();
 	}
 
 	@Override
@@ -425,10 +456,9 @@ public class GodotApp extends GodotActivity {
 
 	@Override
 	protected void onDestroy() {
-		if (multicastLock != null && multicastLock.isHeld()) {
-			multicastLock.release();
-			Log.i(TAG, "WiFi MulticastLock released");
-		}
+		lanDiscoveryActive = false;
+		activityResumed = false;
+		updateMulticastLock();
 		FMOD.close();
 		super.onDestroy();
 	}
@@ -675,6 +705,90 @@ public class GodotApp extends GodotActivity {
 		// exit behind it lets the lifecycle finish first. The exit is still needed:
 		// Godot's process does not reliably unwind once the activity is gone.
 		new Handler(Looper.getMainLooper()).post(() -> Runtime.getRuntime().exit(0));
+	}
+
+	// One-shot test configuration exists only while Godot reads its boot settings.
+	// The launcher restores it before showing controls; onCreate also recovers a crash.
+	public void restartForBenchmark(int pacing) {
+		if (pacing != -2 && pacing != 0 && pacing != 1 && pacing != 2) {
+			throw new IllegalArgumentException("Invalid benchmark pacing mode");
+		}
+		if (!getSharedPreferences("render_benchmark", MODE_PRIVATE).edit()
+				.putInt("next_pacing", pacing).commit()) {
+			throw new IllegalStateException("Could not schedule benchmark boot");
+		}
+		restartApp();
+	}
+
+	public int getBenchmarkPacing() { return benchmarkPacing; }
+	public boolean isActivityResumed() { return activityResumed; }
+	public int getActivityPauseCount() { return activityPauseCount; }
+
+	private AtomicFile benchmarkBackup() {
+		return new AtomicFile(new File(getFilesDir(), "benchmark-override.backup"));
+	}
+
+	private static void writeAtomic(AtomicFile file, byte[] bytes) throws IOException {
+		FileOutputStream out = file.startWrite();
+		try {
+			out.write(bytes);
+			file.finishWrite(out);
+		} catch (IOException error) {
+			file.failWrite(out);
+			throw error;
+		}
+	}
+
+	public boolean restoreBenchmarkConfig() {
+		AtomicFile backup = benchmarkBackup();
+		if (!backup.getBaseFile().exists()
+				&& !new File(backup.getBaseFile().getPath() + ".bak").exists()) return true;
+		try {
+			byte[] bytes = backup.readFully();
+			if (bytes.length == 0) throw new IOException("Empty benchmark backup");
+			AtomicFile config = new AtomicFile(new File(gameDir, "override.cfg"));
+			if (bytes[0] == 1) {
+				writeAtomic(config, Arrays.copyOfRange(bytes, 1, bytes.length));
+			} else if (bytes[0] == 0) {
+				config.delete();
+			} else {
+				throw new IOException("Invalid benchmark backup");
+			}
+			backup.delete();
+			return true;
+		} catch (IOException error) {
+			Log.e(TAG, "Could not restore benchmark config", error);
+			return false;
+		}
+	}
+
+	private void prepareBenchmarkConfig() {
+		SharedPreferences state = getSharedPreferences("render_benchmark", MODE_PRIVATE);
+		if (!state.contains("next_pacing")) return;
+		int mode = state.getInt("next_pacing", -99);
+		// Consume before modifying anything: a failed boot never loops automatically.
+		if (!state.edit().remove("next_pacing").commit()) return;
+		if (mode != -2 && mode != 0 && mode != 1 && mode != 2) return;
+		try {
+			AtomicFile config = new AtomicFile(new File(gameDir, "override.cfg"));
+			boolean existed = config.getBaseFile().exists()
+					|| new File(config.getBaseFile().getPath() + ".bak").exists();
+			byte[] original = existed ? config.readFully() : new byte[0];
+			byte[] backup = new byte[original.length + 1];
+			backup[0] = (byte) (existed ? 1 : 0);
+			System.arraycopy(original, 0, backup, 1, original.length);
+			writeAtomic(benchmarkBackup(), backup);
+			String overrides = new String(original, StandardCharsets.UTF_8)
+					+ "\n[display]\nwindow/frame_pacing/android/enable_frame_pacing="
+					+ (mode != -2 ? "true" : "false")
+					+ "\nwindow/frame_pacing/android/swappy_mode=" + Math.max(0, mode) + "\n";
+			writeAtomic(config, overrides.getBytes(StandardCharsets.UTF_8));
+			benchmarkPacing = mode;
+			Log.i(TAG, "Benchmark cold boot pacing=" + mode);
+		} catch (IOException error) {
+			Log.e(TAG, "Could not prepare benchmark boot", error);
+			if (!restoreBenchmarkConfig()) throw new IllegalStateException(error);
+		}
 	}
 
 	public void restartApp() {

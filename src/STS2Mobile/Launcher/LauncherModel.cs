@@ -25,6 +25,7 @@ public class LauncherModel : IDisposable
     private TaskCompletionSource<string> _codeTcs;
     private SessionState _state = SessionState.Disconnected;
     private string _failReason;
+    private bool _restartRequired;
 
     public volatile bool OfflineMode;
     public volatile bool ConnectionResolved;
@@ -229,6 +230,7 @@ public class LauncherModel : IDisposable
         try
         {
             await Task.Run(() => _downloader.DownloadAsync(_downloadCts.Token));
+            _restartRequired = true;
             DownloadCompleted?.Invoke();
         }
         catch (OperationCanceledException)
@@ -286,7 +288,7 @@ public class LauncherModel : IDisposable
             LauncherPatches.SavedRefreshToken = _credentialStore.RefreshToken;
         }
 
-        if (_launchTcs != null)
+        if (_launchTcs != null && !_restartRequired && !GraphicsPatches.RestartRequired)
             _launchTcs.TrySetResult(true);
         else
         {
@@ -437,6 +439,35 @@ public class LauncherModel : IDisposable
         try
         {
             File.WriteAllText(BetaChannelPrefPath, enabled ? "true" : "false");
+        }
+        catch { }
+    }
+
+    internal static readonly int[] FrameLimitOptions = { 30, 60, 120, 0 };
+    private static string FrameLimitPrefPath => Path.Combine(OS.GetDataDir(), "mobile_fps_limit");
+
+    public static int LoadFrameLimitPref()
+    {
+        try
+        {
+            if (
+                File.Exists(FrameLimitPrefPath)
+                && int.TryParse(File.ReadAllText(FrameLimitPrefPath).Trim(), out int fps)
+                && Array.IndexOf(FrameLimitOptions, fps) >= 0
+            )
+                return fps;
+        }
+        catch { }
+        return 60;
+    }
+
+    public static void SaveFrameLimitPref(int fps)
+    {
+        if (Array.IndexOf(FrameLimitOptions, fps) < 0)
+            throw new ArgumentOutOfRangeException(nameof(fps));
+        try
+        {
+            File.WriteAllText(FrameLimitPrefPath, fps.ToString());
         }
         catch { }
     }

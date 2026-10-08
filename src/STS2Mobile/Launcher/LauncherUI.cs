@@ -15,6 +15,7 @@ public class LauncherUI : Control
     private LauncherView _view;
     private LauncherController _controller;
     private bool _inGameMode;
+    private bool _exiting;
 
     public void Initialize()
     {
@@ -28,9 +29,10 @@ public class LauncherUI : Control
             var scale = Math.Max(vpSize.X, vpSize.Y) / 960f;
 
             _model = new LauncherModel(OS.GetDataDir());
+            GraphicsPatches.Initialize();
             _model.InGameMode = _inGameMode;
             _view = new LauncherView(this, scale);
-            _controller = new LauncherController(_model, _view, a => _mainThreadQueue.Enqueue(a));
+            _controller = new LauncherController(_model, _view, QueueMainThreadAction);
 
             PatchHelper.Log($"LauncherUI initialized. Viewport={vpSize}");
         }
@@ -47,7 +49,8 @@ public class LauncherUI : Control
 
         GetTree().ProcessFrame += OnProcessFrame;
         TreeExiting += OnExitTree;
-        _controller.Start();
+        if (!RenderBenchmarkScreen.RecoverBoot(this))
+            _controller.Start();
     }
 
     public void SetGameMode(bool inGameMode) => _inGameMode = inGameMode;
@@ -73,8 +76,23 @@ public class LauncherUI : Control
 
     private void OnExitTree()
     {
+        lock (_mainThreadQueue)
+        {
+            _exiting = true;
+            _mainThreadQueue.Clear();
+        }
+        _controller?.Dispose();
         GetTree().ProcessFrame -= OnProcessFrame;
         GetTree().AutoAcceptQuit = true;
         _model?.Dispose();
+    }
+
+    private void QueueMainThreadAction(Action action)
+    {
+        lock (_mainThreadQueue)
+        {
+            if (!_exiting)
+                _mainThreadQueue.Enqueue(action);
+        }
     }
 }

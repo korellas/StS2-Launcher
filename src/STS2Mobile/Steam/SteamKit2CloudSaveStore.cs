@@ -130,7 +130,11 @@ public class SteamKit2CloudSaveStore : ICloudSaveStore, IDisposable
         {
             if (_collectingBatch)
             {
-                _batchPendingFiles.Add((path, bytes));
+                var index = _batchPendingFiles.FindIndex(file => file.path == canonPath);
+                if (index >= 0)
+                    _batchPendingFiles[index] = (canonPath, bytes);
+                else
+                    _batchPendingFiles.Add((canonPath, bytes));
                 return;
             }
         }
@@ -336,11 +340,23 @@ public class SteamKit2CloudSaveStore : ICloudSaveStore, IDisposable
         DateTimeOffset? timestamp = null
     )
     {
+        byte[] fileHash = null;
+        byte[] uploadBytes = null;
+        bool compressed = false;
+
         for (int attempt = 0; attempt < 3; attempt++)
         {
             try
             {
-                UploadFileAsync(path, bytes, batchId, timestamp).GetAwaiter().GetResult();
+                if (uploadBytes == null)
+                {
+                    fileHash = SHA1.HashData(bytes);
+                    (uploadBytes, compressed) = CloudCompression.Compress(bytes);
+                }
+
+                UploadFileAsync(path, bytes, fileHash, uploadBytes, compressed, batchId, timestamp)
+                    .GetAwaiter()
+                    .GetResult();
                 return;
             }
             catch (InvalidOperationException ex)
@@ -365,15 +381,16 @@ public class SteamKit2CloudSaveStore : ICloudSaveStore, IDisposable
     private async Task UploadFileAsync(
         string path,
         byte[] bytes,
+        byte[] fileHash,
+        byte[] uploadBytes,
+        bool compressed,
         ulong batchId,
         DateTimeOffset? timestamp = null
     )
     {
         path = CloudFileCache.CanonicalizePath(path);
 
-        var fileHash = SHA1.HashData(bytes);
         var rawSize = (uint)bytes.Length;
-        var (uploadBytes, compressed) = CloudCompression.Compress(bytes);
 
         if (compressed)
             PatchHelper.Log($"[Cloud] Compressed {path} ({rawSize} → {uploadBytes.Length} bytes)");

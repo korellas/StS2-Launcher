@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace STS2Mobile.Launcher.Components;
@@ -21,6 +22,17 @@ public class SettingsRow : HBoxContainer
     {
         control.SizeFlagsVertical = SizeFlags.ShrinkCenter;
         AddChild(control);
+    }
+
+    public void AddHelpButton(float scale, Action showHelp)
+    {
+        var button = new GameMenuButton("?", scale, fontSize: 18)
+        {
+            CustomMinimumSize = new Vector2(40 * scale, 40 * scale),
+        };
+        button.Pressed += showHelp;
+        AddChild(button);
+        MoveChild(button, 1);
     }
 
     public static ColorRect Separator(float scale) =>

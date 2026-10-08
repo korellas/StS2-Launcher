@@ -40,6 +40,8 @@ public class DepotDownloader : IDisposable
     private readonly SteamConnection _connection;
     private readonly string _gameDir;
     private readonly string _stateDir;
+    private readonly string _textureCacheDir;
+    private readonly string _shaderWarmupMarker;
     private readonly Client _cdnClient;
     private readonly DownloadProgress _progress = new();
 
@@ -60,6 +62,8 @@ public class DepotDownloader : IDisposable
         _connection = connection;
         _gameDir = Path.Combine(dataDir, "game");
         _stateDir = Path.Combine(dataDir, "download_state");
+        _textureCacheDir = Path.Combine(dataDir, "etc2_cache");
+        _shaderWarmupMarker = Path.Combine(dataDir, "shader_warmup_version");
         _cdnClient = new Client(connection.Client);
     }
 
@@ -234,6 +238,15 @@ public class DepotDownloader : IDisposable
 
             // Remove Sentry plugin references (no android.arm64 build exists).
             PatchGamePck(Path.Combine(_gameDir, "SlayTheSpire2.pck"));
+
+            // Converted textures are cached by resource path, which can stay the
+            // same when a game update changes the atlas image and sprite coordinates.
+            if (Directory.Exists(_textureCacheDir))
+            {
+                Directory.Delete(_textureCacheDir, recursive: true);
+                Log("Cleared converted texture cache; restart required");
+            }
+            File.Delete(_shaderWarmupMarker);
         }
         finally
         {

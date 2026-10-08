@@ -25,6 +25,13 @@ public static class LauncherPatches
     internal static string SavedAccountName;
     internal static string SavedRefreshToken;
 
+    internal static void SetFpsOverlayEnabled(bool enabled)
+    {
+        FpsOverlayEnabled = enabled;
+        if (!enabled)
+            FpsOverlay.Close();
+    }
+
     private static bool IsHistoryPath(string path) =>
         path != null && (path.Contains("/history/") || path.Contains("\\history\\"));
 
@@ -166,17 +173,8 @@ public static class LauncherPatches
 
         launcher.QueueFree();
 
-        if (ShaderWarmupScreen.NeedsWarmup())
-        {
-            // Shader warmup has its own full-screen UI with progress.
-            var warmup = new ShaderWarmupScreen();
-            gameNode.AddChild(warmup);
-            warmup.Initialize();
-            await warmup.WaitForCompletion();
-            warmup.QueueFree();
-        }
-
         SaveManager.Instance.InitSettingsData();
+        GraphicsPatches.StartRuntime(tree);
 
         var gameStartup = game.GetType()
             .GetMethod("GameStartup", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -195,6 +193,17 @@ public static class LauncherPatches
             if (GodotObject.IsInstanceValid(overlay))
                 overlay.FadeOutAndFree(0.2f);
             throw ex.InnerException ?? ex;
+        }
+
+        if (GraphicsPatches.Settings.ShaderWarmup && ShaderWarmupScreen.NeedsWarmup())
+        {
+            // Loading scenes also initializes their C# scripts, which can depend
+            // on services set up by GameStartup (including localization).
+            var warmup = new ShaderWarmupScreen();
+            gameNode.AddChild(warmup);
+            warmup.Initialize();
+            await warmup.WaitForCompletion();
+            warmup.QueueFree();
         }
 
         if (GodotObject.IsInstanceValid(overlay))

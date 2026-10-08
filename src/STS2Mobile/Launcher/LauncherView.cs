@@ -19,6 +19,9 @@ public class LauncherView
     private readonly StyledLabel _statusLabel;
     private readonly StyledLabel _versionLabel;
     private readonly Control _parent;
+    private readonly SubmenuOverlay _settingsOverlay;
+    private readonly SubmenuOverlay _graphicsHelpOverlay;
+    private readonly StyledLabel _graphicsHelpText;
 
     public LauncherView(Control parent, float scale)
     {
@@ -111,12 +114,39 @@ public class LauncherView
         var settingsOverlay = new SubmenuOverlay(
             Localization.Tr("MENU_SETTINGS"),
             scale,
-            widthRatio: 0.58f,
-            heightRatio: 0.66f
+            widthRatio: 0.78f,
+            heightRatio: 0.78f
         );
         Actions.RemoveChild(Actions.SettingsGroup);
         settingsOverlay.Content.AddChild(Actions.SettingsGroup);
+        var graphics = new GraphicsSection(scale, Actions.GraphicsGroup) { Visible = false };
+        graphics.HelpRequested += ShowGraphicsHelp;
+        graphics.BenchmarkRequested += () => RenderBenchmarkScreen.Open((LauncherUI)parent);
+        Actions.GraphicsHelpRequested += ShowGraphicsHelp;
+        settingsOverlay.Content.AddChild(graphics);
+        foreach (Node child in settingsOverlay.Header.GetChildren())
+        {
+            settingsOverlay.Header.RemoveChild(child);
+            child.QueueFree();
+        }
+        settingsOverlay.Header.Alignment = BoxContainer.AlignmentMode.Center;
+        var generalTab = new SettingsTabButton(Localization.Tr("MENU_GENERAL"), scale);
+        var graphicsTab = new SettingsTabButton(Localization.Tr("MENU_GRAPHICS"), scale);
+        settingsOverlay.Header.AddChild(generalTab);
+        settingsOverlay.Header.AddChild(graphicsTab);
+        generalTab.Pressed += () => SelectTab(false);
+        graphicsTab.Pressed += () => SelectTab(true);
+        SelectTab(false);
+        void SelectTab(bool showGraphics)
+        {
+            Actions.SettingsGroup.Visible = !showGraphics;
+            graphics.Visible = showGraphics;
+            generalTab.SetSelected(!showGraphics);
+            graphicsTab.SetSelected(showGraphics);
+            settingsOverlay.Scroll.ScrollVertical = 0;
+        }
         parent.AddChild(settingsOverlay);
+        _settingsOverlay = settingsOverlay;
 
         var newsOverlay = new SubmenuOverlay(
             Localization.Tr("MENU_NEWS"),
@@ -249,6 +279,33 @@ public class LauncherView
         );
         fmodCredit.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.55f));
         fmodBox.AddChild(fmodCredit);
+
+        _graphicsHelpOverlay = new SubmenuOverlay("", scale, widthRatio: 0.66f, heightRatio: 0.64f)
+        {
+            DismissOnRelease = true,
+        };
+        _graphicsHelpText = new StyledLabel(
+            "",
+            scale,
+            fontSize: 18,
+            align: HorizontalAlignment.Left
+        )
+        {
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        _graphicsHelpOverlay.Content.AddChild(_graphicsHelpText);
+        var closeHelp = new GameMenuButton(Localization.Tr("ACTION_CLOSE"), scale, fontSize: 20);
+        closeHelp.Pressed += _graphicsHelpOverlay.Hide;
+        _graphicsHelpOverlay.Content.AddChild(closeHelp);
+        parent.AddChild(_graphicsHelpOverlay);
+    }
+
+    private void ShowGraphicsHelp(string titleKey, string messageKey)
+    {
+        _graphicsHelpOverlay.Header.GetChild<StyledLabel>(0).Text = Localization.Tr(titleKey);
+        _graphicsHelpText.Text = Localization.Tr(messageKey);
+        _graphicsHelpOverlay.Scroll.ScrollVertical = 0;
+        _graphicsHelpOverlay.Open();
     }
 
     private VBoxContainer _menu;
@@ -265,6 +322,12 @@ public class LauncherView
     private readonly float _scale;
 
     public void SetStatus(string text) => _statusLabel.Text = text;
+
+    public void CloseSettings()
+    {
+        _graphicsHelpOverlay.Hide();
+        _settingsOverlay.Hide();
+    }
 
     // The start count rides along with the version so it needs no screen of its
     // own: if it changes after backgrounding, the process was reclaimed.

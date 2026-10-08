@@ -9,7 +9,7 @@ namespace STS2Mobile.Launcher;
 
 // Wires model events to view updates and handles the launcher UI state machine.
 // All model callbacks are marshalled to the main thread before updating the view.
-public class LauncherController
+public class LauncherController : IDisposable
 {
     private readonly LauncherModel _model;
     private readonly LauncherView _view;
@@ -35,11 +35,7 @@ public class LauncherController
     {
         _model.SessionStateChanged += s => _runOnMainThread(() => UpdateUI(s));
         _model.LogReceived += msg => _runOnMainThread(() => _view.AppendLog(msg));
-        PatchHelper.LogEmitted += msg =>
-        {
-            if (msg.StartsWith("[Cloud]"))
-                _runOnMainThread(() => _view.AppendLog(msg));
-        };
+        PatchHelper.LogEmitted += OnPatchLog;
         _model.CodeNeeded += wasIncorrect =>
             _runOnMainThread(() =>
             {
@@ -66,8 +62,11 @@ public class LauncherController
                 _view.Download.Visible = false;
                 if (LauncherModel.GameFilesReady())
                 {
-                    var text = _model.InGameMode ? "PLAY" : "RESTART APP";
-                    _view.Actions.ShowLaunch(text, showCloudSync: false, showUpdate: false);
+                    _view.Actions.ShowLaunch(
+                        "RESTART APP",
+                        showCloudSync: false,
+                        showUpdate: false
+                    );
                 }
                 else
                     _view.Actions.ShowRetry();
@@ -94,6 +93,7 @@ public class LauncherController
             {
                 if (hasUpdate)
                 {
+                    _view.CloseSettings();
                     _view.Actions.HideAll();
                     _view.Download.Visible = true;
                     _view.Download.Reset("UPDATE GAME FILES");
@@ -121,6 +121,7 @@ public class LauncherController
         _view.Actions.CloudSyncToggled += OnCloudSyncToggled;
         _view.Actions.BetaChannelToggled += OnBetaChannelToggled;
         _view.Actions.FpsOverlayToggled += OnFpsOverlayToggled;
+        _view.Actions.FrameLimitChanged += OnFrameLimitChanged;
         _view.Actions.OverlayRowToggled += OnOverlayRowToggled;
         _view.Actions.CloudPushPressed += OnCloudPushPressed;
         _view.Actions.CloudPullPressed += OnCloudPullPressed;
@@ -144,7 +145,11 @@ public class LauncherController
 
         var fpsOverlayPref = LauncherModel.LoadFpsOverlayPref();
         _view.Actions.SetFpsOverlayChecked(fpsOverlayPref);
-        LauncherPatches.FpsOverlayEnabled = fpsOverlayPref;
+        LauncherPatches.SetFpsOverlayEnabled(fpsOverlayPref);
+
+        var frameLimitPref = LauncherModel.LoadFrameLimitPref();
+        _view.Actions.SetFrameLimitSelected(frameLimitPref);
+        SettingsPatches.SetFrameLimit(frameLimitPref);
 
         foreach (var row in new[] { "cpu", "gpu", "temp" })
         {
@@ -534,7 +539,13 @@ public class LauncherController
     private void OnFpsOverlayToggled(bool pressed)
     {
         LauncherModel.SaveFpsOverlayPref(pressed);
-        LauncherPatches.FpsOverlayEnabled = pressed;
+        LauncherPatches.SetFpsOverlayEnabled(pressed);
+    }
+
+    private void OnFrameLimitChanged(int fps)
+    {
+        LauncherModel.SaveFrameLimitPref(fps);
+        SettingsPatches.SetFrameLimit(fps);
     }
 
     private void OnBetaChannelToggled(bool pressed)
@@ -669,4 +680,15 @@ public class LauncherController
     }
 
     private void OnLaunchPressed() => _model.Launch();
+
+    private void OnPatchLog(string msg)
+    {
+        if (msg.StartsWith("[Cloud]"))
+            _runOnMainThread(() => _view.AppendLog(msg));
+    }
+
+    public void Dispose()
+    {
+        PatchHelper.LogEmitted -= OnPatchLog;
+    }
 }

@@ -45,6 +45,13 @@ public static class EventLayoutPatches
             ApplyLayout(layout);
 
             UiScalePatches.UiScaleChanged += OnScaleChanged;
+            layout.TreeExiting += OnTreeExiting;
+
+            void OnTreeExiting()
+            {
+                UiScalePatches.UiScaleChanged -= OnScaleChanged;
+                layout.TreeExiting -= OnTreeExiting;
+            }
 
             void OnScaleChanged()
             {

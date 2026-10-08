@@ -158,6 +158,7 @@ public class ShaderWarmupScreen : Control
             viewport.Size = new Vector2I(64, 64);
             viewport.RenderTargetUpdateMode = SubViewport.UpdateMode.Always;
             viewport.TransparentBg = true;
+            STS2Mobile.Patches.GraphicsPatches.ConfigureWarmupViewport(viewport);
             AddChild(viewport);
 
             var whiteImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);

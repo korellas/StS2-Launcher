@@ -12,6 +12,8 @@ public class ActionSection : VBoxContainer
     public event Action<bool> CloudSyncToggled;
     public event Action<bool> BetaChannelToggled;
     public event Action<bool> FpsOverlayToggled;
+    public event Action<int> FrameLimitChanged;
+    public event Action<string, string> GraphicsHelpRequested;
     public event Action<string, bool> OverlayRowToggled;
     public event Action CloudPushPressed;
     public event Action CloudPullPressed;
@@ -24,6 +26,7 @@ public class ActionSection : VBoxContainer
     private readonly Button _cloudSyncToggle;
     private readonly Button _betaChannelToggle;
     private readonly Button _fpsOverlayToggle;
+    private readonly System.Collections.Generic.Dictionary<int, Button> _frameLimitButtons = new();
     private readonly Button _pushButton;
     private readonly Button _pullButton;
     private readonly Button _updateButton;
@@ -33,6 +36,7 @@ public class ActionSection : VBoxContainer
     // Toggles and cloud actions live in this group so LauncherView can reparent
     // them into a Settings submenu, leaving only PLAY-level actions on the menu.
     public VBoxContainer SettingsGroup { get; }
+    public VBoxContainer GraphicsGroup { get; } = new();
 
     private readonly VBoxContainer _rows;
     private readonly System.Collections.Generic.Dictionary<
@@ -95,6 +99,32 @@ public class ActionSection : VBoxContainer
         };
         AddSettingRow("SETTING_BETA_CHANNEL", _betaChannelToggle, scale);
 
+        var frameLimitRow = new SettingsRow(Localization.Tr("SETTING_FRAME_LIMIT"), scale);
+        frameLimitRow.AddHelpButton(
+            scale,
+            () => GraphicsHelpRequested?.Invoke("SETTING_FRAME_LIMIT", "SETTING_FRAME_LIMIT_INFO")
+        );
+        var frameLimitGroup = new ButtonGroup();
+        foreach (int fps in LauncherModel.FrameLimitOptions)
+        {
+            var option = new GameMenuButton(
+                fps == 0 ? Localization.Tr("FRAME_LIMIT_UNLIMITED") : fps.ToString(),
+                scale,
+                fontSize: 21
+            );
+            option.ToggleMode = true;
+            option.ButtonGroup = frameLimitGroup;
+            option.Toggled += pressed =>
+            {
+                if (pressed)
+                    FrameLimitChanged?.Invoke(fps);
+            };
+            _frameLimitButtons[fps] = option;
+            frameLimitRow.AddControl(option);
+        }
+        GraphicsGroup.AddChild(frameLimitRow);
+        GraphicsGroup.AddChild(SettingsRow.Separator(scale));
+
         // Debug aid, so it stays available whether or not Steam is connected.
         _fpsOverlayToggle = new GameCheckbox(scale);
         _fpsOverlayToggle.ToggleMode = true;
@@ -103,7 +133,7 @@ public class ActionSection : VBoxContainer
         {
             FpsOverlayToggled?.Invoke(pressed);
         };
-        AddSettingRow("SETTING_FPS_OVERLAY", _fpsOverlayToggle, scale);
+        AddSettingRow("SETTING_FPS_OVERLAY", _fpsOverlayToggle, scale, GraphicsGroup);
 
         // One switch per line of the overlay, so an unwanted reading can be
         // dropped without losing the rest.
@@ -120,7 +150,7 @@ public class ActionSection : VBoxContainer
             var rowName = row;
             box.Toggled += pressed => OverlayRowToggled?.Invoke(rowName, pressed);
             _overlayRowToggles[rowName] = box;
-            AddSettingRow(key, box, scale);
+            AddSettingRow(key, box, scale, GraphicsGroup);
         }
 
         // Cloud transfers used to report only into the console; this line keeps
@@ -207,6 +237,12 @@ public class ActionSection : VBoxContainer
         _fpsOverlayToggle.ButtonPressed = value;
     }
 
+    public void SetFrameLimitSelected(int fps)
+    {
+        foreach (var option in _frameLimitButtons)
+            option.Value.SetPressedNoSignal(option.Key == fps);
+    }
+
     public void SetBetaChannelChecked(bool value)
     {
         _betaChannelToggle.ButtonPressed = value;
@@ -254,12 +290,22 @@ public class ActionSection : VBoxContainer
         _appUpdateButton.Visible = false;
     }
 
-    private void AddSettingRow(string labelKey, Control control, float scale)
+    private void AddSettingRow(
+        string labelKey,
+        Control control,
+        float scale,
+        VBoxContainer container = null
+    )
     {
         var row = new SettingsRow(Localization.Tr(labelKey), scale);
+        if (container == GraphicsGroup)
+            row.AddHelpButton(
+                scale,
+                () => GraphicsHelpRequested?.Invoke(labelKey, labelKey + "_INFO")
+            );
         row.AddControl(control);
-        _rows.AddChild(row);
-        _rows.AddChild(SettingsRow.Separator(scale));
+        (container ?? _rows).AddChild(row);
+        (container ?? _rows).AddChild(SettingsRow.Separator(scale));
     }
 
     public void SetOverlayRowChecked(string row, bool value)

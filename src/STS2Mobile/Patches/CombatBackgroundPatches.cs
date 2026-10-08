@@ -69,6 +69,13 @@ public static class CombatBackgroundPatches
 
             // Re-apply when UI scale changes mid-combat.
             UiScalePatches.UiScaleChanged += OnScaleChanged;
+            room.TreeExiting += OnTreeExiting;
+
+            void OnTreeExiting()
+            {
+                UiScalePatches.UiScaleChanged -= OnScaleChanged;
+                room.TreeExiting -= OnTreeExiting;
+            }
 
             void OnScaleChanged()
             {

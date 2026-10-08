@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using Godot;
 using HarmonyLib;
+using STS2Mobile.Launcher;
 
 namespace STS2Mobile.Patches;
 
@@ -610,6 +611,8 @@ public static class LanMultiplayerPatcher
             }
 
             _listenThread = new Thread(ListenLoop) { IsBackground = true, Name = "LanDiscovery" };
+            SetDiscoveryActive(true);
+            ((Node)screen).TreeExiting += Stop;
             _listenThread.Start();
 
             _pollTimer = new Godot.Timer();
@@ -761,6 +764,9 @@ public static class LanMultiplayerPatcher
 
         public void Stop()
         {
+            SetDiscoveryActive(false);
+            if (_screen is Node node && GodotObject.IsInstanceValid(node))
+                node.TreeExiting -= Stop;
             _running = false;
             try
             {
@@ -785,6 +791,18 @@ public static class LanMultiplayerPatcher
             _hostButtons.Clear();
 
             PatchHelper.Log("LAN discovery stopped");
+        }
+
+        private static void SetDiscoveryActive(bool active)
+        {
+            try
+            {
+                LauncherModel.GetGodotApp()?.Call("setLanDiscoveryActive", active);
+            }
+            catch (Exception ex)
+            {
+                PatchHelper.Log($"LAN discovery Wi-Fi setting failed: {ex.Message}");
+            }
         }
     }
 }

@@ -12,6 +12,9 @@ public class SubmenuOverlay : Control
     public event Action Opened;
 
     public VBoxContainer Content { get; }
+    public HBoxContainer Header { get; }
+    public ScrollContainer Scroll { get; }
+    public bool DismissOnRelease { get; set; }
 
     private readonly ColorRect _scrim;
 
@@ -59,6 +62,7 @@ public class SubmenuOverlay : Control
         PositionBack();
 
         var header = new HBoxContainer();
+        Header = header;
         header.AddThemeConstantOverride("separation", (int)(12 * scale));
         frame.AddChild(header);
 
@@ -70,6 +74,7 @@ public class SubmenuOverlay : Control
             SizeFlagsVertical = SizeFlags.ExpandFill,
             HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
         };
+        Scroll = scroll;
         frame.AddChild(scroll);
         LauncherTheme.ApplyGameScrollbar(scroll, scale);
 
@@ -143,9 +148,13 @@ public class SubmenuOverlay : Control
     private void OnScrimInput(InputEvent evt)
     {
         if (
-            evt
-            is InputEventMouseButton { Pressed: true }
-                or InputEventScreenTouch { Pressed: true }
+            DismissOnRelease
+                ? evt
+                    is InputEventMouseButton { Pressed: false }
+                        or InputEventScreenTouch { Pressed: false }
+                : evt
+                    is InputEventMouseButton { Pressed: true }
+                        or InputEventScreenTouch { Pressed: true }
         )
             Hide();
     }

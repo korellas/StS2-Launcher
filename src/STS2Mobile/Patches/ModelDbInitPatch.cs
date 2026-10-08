@@ -18,12 +18,11 @@ namespace STS2Mobile.Patches;
 //    MethodInfo.Invoke to avoid per-call argument boxing into a new object[].
 //  - _contentById is cast to IDictionary so we write entries with dict[id] = model
 //    instead of reflecting into the set_Item method on every iteration.
-//  - The Contains short-circuit is installed as a permanent Harmony prefix in Apply()
-//    and gated by the _suppressContains flag; the original code installed and removed
-//    a second Harmony instance inside InitPrefix on every call, which is pure overhead.
+//  - Only the base constructor's duplicate check is bypassed during Phase 2;
+//    normal registry lookups remain available to model constructors.
 public static class ModelDbInitPatch
 {
-    private static bool _suppressContains;
+    private static bool _runningConstructors;
 
     private static PropertyInfo _allSubtypesProp;
     private static MethodInfo _getIdMethod;
@@ -60,49 +59,58 @@ public static class ModelDbInitPatch
             prefix: PatchHelper.Method(typeof(ModelDbInitPatch), nameof(InitPrefix))
         );
 
-        // Permanent Contains(Type) prefix that short-circuits only while Phase 2 is
-        // running. Replaces the old pattern of installing a secondary Harmony patch
-        // inside InitPrefix and un-patching it at the end. Contains has overloads so
-        // we bind to the specific signature instead of using PatchHelper.Patch.
-        var containsMethod = modelDbType.GetMethod(
-            "Contains",
-            StaticFlags,
-            null,
-            new[] { typeof(Type) },
-            null
+        harmony.Patch(
+            AccessTools.Constructor(typeof(AbstractModel), Type.EmptyTypes),
+            transpiler: new HarmonyMethod(
+                PatchHelper.Method(typeof(ModelDbInitPatch), nameof(ConstructorTranspiler))
+            )
         );
-        if (containsMethod != null)
-        {
-            try
-            {
-                harmony.Patch(
-                    containsMethod,
-                    new HarmonyMethod(
-                        PatchHelper.Method(typeof(ModelDbInitPatch), nameof(ContainsPrefix))
-                    )
-                );
-                PatchHelper.Log("Patched ModelDb.Contains (Type)");
-            }
-            catch (Exception ex)
-            {
-                PatchHelper.Log($"FAILED ModelDb.Contains patch: {ex.Message}");
-            }
-        }
-        else
-        {
-            PatchHelper.Log("ModelDb.Contains(Type) not found; suppressContains disabled");
-        }
+        PatchHelper.Log("Patched AbstractModel constructor duplicate check");
     }
 
-    public static bool ContainsPrefix(ref bool __result)
+    public static IEnumerable<CodeInstruction> ConstructorTranspiler(
+        IEnumerable<CodeInstruction> instructions
+    )
     {
-        if (_suppressContains)
+        var contains = AccessTools.Method(
+            typeof(ModelDb),
+            nameof(ModelDb.Contains),
+            new[] { typeof(Type) }
+        );
+        var lookup = AccessTools
+            .Method(typeof(ModelDb), nameof(ModelDb.GetByIdOrNull))
+            .MakeGenericMethod(typeof(AbstractModel));
+        var codes = new List<CodeInstruction>(instructions);
+        bool patched = false;
+        foreach (var instruction in codes)
         {
-            __result = false;
-            return false;
+            if (instruction.Calls(contains))
+            {
+                instruction.operand = PatchHelper.Method(
+                    typeof(ModelDbInitPatch),
+                    nameof(ContainsForConstructor)
+                );
+                patched = true;
+            }
+            else if (instruction.Calls(lookup))
+            {
+                instruction.operand = PatchHelper.Method(
+                    typeof(ModelDbInitPatch),
+                    nameof(LookupForConstructor)
+                );
+                patched = true;
+            }
         }
-        return true;
+        if (!patched)
+            throw new InvalidOperationException("AbstractModel duplicate check not found");
+        return codes;
     }
+
+    public static bool ContainsForConstructor(Type type) =>
+        !_runningConstructors && ModelDb.Contains(type);
+
+    public static AbstractModel LookupForConstructor(ModelId id) =>
+        _runningConstructors ? null : ModelDb.GetByIdOrNull<AbstractModel>(id);
 
     public static bool InitPrefix()
     {
@@ -151,11 +159,10 @@ public static class ModelDbInitPatch
 
         PatchHelper.Log($"Phase 1 complete: {preRegCount} types pre-registered");
 
-        // Phase 2: Run constructors on pre-allocated objects. _suppressContains stops
-        // the game's Contains() from reporting "not registered" mid-construction.
+        // Phase 2: Initialize the registered objects without treating them as duplicates.
         PatchHelper.Log("Phase 2: Running constructors");
 
-        _suppressContains = true;
+        _runningConstructors = true;
         int successCount = 0;
         var failed = new List<Type>();
         var phase2Stride = Math.Max(1, types.Length / 4);
@@ -199,7 +206,7 @@ public static class ModelDbInitPatch
         }
         finally
         {
-            _suppressContains = false;
+            _runningConstructors = false;
         }
 
         if (failed.Count > 0)

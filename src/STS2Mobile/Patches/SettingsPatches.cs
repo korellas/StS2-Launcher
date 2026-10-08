@@ -6,6 +6,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Saves;
 using MegaCrit.Sts2.Core.Settings;
+using STS2Mobile.Launcher;
 
 namespace STS2Mobile.Patches;
 
@@ -14,9 +15,45 @@ namespace STS2Mobile.Patches;
 public static class SettingsPatches
 {
     private static bool _mobileDefaultsChecked;
+    private static int _frameLimit = 60;
+
+    public static void SetFrameLimit(int fps)
+    {
+        if (Array.IndexOf(LauncherModel.FrameLimitOptions, fps) < 0)
+            throw new ArgumentOutOfRangeException(nameof(fps));
+        _frameLimit = fps;
+        FrameLimitChangedPostfix();
+    }
+
+    public static void FrameLimitChangedPostfix()
+    {
+        Engine.MaxFps = _frameLimit;
+    }
 
     public static void Apply(Harmony harmony)
     {
+        PatchHelper.Patch(
+            harmony,
+            typeof(NGame),
+            "InitializeGraphicsPreferences",
+            postfix: PatchHelper.Method(typeof(SettingsPatches), nameof(FrameLimitChangedPostfix))
+        );
+        var fpsPaginatorType = typeof(NGame).Assembly.GetType(
+            "MegaCrit.Sts2.Core.Nodes.Screens.Settings.NFpsPaginator"
+        );
+        if (fpsPaginatorType != null)
+        {
+            PatchHelper.Patch(
+                harmony,
+                fpsPaginatorType,
+                "OnIndexChanged",
+                postfix: PatchHelper.Method(
+                    typeof(SettingsPatches),
+                    nameof(FrameLimitChangedPostfix)
+                )
+            );
+        }
+
         // Apply mobile defaults on first launch; user preferences are respected after that.
         PatchHelper.Patch(
             harmony,

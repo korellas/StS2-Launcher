@@ -38,6 +38,13 @@ public static class MobileLayoutPatches
             ApplyMainMenuLayout(menu);
 
             UiScalePatches.UiScaleChanged += OnScaleChanged;
+            menu.TreeExiting += OnTreeExiting;
+
+            void OnTreeExiting()
+            {
+                UiScalePatches.UiScaleChanged -= OnScaleChanged;
+                menu.TreeExiting -= OnTreeExiting;
+            }
 
             void OnScaleChanged()
             {
