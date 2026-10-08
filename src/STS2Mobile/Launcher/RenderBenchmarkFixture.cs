@@ -33,6 +33,9 @@ namespace STS2Mobile.Launcher;
 
 public sealed class RenderBenchmarkFixture : IDisposable
 {
+    // Game updates can insert enum members; resolve the loaded game's value by name.
+    private static readonly ActionSynchronizerCombatState PlayerPlayPhase =
+        Enum.Parse<ActionSynchronizerCombatState>(nameof(ActionSynchronizerCombatState.PlayPhase));
     private readonly Action _check;
     private readonly BenchmarkTrace _trace;
     private readonly HashSet<string> _visited = new();
@@ -414,8 +417,7 @@ public sealed class RenderBenchmarkFixture : IDisposable
             CombatManager.Instance.IsInProgress
             && (
                 _player.PlayerCombatState.TurnNumber <= previousTurn
-                || RunManager.Instance.ActionQueueSynchronizer.CombatState
-                    != ActionSynchronizerCombatState.PlayPhase
+                || RunManager.Instance.ActionQueueSynchronizer.CombatState != PlayerPlayPhase
                 || RunManager.Instance.ActionExecutor.IsPaused
             )
         )
