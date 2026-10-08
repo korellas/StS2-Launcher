@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Godot;
 using STS2Mobile.Launcher.Components;
@@ -13,8 +14,10 @@ namespace STS2Mobile.Launcher;
 // rendering them in a SubViewport, then writing a version marker to skip on future launches.
 public class ShaderWarmupScreen : Control
 {
-    private const int WarmupVersion = 5;
-    private const int BatchSize = 8;
+    private const int WarmupVersion = 6;
+    private const int BatchSize = 64;
+
+    private sealed record ScanProgress(string Detail, double Percent);
 
     private TaskCompletionSource<bool> _tcs;
     private float _scale;
@@ -136,6 +139,7 @@ public class ShaderWarmupScreen : Control
     private async void RunWarmup()
     {
         var sw = Stopwatch.StartNew();
+        SubViewport viewport = null;
 
         try
         {
@@ -154,7 +158,8 @@ public class ShaderWarmupScreen : Control
                 return;
             }
 
-            var viewport = new SubViewport();
+            var compileTimer = Stopwatch.StartNew();
+            viewport = new SubViewport();
             viewport.Size = new Vector2I(64, 64);
             viewport.RenderTargetUpdateMode = SubViewport.UpdateMode.Always;
             viewport.TransparentBg = true;
@@ -171,6 +176,7 @@ public class ShaderWarmupScreen : Control
             for (int i = 0; i < total; i += BatchSize)
             {
                 var batchNodes = new List<Node>();
+                bool hasParticles = false;
                 int batchEnd = Math.Min(i + BatchSize, total);
 
                 for (int j = i; j < batchEnd; j++)
@@ -183,6 +189,7 @@ public class ShaderWarmupScreen : Control
                         {
                             viewport.AddChild(node);
                             batchNodes.Add(node);
+                            hasParticles |= node is GpuParticles2D;
                         }
                     }
                     catch (Exception ex)
@@ -193,25 +200,28 @@ public class ShaderWarmupScreen : Control
                     }
                 }
 
-                processed = batchEnd;
-                double pct = 50 + (double)processed / total * 50;
-                _progressBar.Value = pct;
-                _detailLabel.Text = $"Compiling {processed} / {total}";
-
-                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                // Keep the batch alive until it is drawn. Particles also need a
+                // subsequent draw after their first simulation update.
+                await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+                if (hasParticles)
+                    await ToSignal(
+                        RenderingServer.Singleton,
+                        RenderingServer.SignalName.FramePostDraw
+                    );
 
                 foreach (var node in batchNodes)
                     node.QueueFree();
-            }
 
-            viewport.QueueFree();
+                processed = batchEnd;
+                _progressBar.Value = 50 + (double)processed / total * 50;
+                _detailLabel.Text = $"Compiling {processed} / {total}";
+            }
 
             _progressBar.Value = 100;
             _statusLabel.Text = Localization.Tr("STATUS_DONE");
-            _detailLabel.Text = $"Compiled {total} shaders in {sw.ElapsedMilliseconds}ms";
+            _detailLabel.Text = $"Warmed {total} materials in {sw.ElapsedMilliseconds}ms";
             PatchHelper.Log(
-                $"[ShaderWarmup] Completed: {total} materials in {sw.ElapsedMilliseconds}ms"
+                $"[ShaderWarmup] Completed: {total} materials in {sw.ElapsedMilliseconds}ms (rendering {compileTimer.ElapsedMilliseconds}ms, batch size {BatchSize})"
             );
 
             WriteVersionMarker();
@@ -222,16 +232,24 @@ public class ShaderWarmupScreen : Control
         {
             PatchHelper.Log($"[ShaderWarmup] Failed: {ex}");
         }
+        finally
+        {
+            viewport?.QueueFree();
+        }
 
         _tcs?.TrySetResult(true);
     }
 
     private static Node CreateWarmupNode(Material mat, ImageTexture whiteTex)
     {
-        if (mat is ParticleProcessMaterial particleMat)
+        if (
+            mat is ParticleProcessMaterial
+            || mat is ShaderMaterial { Shader: not null } sm
+                && sm.Shader.GetMode() == Shader.Mode.Particles
+        )
         {
             var particles = new GpuParticles2D();
-            particles.ProcessMaterial = particleMat;
+            particles.ProcessMaterial = mat;
             particles.Amount = 1;
             particles.Emitting = true;
             particles.OneShot = false;
@@ -247,19 +265,73 @@ public class ShaderWarmupScreen : Control
 
     private async Task<List<(string path, Material mat)>> CollectMaterialsAsync()
     {
-        var materials = new Dictionary<string, Material>();
-
-        CollectFromDirectory("res://", materials);
-        PatchHelper.Log(
-            $"[ShaderWarmup] Found {materials.Count} materials from loose resource files"
+        var progress = new ScanProgress(Localization.Tr("STATUS_ENUMERATING"), 0);
+        // A single loader avoids shared-resource parsing races. It can run
+        // continuously while the main thread draws UI and Godot compiles shaders.
+        var scan = Task.Run(() =>
+            CollectMaterials(
+                (detail, percent) => Volatile.Write(ref progress, new ScanProgress(detail, percent))
+            )
         );
-        _detailLabel.Text = $"Found {materials.Count} materials...";
-        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        while (!scan.IsCompleted)
+        {
+            var current = Volatile.Read(ref progress);
+            _detailLabel.Text = current.Detail;
+            _progressBar.Value = current.Percent;
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
 
+        var materials = await scan;
+        _progressBar.Value = 50;
+        return materials;
+    }
+
+    private static List<(string path, Material mat)> CollectMaterials(Action<string, double> report)
+    {
+        var sw = Stopwatch.StartNew();
+        var resourcePaths = new List<string>();
         var scenePaths = new List<string>();
-        CollectScenePaths("res://scenes", scenePaths);
-        PatchHelper.Log($"[ShaderWarmup] Found {scenePaths.Count} scenes to scan");
+        CollectResourcePaths("res://", resourcePaths, scenePaths, new HashSet<string>());
+        PatchHelper.Log(
+            $"[ShaderWarmup] Found {resourcePaths.Count} resource files and {scenePaths.Count} scenes in {sw.ElapsedMilliseconds}ms"
+        );
 
+        var materials = new Dictionary<string, (string path, Material mat)>();
+        int total = resourcePaths.Count + scenePaths.Count;
+        int processed = 0;
+        sw.Restart();
+        foreach (var path in resourcePaths)
+        {
+            try
+            {
+                // A type hint does not filter .tres resources. Load once, then
+                // inspect the result instead of loading non-materials twice.
+                var resource = ResourceLoader.Load(path, null, ResourceLoader.CacheMode.Reuse);
+                if (resource is Material mat)
+                    materials.TryAdd(GetShaderKey(mat), (path, mat));
+                else if (resource is Shader shader)
+                {
+                    var key = GetResourceKey(shader);
+                    if (!materials.ContainsKey(key))
+                        materials.Add(key, (path, new ShaderMaterial { Shader = shader }));
+                }
+            }
+            catch (Exception ex)
+            {
+                PatchHelper.Log($"[ShaderWarmup] Failed to load {path}: {ex.Message}");
+            }
+
+            processed++;
+            report(
+                $"Scanning resources... {processed} / {resourcePaths.Count}",
+                (double)processed / total * 50
+            );
+        }
+        PatchHelper.Log(
+            $"[ShaderWarmup] Resource scan: {materials.Count} unique materials in {sw.ElapsedMilliseconds}ms"
+        );
+
+        sw.Restart();
         for (int i = 0; i < scenePaths.Count; i++)
         {
             try
@@ -279,38 +351,39 @@ public class ShaderWarmupScreen : Control
                 );
             }
 
-            if (i % 50 == 0)
-            {
-                _detailLabel.Text = $"Scanning scenes... {i} / {scenePaths.Count}";
-                _progressBar.Value = (double)i / scenePaths.Count * 50;
-                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-            }
-        }
-
-        // Deduplicate by shader since many materials share the same program with different params.
-        var unique = new Dictionary<string, (string path, Material mat)>();
-        foreach (var (path, mat) in materials)
-        {
-            var shaderKey = GetShaderKey(mat);
-            unique.TryAdd(shaderKey, (path, mat));
+            processed++;
+            report(
+                $"Scanning scenes... {i + 1} / {scenePaths.Count}",
+                (double)processed / total * 50
+            );
         }
 
         PatchHelper.Log(
-            $"[ShaderWarmup] {materials.Count} total materials, {unique.Count} unique shaders"
+            $"[ShaderWarmup] Scene scan: {materials.Count} unique materials in {sw.ElapsedMilliseconds}ms"
         );
-        return unique.Values.ToList();
+        return materials.Values.ToList();
     }
+
+    private static string GetResourceKey(Resource resource) =>
+        string.IsNullOrEmpty(resource.ResourcePath)
+            ? $"instance#{resource.GetInstanceId()}"
+            : resource.ResourcePath;
 
     private static string GetShaderKey(Material mat)
     {
-        if (mat is ShaderMaterial sm && sm.Shader != null)
-            return sm.Shader.ResourcePath ?? sm.Shader.GetRid().ToString();
+        if (mat is ShaderMaterial { Shader: not null } sm)
+            return GetResourceKey(sm.Shader);
         if (mat is ParticleProcessMaterial)
-            return $"particle#{mat.GetRid()}";
-        return mat.ResourcePath ?? mat.GetRid().ToString();
+            return $"particle#{mat.GetInstanceId()}";
+        return GetResourceKey(mat);
     }
 
-    private void CollectFromDirectory(string dirPath, Dictionary<string, Material> materials)
+    private static void CollectResourcePaths(
+        string dirPath,
+        List<string> resourcePaths,
+        List<string> scenePaths,
+        HashSet<string> visited
+    )
     {
         try
         {
@@ -325,120 +398,33 @@ public class ShaderWarmupScreen : Control
                 if (fileName == "." || fileName == "..")
                     continue;
 
-                var fullPath = $"{dirPath}/{fileName}";
-
+                var fullPath = dirPath + (dirPath.EndsWith('/') ? "" : "/") + fileName;
                 if (dir.CurrentIsDir())
                 {
-                    if (fileName == "debug")
-                        continue;
-                    CollectFromDirectory(fullPath, materials);
+                    if (fileName != "debug")
+                        CollectResourcePaths(fullPath, resourcePaths, scenePaths, visited);
                     continue;
                 }
 
-                var cleanName = fileName.Replace(".remap", "");
-                var cleanPath = $"{dirPath}/{cleanName}";
-
-                if (
-                    !cleanName.EndsWith(".tres")
-                    && !cleanName.EndsWith(".gdshader")
-                    && !cleanName.EndsWith(".material")
-                )
+                var cleanPath = fullPath.EndsWith(".remap", StringComparison.Ordinal)
+                    ? fullPath[..^6]
+                    : fullPath;
+                bool isScene =
+                    cleanPath.StartsWith("res://scenes/", StringComparison.Ordinal)
+                    && cleanPath.EndsWith(".tscn", StringComparison.Ordinal);
+                bool isResource =
+                    cleanPath.EndsWith(".tres", StringComparison.Ordinal)
+                    || cleanPath.EndsWith(".gdshader", StringComparison.Ordinal)
+                    || cleanPath.EndsWith(".material", StringComparison.Ordinal);
+                if ((!isScene && !isResource) || !visited.Add(cleanPath))
+                    continue;
+                if (!ResourceLoader.Exists(cleanPath))
                     continue;
 
-                if (materials.ContainsKey(cleanPath))
-                    continue;
-
-                try
-                {
-                    if (!ResourceLoader.Exists(cleanPath))
-                        continue;
-
-                    // Load .tres with type hints to avoid errors from non-material resources.
-                    if (cleanName.EndsWith(".tres"))
-                    {
-                        var mat =
-                            ResourceLoader.Load(
-                                cleanPath,
-                                "Material",
-                                ResourceLoader.CacheMode.Reuse
-                            ) as Material;
-                        if (mat != null)
-                            materials[cleanPath] = mat;
-                        else
-                        {
-                            var shader =
-                                ResourceLoader.Load(
-                                    cleanPath,
-                                    "Shader",
-                                    ResourceLoader.CacheMode.Reuse
-                                ) as Shader;
-                            if (shader != null)
-                            {
-                                var shaderMat = new ShaderMaterial();
-                                shaderMat.Shader = shader;
-                                materials[cleanPath] = shaderMat;
-                            }
-                        }
-                        continue;
-                    }
-
-                    var res = ResourceLoader.Load(cleanPath, null, ResourceLoader.CacheMode.Reuse);
-                    if (res is Material resMat)
-                    {
-                        materials[cleanPath] = resMat;
-                    }
-                    else if (res is Shader resShader)
-                    {
-                        var shaderMat = new ShaderMaterial();
-                        shaderMat.Shader = resShader;
-                        materials[cleanPath] = shaderMat;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    PatchHelper.Log($"[ShaderWarmup] Failed to load {cleanPath}: {ex.Message}");
-                }
-            }
-            dir.ListDirEnd();
-        }
-        catch (Exception ex)
-        {
-            PatchHelper.Log($"[ShaderWarmup] Failed to enumerate {dirPath}: {ex.Message}");
-        }
-    }
-
-    private static void CollectScenePaths(string dirPath, List<string> paths)
-    {
-        try
-        {
-            using var dir = DirAccess.Open(dirPath);
-            if (dir == null)
-                return;
-
-            dir.ListDirBegin();
-            string fileName;
-            while ((fileName = dir.GetNext()) != "")
-            {
-                if (fileName == "." || fileName == "..")
-                    continue;
-
-                var fullPath = $"{dirPath}/{fileName}";
-
-                if (dir.CurrentIsDir())
-                {
-                    if (fileName == "debug")
-                        continue;
-                    CollectScenePaths(fullPath, paths);
-                    continue;
-                }
-
-                var cleanName = fileName.Replace(".remap", "");
-                if (!cleanName.EndsWith(".tscn"))
-                    continue;
-
-                var cleanPath = $"{dirPath}/{cleanName}";
-                if (ResourceLoader.Exists(cleanPath))
-                    paths.Add(cleanPath);
+                if (isScene)
+                    scenePaths.Add(cleanPath);
+                else
+                    resourcePaths.Add(cleanPath);
             }
             dir.ListDirEnd();
         }
@@ -451,7 +437,7 @@ public class ShaderWarmupScreen : Control
     private static void ExtractMaterialsFromSceneState(
         PackedScene packed,
         string scenePath,
-        Dictionary<string, Material> materials
+        Dictionary<string, (string path, Material mat)> materials
     )
     {
         var state = packed.GetState();
@@ -475,15 +461,13 @@ public class ShaderWarmupScreen : Control
                     var val = state.GetNodePropertyValue(n, p);
                     if (val.Obj is Material mat)
                     {
-                        var key = $"{scenePath}#node{n}#{propName}";
-                        materials.TryAdd(key, mat);
+                        materials.TryAdd(GetShaderKey(mat), (scenePath, mat));
                     }
                     else if (val.Obj is Shader shader)
                     {
-                        var shaderMat = new ShaderMaterial();
-                        shaderMat.Shader = shader;
-                        var key = $"{scenePath}#node{n}#{propName}";
-                        materials.TryAdd(key, shaderMat);
+                        var key = GetResourceKey(shader);
+                        if (!materials.ContainsKey(key))
+                            materials.Add(key, (scenePath, new ShaderMaterial { Shader = shader }));
                     }
                 }
                 catch (Exception ex)
