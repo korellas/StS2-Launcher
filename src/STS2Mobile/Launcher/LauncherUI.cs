@@ -49,8 +49,15 @@ public class LauncherUI : Control
 
         GetTree().ProcessFrame += OnProcessFrame;
         TreeExiting += OnExitTree;
-        if (!RenderBenchmarkScreen.RecoverBoot(this))
-            _controller.Start();
+        // The game calls Initialize from _EnterTree, while the root is still
+        // visiting its children. Benchmark recovery adds a sibling to that root.
+        Callable
+            .From(() =>
+            {
+                if (!_exiting && !RenderBenchmarkScreen.RecoverBoot(this))
+                    _controller.Start();
+            })
+            .CallDeferred();
     }
 
     public void SetGameMode(bool inGameMode) => _inGameMode = inGameMode;
