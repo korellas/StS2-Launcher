@@ -216,7 +216,8 @@ public class GraphicsRuntime : Node
         _resizeQueued = false;
         if (!IsInsideTree())
             return;
-        var size = _window.Size;
+        var stretch = _window.GetStretchTransform();
+        var size = _window.GetVisibleRect().Size * stretch.Scale;
         if (size.X <= 0 || size.Y <= 0)
             return;
         float scale = GraphicsPatches.Settings.RenderScale / 100f;
@@ -224,12 +225,12 @@ public class GraphicsRuntime : Node
         int height = Math.Max(2, (int)Math.Round(size.Y * scale));
         var ratio = new Vector2((float)width / size.X, (float)height / size.Y);
         var viewport = _window.GetViewportRid();
-        // Keep Window's logical size and input transform intact. Only the render
-        // server target and its drawing transform shrink; presentation upscales.
+        // Window already applies letterbox margins when presenting the viewport.
+        // Scale its render area and canvas transform without adding those margins again.
         RenderingServer.ViewportSetSize(viewport, width, height);
         RenderingServer.ViewportSetGlobalCanvasTransform(
             viewport,
-            _window.GetFinalTransform().Scaled(ratio)
+            (stretch * _window.GlobalCanvasTransform).Scaled(ratio)
         );
         PatchHelper.Log(
             $"[Graphics] Render target={width}x{height}, layout={_window.GetVisibleRect().Size}"
