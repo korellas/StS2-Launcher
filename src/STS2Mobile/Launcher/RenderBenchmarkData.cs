@@ -10,6 +10,12 @@ namespace STS2Mobile.Launcher;
 public sealed record RenderBenchmarkCase(string Scene, string Name)
 {
     public const string Seed = "MOBILEBENCH";
+    public const int EffectIntervalSeconds = 2;
+    public const int CombatTurnLimit = 16;
+    public const int CombatTailSeconds = 2;
+    public const int TargetHp = 400;
+    public const int PlayerHp = 2000;
+    public const int MaxEnergy = 5;
     public static readonly int[] FrameLimits = { 30, 60, 120, 0 };
     public static readonly string[] Scenes =
     {
@@ -30,6 +36,17 @@ public sealed record RenderBenchmarkCase(string Scene, string Name)
     public bool Distortion { get; init; } = true;
     public int Particles { get; init; } = 100;
     public int Fps { get; init; }
+
+    public static IEnumerable<RenderBenchmarkCase> EngineCases()
+    {
+        foreach (string scene in new[] { "CombatTurns", "KaiserCrabTurns", "WaterfallGiantTurns" })
+            yield return new RenderBenchmarkCase(scene, "controlled visuals")
+            {
+                Msaa = 2,
+                Filter = 4,
+                Direct = true,
+            };
+    }
 
     public static IEnumerable<RenderBenchmarkCase> QualityCases()
     {
@@ -215,6 +232,7 @@ public sealed class BenchmarkResult
     public string Case { get; set; }
     public string Variant { get; set; }
     public string Applied { get; set; }
+    public string Sequence { get; set; }
     public string ThermalStart { get; set; }
     public string ThermalEnd { get; set; }
     public string Screenshot { get; set; }
@@ -239,7 +257,7 @@ public sealed class BenchmarkBootTiming
 
 public sealed class RenderBenchmarkData
 {
-    public const int FormatVersion = 2;
+    public const int FormatVersion = 5;
     public static readonly int[] PacingModes = { -2, 0, 1, 2 };
     public int Version { get; set; } = FormatVersion;
     public string StartedUtc { get; set; } = DateTime.UtcNow.ToString("O");
@@ -296,12 +314,24 @@ public sealed class RenderBenchmarkData
             );
         if (EngineOnly)
         {
-            text.AppendLine(
-                $"Actual idle combat, merchant and map; fixed Defect deck, ConstructMenagerieNormal, seed {RenderBenchmarkCase.Seed}; saves in memory. Visual settings held fixed; inherited game settings use the fixture defaults."
-            );
-            text.AppendLine(
-                "Uncapped / VSync off / native pacing off. No screenshots, texture readback or image encoding. Scene setup, warmup and result saving are outside samples; measured stalls are retained."
-            );
+            if (Version < 3)
+            {
+                text.AppendLine(
+                    "Legacy engine benchmark: idle combat, merchant and map with inherited visual settings. Do not compare with the controlled boss benchmark."
+                );
+            }
+            else if (Version < 5)
+                text.AppendLine(
+                    "Legacy scripted attack/effects benchmark without enemy turns. Do not compare with the full-turn combat benchmark."
+                );
+            else
+                text.AppendLine(
+                    $"Actual combat, KaiserCrabBoss and WaterfallGiantBoss: fixed Defect effects deck, seed {RenderBenchmarkCase.Seed}; saves in memory. Card actions, end turn, enemy turns, hits, orbs and normal draw, discard and energy progression are measured. Up to {RenderBenchmarkCase.CombatTurnLimit} player turns or combat victory, then {RenderBenchmarkCase.CombatTailSeconds} seconds for remaining effects. Fixture player HP={RenderBenchmarkCase.PlayerHp}, enemy HP={RenderBenchmarkCase.TargetHp}, max energy={RenderBenchmarkCase.MaxEnergy}. The dealt playable cards are used in hand order with MeteorStrike and Hyperbeam prioritized. Identical explicit visual settings are applied to every scene."
+                );
+            if (Version >= 3)
+                text.AppendLine(
+                    "FPS cap=0 / requested Mailbox presentation / native pacing off. Mailbox permits rendering above display refresh rate when supported; unsupported modes may fall back to VSync on. Actual VSync and display refresh rate are recorded per scene. No screenshots, texture readback or image encoding. Scene setup, warmup and result saving are outside samples; measured stalls are retained."
+                );
             text.AppendLine(
                 "Minimum FPS = 1000 / longest measured frame ms, not a rolling average. CPU/GPU measure viewport rendering; frame times measure whole-frame cadence. GPU N/A means timestamps unavailable. No battery measurement."
             );
@@ -336,6 +366,8 @@ public sealed class RenderBenchmarkData
         {
             var m = result.Metrics;
             text.AppendLine($"\n{result.Case} | {result.Variant} | {result.Applied}");
+            if (result.Sequence != null)
+                text.AppendLine($"Sequence: {result.Sequence}");
             text.AppendLine(
                 FormattableString.Invariant(
                     $"n={m.Frames}, FPS={m.Fps:F2}, frame avg/p95/p99={m.FrameMeanMs:F3}/{m.FrameP95Ms:F3}/{m.FrameP99Ms:F3} ms, CPU={m.CpuMeanMs:F3} ms, GPU={Format(m.GpuMeanMs)}/{Format(m.GpuP95Ms)} ms avg/p95, canvas draws={m.DrawCallsMean:F1}"

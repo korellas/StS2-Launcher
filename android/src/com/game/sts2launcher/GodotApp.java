@@ -785,7 +785,8 @@ public class GodotApp extends GodotActivity {
 			String overrides = new String(original, StandardCharsets.UTF_8)
 					+ "\n[display]\nwindow/frame_pacing/android/enable_frame_pacing="
 					+ (mode != -2 ? "true" : "false")
-					+ "\nwindow/frame_pacing/android/swappy_mode=" + Math.max(0, mode) + "\n";
+					+ "\nwindow/frame_pacing/android/swappy_mode=" + Math.max(0, mode)
+					+ "\n[rendering]\nrendering_device/vsync/swapchain_image_count=3\n";
 			writeAtomic(config, overrides.getBytes(StandardCharsets.UTF_8));
 			benchmarkPacing = mode;
 			Log.i(TAG, "Benchmark cold boot pacing=" + mode);

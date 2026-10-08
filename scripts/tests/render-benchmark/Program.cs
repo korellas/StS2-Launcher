@@ -287,3 +287,64 @@ Check(
 );
 File.Delete(path);
 Console.WriteLine("PASS engine job isolation and unfiltered worst frame");
+
+var engineCases = RenderBenchmarkCase.EngineCases().ToArray();
+Check(
+    engineCases
+        .Select(test => test.Scene)
+        .SequenceEqual(new[] { "CombatTurns", "KaiserCrabTurns", "WaterfallGiantTurns" }),
+    "Engine comparison covers full turns in ordinary combat and both boss candidates"
+);
+foreach (var test in engineCases)
+    Check(
+        test.Scale == 100
+            && !test.Hdr
+            && test.Msaa == 2
+            && test.Filter == 4
+            && test.Direct
+            && test.Blur == 12
+            && test.Distortion
+            && test.Particles == 100
+            && test.Fps == 0,
+        "Both engines use explicit identical graphics settings without inherited values"
+    );
+Check(
+    !new RenderBenchmarkData
+    {
+        Version = 2,
+        EngineOnly = true,
+        Running = true,
+    }.CanResume(-2),
+    "Old inherited-setting engine jobs cannot resume with the controlled boss protocol"
+);
+Check(
+    !new RenderBenchmarkData
+    {
+        Version = 4,
+        EngineOnly = true,
+        Running = true,
+    }.CanResume(-2),
+    "The attack-only protocol cannot resume as full combat turns"
+);
+Check(
+    engineJob.Report().Contains("enemy turns")
+        && engineJob.Report().Contains("normal draw, discard and energy")
+        && !engineJob.Report().Contains("no damage"),
+    "The report identifies full combat turns and the fixture controls"
+);
+engineJob.Results[0].Sequence = "turns=4, cards=12, HP=2000->1920";
+engineJob.Save(path);
+Check(
+    RenderBenchmarkData.Load(path).Report().Contains("turns=4, cards=12, HP=2000->1920"),
+    "Observed combat progression survives report persistence"
+);
+File.Delete(path);
+engineJob.Results[0].Applied = "vsyncActual=Enabled, refreshHz=120.00";
+Check(
+    engineJob.Report().Contains("vsyncActual=Enabled")
+        && engineJob.Report().Contains("requested Mailbox presentation")
+        && !engineJob.Report().Contains("inherited game settings")
+        && !engineJob.Report().Contains("Uncapped / VSync off"),
+    "Report records actual presentation state and does not promise unsupported VSync disabling"
+);
+Console.WriteLine("PASS identical engine visuals, boss coverage and presentation provenance");

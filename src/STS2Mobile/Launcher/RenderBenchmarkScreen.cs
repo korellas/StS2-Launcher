@@ -441,14 +441,13 @@ public sealed class RenderBenchmarkScreen : Control
             CheckForeground();
             _viewport = GetTree().Root;
             RenderingServer.ViewportSetMeasureRenderTime(_viewport.GetViewportRid(), true);
-            DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+            var benchmarkVsync = _engine
+                ? DisplayServer.VSyncMode.Mailbox
+                : DisplayServer.VSyncMode.Disabled;
+            DisplayServer.WindowSetVsyncMode(benchmarkVsync);
             var tests = new List<RenderBenchmarkCase>();
             if (_engine)
-                tests.AddRange(
-                    new[] { "CombatIdle", "Merchant", "Map" }.Select(
-                        scene => new RenderBenchmarkCase(scene, "fixed visuals")
-                    )
-                );
+                tests.AddRange(RenderBenchmarkCase.EngineCases());
             else if (_comparison)
                 tests.AddRange(RenderBenchmarkCase.ComparisonCases());
             else if (_data.Phase == 0)
@@ -463,9 +462,9 @@ public sealed class RenderBenchmarkScreen : Control
                 var test = tests[i];
                 Godot.Engine.MaxFps = test.Fps;
                 _status.Text = $"{Tr("BENCH_LOAD_GAME")} · {SceneName(test.Scene)}";
-                await _fixture.Build(test, applyVisuals: !_engine);
+                await _fixture.Build(test);
                 // Game scene initialization can reapply its display preferences.
-                DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+                DisplayServer.WindowSetVsyncMode(benchmarkVsync);
                 Godot.Engine.MaxFps = test.Fps;
                 CheckCancellation();
                 CheckForeground();
@@ -540,9 +539,9 @@ public sealed class RenderBenchmarkScreen : Control
                 BenchmarkMetrics metrics;
                 if (_comparison)
                     metrics = new BenchmarkMetrics();
-                else if (test.Scene == "Transitions")
+                else if (_engine || test.Scene == "Transitions")
                 {
-                    var route = _fixture.RunTransitions();
+                    var route = _engine ? _fixture.RunCombatTurns() : _fixture.RunTransitions();
                     try
                     {
                         metrics = await Sample(0, record: true, until: route);
@@ -553,7 +552,7 @@ public sealed class RenderBenchmarkScreen : Control
                     }
                 }
                 else
-                    metrics = await Sample(_engine ? 15 : SampleSeconds, record: true);
+                    metrics = await Sample(SampleSeconds, record: true);
                 if (_engine)
                     _status.Visible = _cancel.Visible = true;
                 CheckCancellation();
@@ -564,9 +563,11 @@ public sealed class RenderBenchmarkScreen : Control
                     {
                         Case = test.Scene,
                         Variant = test.Name,
-                        Applied =
-                            $"root viewport, scale={GraphicsPatches.Settings.RenderScale}%, HDR={_viewport.UseHdr2D}, MSAA={_viewport.Msaa2D}, filter={GraphicsPatches.Settings.TextureFilter}, direct={GraphicsPatches.Settings.DirectCardPortraits}, blur={GraphicsPatches.Settings.RadialBlurSamples}, distortion={GraphicsPatches.Settings.ScreenDistortion}, backgroundParticles={GraphicsPatches.Settings.BackgroundParticles}%, cap={Godot.Engine.MaxFps}, nativePacing={expected}",
+                        Applied = FormattableString.Invariant(
+                            $"root viewport, scale={GraphicsPatches.Settings.RenderScale}%, HDR={_viewport.UseHdr2D}, MSAA={_viewport.Msaa2D}, filter={GraphicsPatches.Settings.TextureFilter}, direct={GraphicsPatches.Settings.DirectCardPortraits}, blur={GraphicsPatches.Settings.RadialBlurSamples}, distortion={GraphicsPatches.Settings.ScreenDistortion}, backgroundParticles={GraphicsPatches.Settings.BackgroundParticles}%, cap={Godot.Engine.MaxFps}, nativePacing={expected}, vsyncRequested={benchmarkVsync}, vsyncActual={DisplayServer.WindowGetVsyncMode()}, refreshHz={DisplayServer.ScreenGetRefreshRate():F2}"
+                        ),
                         Metrics = metrics,
+                        Sequence = _engine ? _fixture.SequenceSummary : null,
                         ThermalStart = thermalStart,
                         ThermalEnd = Thermal(),
                         Screenshot = screenshot,
@@ -610,7 +611,15 @@ public sealed class RenderBenchmarkScreen : Control
             }
             try
             {
-                _fixture?.Dispose();
+                try
+                {
+                    if (_fixture != null)
+                        await _fixture.FinishActions();
+                }
+                finally
+                {
+                    _fixture?.Dispose();
+                }
             }
             catch (Exception ex)
             {
@@ -664,7 +673,7 @@ public sealed class RenderBenchmarkScreen : Control
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             CheckCancellation();
-            if (!_comparison && !_engine)
+            if (!_comparison)
                 _fixture.Animate();
             await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
             CheckCancellation();
@@ -857,8 +866,11 @@ public sealed class RenderBenchmarkScreen : Control
             "Geometry" => Tr("BENCH_SCENE_GEOMETRY"),
             "Effects" => Tr("BENCH_SCENE_EFFECTS"),
             "CombatIdle" => Tr("BENCH_SCENE_COMBAT_IDLE"),
+            "CombatTurns" => Tr("BENCH_SCENE_COMBAT_ACTIONS"),
             "CombatCards" => Tr("BENCH_SCENE_COMBAT_CARDS"),
             "CombatEffects" => Tr("BENCH_SCENE_COMBAT_EFFECTS"),
+            "KaiserCrabTurns" => Tr("BENCH_SCENE_BOSS_EFFECTS"),
+            "WaterfallGiantTurns" => Tr("BENCH_SCENE_WATERFALL_GIANT"),
             "Merchant" => Tr("BENCH_SCENE_MERCHANT"),
             "Map" => Tr("BENCH_SCENE_MAP"),
             "Deck" => Tr("BENCH_SCENE_DECK"),

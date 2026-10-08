@@ -38,8 +38,11 @@ public static class Localization
         ["BENCH_SCENE_GEOMETRY"] = "도형",
         ["BENCH_SCENE_EFFECTS"] = "화면 효과",
         ["BENCH_SCENE_COMBAT_IDLE"] = "전투 대기",
+        ["BENCH_SCENE_COMBAT_ACTIONS"] = "전투·카드 공격",
         ["BENCH_SCENE_COMBAT_CARDS"] = "손패·카드 확대",
         ["BENCH_SCENE_COMBAT_EFFECTS"] = "전투 VFX",
+        ["BENCH_SCENE_BOSS_EFFECTS"] = "카이저 크랩·복합 효과",
+        ["BENCH_SCENE_WATERFALL_GIANT"] = "폭포 거인·증기 효과",
         ["BENCH_LOAD_GAME"] = "실제 게임 화면 준비 중…",
         ["BENCH_SCENE_MERCHANT"] = "상점 상품 진열",
         ["BENCH_SCENE_MAP"] = "지도",
@@ -52,7 +55,7 @@ public static class Localization
         ["BENCH_FIRST_VISIT"] = "이번 부팅에서 첫 진입",
         ["BENCH_REPEAT_VISIT"] = "이번 부팅에서 재진입",
         ["BENCH_LEGACY_RESULT"] =
-            "이 결과는 이전 합성 테스트입니다. 실제 전투 측정과 비교하지 마세요.",
+            "이 결과는 이전 측정 방식입니다. 새 벤치마크 결과와 직접 비교하지 마세요.",
         ["BENCH_FRAME_TIMES"] = "프레임 평균 / p95 / p99",
         ["BENCH_RESULTS_HELP"] =
             "같은 화면의 결과끼리 비교하세요. 진입 시간은 호출부터 첫 렌더 프레임까지이며 전투는 손패 준비도 기다립니다. 방 전환에는 게임의 페이드가 포함됩니다. 첫 진입은 이번 부팅 기준이며 디스크·셰이더 캐시 삭제를 의미하지 않습니다. 배터리 소비량은 측정하지 않습니다.",
@@ -66,7 +69,7 @@ public static class Localization
         ["ENGINE_BENCH_START"] = "장면 측정 시작",
         ["ENGINE_BENCH_MINIMUM"] = "최저 FPS / 최장 프레임",
         ["ENGINE_BENCH_INFO"] =
-            "전투 대기·상점·지도를 캡처 없이 측정합니다. 화질은 고정하고 FPS 제한·VSync·네이티브 페이싱을 해제합니다. 최저 FPS는 가장 긴 프레임에서 계산하며, 준비·예열은 제외하고 측정 중 끊김은 포함합니다. 종료 후 원래 설정으로 복귀합니다.",
+            $"일반 전투·카이저 크랩·폭포 거인에서 고정 덱으로 최대 {RenderBenchmarkCase.CombatTurnLimit}턴 또는 전투 승리까지 진행합니다. 카드 사용, 턴 종료, 구체 발동, 적 공격·피격과 다음 손패 뽑기를 실제 게임 흐름으로 측정합니다. 테스트용 체력과 최대 에너지는 결과에 기록합니다. 같은 화질 설정을 적용하고 FPS 제한·네이티브 페이싱을 해제하며 Mailbox 표시 방식을 요청합니다. 실제 VSync와 주사율도 기록합니다. 캡처·준비·예열은 제외하고 측정 중 끊김은 포함합니다. 종료 후 원래 설정으로 복귀합니다.",
         ["BENCH_TITLE"] = "렌더링 벤치마크",
         ["BENCH_INFO"] =
             "실제 전투·손패와 카드 확대·공격 VFX·상점·지도·덱 화면을 자동 비교합니다. 화면 전환과 로딩, 앱 시작 시간도 기록합니다. 고정 시드의 테스트 런과 진행도는 메모리에 분리합니다. 재시작은 자동입니다. 테스트 중에는 조작하거나 화면을 접지 말아 주세요. 완료 후 원래 설정으로 돌아옵니다.",
@@ -236,8 +239,11 @@ public static class Localization
         ["BENCH_SCENE_GEOMETRY"] = "Geometry",
         ["BENCH_SCENE_EFFECTS"] = "Screen effects",
         ["BENCH_SCENE_COMBAT_IDLE"] = "Combat idle",
+        ["BENCH_SCENE_COMBAT_ACTIONS"] = "Combat card attacks",
         ["BENCH_SCENE_COMBAT_CARDS"] = "Hand and card focus",
         ["BENCH_SCENE_COMBAT_EFFECTS"] = "Combat VFX",
+        ["BENCH_SCENE_BOSS_EFFECTS"] = "Kaiser Crab · overlapping effects",
+        ["BENCH_SCENE_WATERFALL_GIANT"] = "Waterfall Giant · steam effects",
         ["BENCH_LOAD_GAME"] = "Preparing actual game screen…",
         ["BENCH_SCENE_MERCHANT"] = "Merchant inventory",
         ["BENCH_SCENE_MAP"] = "Map",
@@ -250,7 +256,7 @@ public static class Localization
         ["BENCH_FIRST_VISIT"] = "First operation this boot",
         ["BENCH_REPEAT_VISIT"] = "Repeated operation this boot",
         ["BENCH_LEGACY_RESULT"] =
-            "These are legacy synthetic results. Do not compare with actual combat measurements.",
+            "These results use an older measurement protocol. Do not compare directly with the new benchmark.",
         ["BENCH_FRAME_TIMES"] = "Frame mean / p95 / p99",
         ["BENCH_RESULTS_HELP"] =
             "Compare within the same screen. Entry timing ends at the first rendered frame; combat also waits for its hand. Room transitions include game fades. First operation refers to this boot, not cleared disk or shader caches. Battery consumption is not measured.",
@@ -264,7 +270,7 @@ public static class Localization
         ["ENGINE_BENCH_START"] = "Start scene measurement",
         ["ENGINE_BENCH_MINIMUM"] = "Minimum FPS / worst frame",
         ["ENGINE_BENCH_INFO"] =
-            "Measure idle combat, merchant and map without captures. Visual settings stay fixed; FPS cap, VSync and native pacing are disabled. Minimum FPS uses the longest frame. Setup and warmup are excluded; measured stalls are retained. Your settings are restored afterward.",
+            $"Play a fixed deck in ordinary combat, Kaiser Crab and Waterfall Giant for up to {RenderBenchmarkCase.CombatTurnLimit} turns or victory. Measure card actions, end turn, orbs, enemy attacks, hits and the next hand through normal game flow. Fixture health and max energy are reported. Identical visuals are enforced; FPS cap and native pacing are disabled, and Mailbox presentation is requested. Actual VSync and refresh rate are reported. No captures; setup and warmup are excluded, measured stalls are retained. Your settings are restored afterward.",
         ["BENCH_TITLE"] = "Rendering benchmark",
         ["BENCH_INFO"] =
             "Automatically compares actual combat, focused cards, attack VFX, merchant inventory, map and deck screens. Records transitions, loading and app startup. Fixed-seed test saves stay in memory. Restarts are automatic. Leave the app untouched and do not resize the screen. Your settings are restored at the end.",

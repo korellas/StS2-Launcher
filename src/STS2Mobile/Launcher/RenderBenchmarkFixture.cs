@@ -5,9 +5,15 @@ using System.Threading.Tasks;
 using Godot;
 using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Multiplayer;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.GameActions;
+using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Characters;
 using MegaCrit.Sts2.Core.Models.Encounters;
 using MegaCrit.Sts2.Core.Nodes;
@@ -33,6 +39,12 @@ public sealed class RenderBenchmarkFixture : IDisposable
     private Player _player;
     private RunState _state;
     private NCombatRoom _room;
+    private Task _combatSequence = Task.CompletedTask;
+    private int _turnsPlayed;
+    private int _cardsPlayed;
+    private string _deck;
+    public string SequenceSummary =>
+        $"turns={_turnsPlayed}, cards={_cardsPlayed}, HP={RenderBenchmarkCase.PlayerHp}->{_player.Creature.CurrentHp}, combatEnded={!CombatManager.Instance.IsInProgress}, deck={_deck}";
     private string _scenario;
     private int _effectStep = -1;
     private ulong _animationStart;
@@ -77,28 +89,26 @@ public sealed class RenderBenchmarkFixture : IDisposable
         GraphicsPatches.StartRuntime(NGame.Instance.GetTree());
     }
 
-    public async Task Build(RenderBenchmarkCase test, bool applyVisuals = true)
+    public async Task Build(RenderBenchmarkCase test)
     {
         using var trace = _trace?.Span($"Build.{test.Scene}.{test.Name}");
+        await FinishActions();
         Dispose();
         LoadTimings.Clear();
         _currentScreen = "Reset";
         _check();
-        if (applyVisuals)
-        {
-            var settings = GraphicsPatches.Settings;
-            settings.RenderScale = test.Scale;
-            SaveManager.Instance.SettingsSave.Msaa = test.Msaa;
-            SaveManager.Instance.SettingsSave.FpsLimit = test.Fps;
-            SaveManager.Instance.SettingsSave.VSync = MegaCrit.Sts2.Core.Settings.VSyncType.Off;
-            settings.Hdr = test.Hdr ? 1 : 0;
-            settings.TextureFilter = test.Filter;
-            settings.DirectCardPortraits = test.Direct;
-            settings.RadialBlurSamples = test.Blur;
-            settings.ScreenDistortion = test.Distortion;
-            settings.BackgroundParticles = test.Particles;
-            GraphicsPatches.GraphicsPreferencesPostfix();
-        }
+        var settings = GraphicsPatches.Settings;
+        settings.RenderScale = test.Scale;
+        SaveManager.Instance.SettingsSave.Msaa = test.Msaa;
+        SaveManager.Instance.SettingsSave.FpsLimit = test.Fps;
+        SaveManager.Instance.SettingsSave.VSync = MegaCrit.Sts2.Core.Settings.VSyncType.Off;
+        settings.Hdr = test.Hdr ? 1 : 0;
+        settings.TextureFilter = test.Filter;
+        settings.DirectCardPortraits = test.Direct;
+        settings.RadialBlurSamples = test.Blur;
+        settings.ScreenDistortion = test.Distortion;
+        settings.BackgroundParticles = test.Particles;
+        GraphicsPatches.GraphicsPreferencesPostfix();
 
         _player = Player.CreateForNewRun<Defect>(UnlockState.all, 1);
         _state = RunState.CreateForNewRun(
@@ -109,6 +119,30 @@ public sealed class RenderBenchmarkFixture : IDisposable
             0,
             RenderBenchmarkCase.Seed
         );
+        if (test.Scene is "CombatTurns" or "KaiserCrabTurns" or "WaterfallGiantTurns")
+        {
+            _player.MaxEnergy = RenderBenchmarkCase.MaxEnergy;
+            await CardPileCmd.RemoveFromDeck(_player.Deck.Cards.ToArray(), showPreview: false);
+            await CardPileCmd.Add(
+                new CardModel[]
+                {
+                    _state.CreateCard<StrikeDefect>(_player),
+                    _state.CreateCard<DefendDefect>(_player),
+                    _state.CreateCard<BallLightning>(_player),
+                    _state.CreateCard<BallLightning>(_player),
+                    _state.CreateCard<SweepingBeam>(_player),
+                    _state.CreateCard<SweepingBeam>(_player),
+                    _state.CreateCard<Glacier>(_player),
+                    _state.CreateCard<Coolheaded>(_player),
+                    _state.CreateCard<MeteorStrike>(_player),
+                    _state.CreateCard<Hyperbeam>(_player),
+                },
+                PileType.Deck,
+                skipVisuals: true
+            );
+            _deck = string.Join(",", _player.Deck.Cards.Select(card => card.Id.Entry));
+        }
+        _turnsPlayed = _cardsPlayed = 0;
         await TimeScreen(
             "Run",
             async () =>
@@ -118,7 +152,7 @@ public sealed class RenderBenchmarkFixture : IDisposable
                 await PreloadManager.LoadRunAssets(new[] { _player.Character });
                 RunManager.Instance.Launch();
                 NGame.Instance.RootSceneContainer.SetCurrentScene(NRun.Create(_state));
-                await RunManager.Instance.SetActInternal(0);
+                await RunManager.Instance.SetActInternal(test.Scene == "KaiserCrabTurns" ? 1 : 0);
             }
         );
         _scenario = test.Scene;
@@ -126,8 +160,11 @@ public sealed class RenderBenchmarkFixture : IDisposable
         switch (test.Scene)
         {
             case "CombatIdle":
+            case "CombatTurns":
             case "CombatCards":
             case "CombatEffects":
+            case "KaiserCrabTurns":
+            case "WaterfallGiantTurns":
                 await OpenCombat(test.Scene, transition: false);
                 break;
             case "Merchant":
@@ -158,9 +195,16 @@ public sealed class RenderBenchmarkFixture : IDisposable
             {
                 if (transition)
                     await NGame.Instance.Transition.RoomFadeOut();
+                bool boss = scenario is "KaiserCrabTurns" or "WaterfallGiantTurns";
+                EncounterModel encounter = scenario switch
+                {
+                    "KaiserCrabTurns" => ModelDb.Encounter<KaiserCrabBoss>().ToMutable(),
+                    "WaterfallGiantTurns" => ModelDb.Encounter<WaterfallGiantBoss>().ToMutable(),
+                    _ => ModelDb.Encounter<ConstructMenagerieNormal>().ToMutable(),
+                };
                 await RunManager.Instance.EnterRoomDebug(
-                    RoomType.Monster,
-                    model: ModelDb.Encounter<ConstructMenagerieNormal>().ToMutable(),
+                    boss ? RoomType.Boss : RoomType.Monster,
+                    model: encounter,
                     showTransition: transition
                 );
                 _room =
@@ -188,6 +232,18 @@ public sealed class RenderBenchmarkFixture : IDisposable
                 }
                 if (scenario == "CombatCards")
                     _room.Ui.Hand.ActiveHolders[0].Call("OnFocus");
+                if (scenario is "CombatTurns" or "KaiserCrabTurns" or "WaterfallGiantTurns")
+                {
+                    await CreatureCmd.SetMaxAndCurrentHp(
+                        _player.Creature,
+                        RenderBenchmarkCase.PlayerHp
+                    );
+                    foreach (var enemy in _room.CreatureNodes.Where(node => !node.Entity.IsPlayer))
+                        await CreatureCmd.SetMaxAndCurrentHp(
+                            enemy.Entity,
+                            RenderBenchmarkCase.TargetHp
+                        );
+                }
             }
         );
     }
@@ -288,7 +344,10 @@ public sealed class RenderBenchmarkFixture : IDisposable
     {
         if (_scenario != "CombatEffects")
             return;
-        int step = (int)((Time.GetTicksUsec() - _animationStart) / 2_000_000);
+        int step = (int)(
+            (Time.GetTicksUsec() - _animationStart)
+            / (RenderBenchmarkCase.EffectIntervalSeconds * 1_000_000UL)
+        );
         if (step == _effectStep)
             return;
         _effectStep = step;
@@ -301,12 +360,109 @@ public sealed class RenderBenchmarkFixture : IDisposable
         _room.RadialBlur(VfxPosition.Center);
     }
 
+    public Task RunCombatTurns() => _combatSequence = RunCombatTurnsCore();
+
+    private async Task RunCombatTurnsCore()
+    {
+        // Start after the sampler is attached, including the first queued action.
+        await NGame.Instance.ToSignal(NGame.Instance.GetTree(), SceneTree.SignalName.ProcessFrame);
+        while (
+            _turnsPlayed < RenderBenchmarkCase.CombatTurnLimit
+            && CombatManager.Instance.IsInProgress
+        )
+        {
+            await WaitForPlayerTurn(0);
+            if (!CombatManager.Instance.IsInProgress)
+                break;
+            int turn = _player.PlayerCombatState.TurnNumber;
+            _turnsPlayed++;
+            while (CombatManager.Instance.IsInProgress && !CombatManager.Instance.IsOverOrEnding)
+            {
+                _check();
+                var target = _player.Creature.CombatState.HittableEnemies.FirstOrDefault();
+                var card = _player
+                    .PlayerCombatState.Hand.Cards.Where(card =>
+                        card.CanPlayTargeting(
+                            card.TargetType == TargetType.AnyEnemy ? target : null
+                        )
+                    )
+                    .OrderByDescending(card =>
+                        card is MeteorStrike ? 2
+                        : card is Hyperbeam ? 1
+                        : 0
+                    )
+                    .FirstOrDefault();
+                if (card == null)
+                    break;
+                await PlayCard(card);
+            }
+            if (!CombatManager.Instance.IsInProgress)
+                break;
+            _check();
+            PlayerCmd.EndTurn(_player, canBackOut: false);
+            await WaitForPlayerTurn(turn);
+        }
+        var tail = NGame.Instance.GetTree().CreateTimer(RenderBenchmarkCase.CombatTailSeconds);
+        await NGame.Instance.ToSignal(tail, SceneTreeTimer.SignalName.Timeout);
+        _check();
+    }
+
+    private async Task WaitForPlayerTurn(int previousTurn)
+    {
+        ulong started = Time.GetTicksMsec();
+        while (
+            CombatManager.Instance.IsInProgress
+            && (
+                _player.PlayerCombatState.TurnNumber <= previousTurn
+                || RunManager.Instance.ActionQueueSynchronizer.CombatState
+                    != ActionSynchronizerCombatState.PlayPhase
+                || RunManager.Instance.ActionExecutor.IsPaused
+            )
+        )
+        {
+            _check();
+            if (Time.GetTicksMsec() - started > 45000)
+                throw new InvalidOperationException("Benchmark enemy turn did not finish");
+            await NGame.Instance.ToSignal(
+                NGame.Instance.GetTree(),
+                SceneTree.SignalName.ProcessFrame
+            );
+        }
+        _check();
+    }
+
+    private async Task PlayCard(CardModel card)
+    {
+        var target =
+            card.TargetType == TargetType.AnyEnemy
+                ? _player.Creature.CombatState.HittableEnemies.First()
+                : null;
+        if (!card.CanPlayTargeting(target))
+            throw new InvalidOperationException(
+                $"Benchmark attack card cannot be played: {card.Id}"
+            );
+        await card.OnEnqueuePlayVfx(target);
+        _check();
+        var action = new PlayCardAction(card, target);
+        RunManager.Instance.ActionQueueSynchronizer.RequestEnqueue(action);
+        await action.CompletionTask.WaitAsync(TimeSpan.FromSeconds(20));
+        if (action.Exception != null)
+            throw new InvalidOperationException("Benchmark attack failed", action.Exception);
+        if (CombatManager.Instance.IsInProgress && card.Pile?.Type == PileType.Hand)
+            throw new InvalidOperationException($"Benchmark card action was cancelled: {card.Id}");
+        _cardsPlayed++;
+        _check();
+    }
+
+    public Task FinishActions() => _combatSequence;
+
     public void Dispose()
     {
+        _combatSequence = Task.CompletedTask;
         _room = null;
         if (!RunManager.Instance.IsInProgress)
             return;
-        RunManager.Instance.CleanUp(graceful: false);
+        RunManager.Instance.CleanUp(graceful: true);
         NGame.Instance.RootSceneContainer.SetCurrentScene(new Control());
         // Keep the mock SaveManager active until the cold restart so quit
         // handlers cannot write benchmark data to the user's real profiles.
