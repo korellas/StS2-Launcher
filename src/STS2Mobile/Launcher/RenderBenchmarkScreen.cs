@@ -56,6 +56,7 @@ public sealed class RenderBenchmarkScreen : Control
     private GraphicsSettings _savedGraphics;
     private RenderBenchmarkFixture _fixture;
     private BenchmarkTrace _trace;
+    private string _traceFailure;
     private bool _running;
     private readonly GodotObject _app;
     private int _pauseCount;
@@ -433,7 +434,12 @@ public sealed class RenderBenchmarkScreen : Control
             _status.Text = Tr("BENCH_LOAD_GAME");
             ulong initializationStart = Time.GetTicksUsec();
 #if BENCHMARK_DEATH_DIAGNOSTICS
-            _trace = BenchmarkTrace.TryStart(_app, GetTree(), recordDeath: _engine);
+            _trace = BenchmarkTrace.TryStart(
+                _app,
+                GetTree(),
+                out _traceFailure,
+                recordDeath: _engine
+            );
 #else
             _trace = _engine ? null : BenchmarkTrace.TryStart(_app, GetTree());
 #endif
@@ -578,7 +584,8 @@ public sealed class RenderBenchmarkScreen : Control
                             _trace?.DeathReport()
                             ?? (
                                 _engine
-                                    ? "Death diagnostics unavailable: hook setup failed; see launcher log."
+                                    ? _traceFailure
+                                        ?? "Death diagnostics unavailable: no setup error was captured."
                                     : null
                             ),
 #else

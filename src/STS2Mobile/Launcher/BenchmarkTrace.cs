@@ -43,6 +43,7 @@ internal sealed class BenchmarkTrace : IDisposable
     private const double StallThresholdMs = 50;
     private readonly long[] _lastCounters = new long[GC.MaxGeneration + 3];
     private ulong _lastFrame;
+    private string _setupStage;
 
     private BenchmarkTrace(SceneTree tree, bool androidTracing, bool recordDeath)
     {
@@ -52,13 +53,32 @@ internal sealed class BenchmarkTrace : IDisposable
         Array.Fill(_lastCounters, -1);
     }
 
-    public static BenchmarkTrace TryStart(GodotObject app, SceneTree tree, bool recordDeath = false)
+    public static BenchmarkTrace TryStart(
+        GodotObject app,
+        SceneTree tree,
+        bool recordDeath = false
+    ) => TryStart(app, tree, out _, recordDeath);
+
+    public static BenchmarkTrace TryStart(
+        GodotObject app,
+        SceneTree tree,
+        out string failure,
+        bool recordDeath = false
+    )
     {
+        failure = null;
+        string stage = "Android tracing support";
         BenchmarkTrace trace = null;
         try
         {
             if (!app.Call("supportsBenchmarkTracing").AsBool())
+            {
+                if (recordDeath)
+                    failure =
+                        "Death diagnostics unavailable: Android tracing support check returned false.";
                 return null;
+            }
+            stage = "ATrace_isEnabled";
             bool androidTracing = ATrace_isEnabled();
             if (!androidTracing && !recordDeath)
                 return null;
@@ -93,6 +113,7 @@ internal sealed class BenchmarkTrace : IDisposable
                 trace.PatchSync(typeof(NCombatRoom), "_Ready");
                 trace.PatchSync(typeof(NCombatRoom), "OnCombatSetUp");
             }
+            trace._setupStage = "ProcessFrame counters";
             tree.ProcessFrame += trace.SampleCounters;
             trace.SampleCounters();
             PatchHelper.Log(
@@ -102,14 +123,17 @@ internal sealed class BenchmarkTrace : IDisposable
         }
         catch (Exception error)
         {
+            failure =
+                $"Death diagnostics unavailable: setup stage={trace?._setupStage ?? stage}\n{error}";
             trace?.Dispose();
-            PatchHelper.Log($"[BenchmarkTrace] Cannot enable markers: {error.Message}");
+            PatchHelper.Log($"[BenchmarkTrace] Cannot enable markers: {failure}");
             return null;
         }
     }
 
     private void PatchTask(Type type, string name, Type[] parameters = null)
     {
+        _setupStage = type.FullName + "." + name;
         var method = AccessTools.Method(type, name, parameters);
         if (method == null || method.ReturnType != typeof(Task))
             throw new MissingMethodException(type.FullName, name);
@@ -123,6 +147,7 @@ internal sealed class BenchmarkTrace : IDisposable
 
     private void PatchSync(Type type, string name)
     {
+        _setupStage = type.FullName + "." + name;
         var method = AccessTools.Method(type, name);
         if (method == null || typeof(Task).IsAssignableFrom(method.ReturnType))
             throw new MissingMethodException(type.FullName, name);

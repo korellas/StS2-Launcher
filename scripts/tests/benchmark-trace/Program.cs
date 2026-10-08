@@ -5,6 +5,7 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
+using STS2Mobile;
 using STS2Mobile.Launcher;
 
 namespace BenchmarkTraceTests
@@ -29,6 +30,11 @@ namespace BenchmarkTraceTests
             var app = new GodotObject();
             var tree = new SceneTree();
             app.Supported = false;
+            Check(
+                BenchmarkTrace.TryStart(app, tree, out string supportFailure, recordDeath: true) == null
+                    && supportFailure.Contains("support check returned false"),
+                "Unsupported Android must explain why diagnostics could not start"
+            );
             Check(BenchmarkTrace.TryStart(app, tree) == null, "Unsupported Android must skip hooks");
             app.Supported = true;
             trace_enabled(false);
@@ -109,6 +115,22 @@ namespace BenchmarkTraceTests
                 );
             }
             Check(tree.Listeners == 0, "Standalone death diagnostics leaked its frame callback");
+            RenderingServer.FailNext = true;
+            Check(
+                BenchmarkTrace.TryStart(app, tree, out string setupFailure, recordDeath: true) == null,
+                "Counter setup failure should disable diagnostics"
+            );
+            Check(
+                PatchHelper.Messages.Last().Contains("ProcessFrame counters")
+                    && PatchHelper.Messages.Last().Contains("native counter detail"),
+                "Setup failure must retain its stage and inner exception for copied reports"
+            );
+            Check(
+                setupFailure.Contains("ProcessFrame counters")
+                    && setupFailure.Contains("native counter detail"),
+                "Caller must receive the complete failure for the benchmark result"
+            );
+            Check(tree.Listeners == 0, "Failed setup leaked its frame callback");
             Console.WriteLine("Benchmark trace task, exception, gating and cleanup tests passed");
         }
     }
@@ -133,7 +155,16 @@ namespace Godot
     {
         public enum RenderingInfo { PipelineCompilationsCanvas, PipelineCompilationsSpecialization }
         public static ulong Canvas;
-        public static ulong GetRenderingInfo(RenderingInfo value) => value == RenderingInfo.PipelineCompilationsCanvas ? Canvas : 0;
+        public static bool FailNext;
+        public static ulong GetRenderingInfo(RenderingInfo value)
+        {
+            if (FailNext)
+            {
+                FailNext = false;
+                throw new InvalidOperationException("counter unavailable", new NotSupportedException("native counter detail"));
+            }
+            return value == RenderingInfo.PipelineCompilationsCanvas ? Canvas : 0;
+        }
     }
 }
 
@@ -210,7 +241,15 @@ namespace MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen
 
 namespace STS2Mobile
 {
-    public static class PatchHelper { public static void Log(string text) => Console.WriteLine(text); }
+    public static class PatchHelper
+    {
+        public static readonly List<string> Messages = new();
+        public static void Log(string text)
+        {
+            Messages.Add(text);
+            Console.WriteLine(text);
+        }
+    }
 }
 
 namespace MegaCrit.Sts2.Core.Assets
